@@ -1,2 +1,77 @@
-# docker-compose.yml placeholder
+version: '3.8'
 
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: videogen
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: devpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://dev:devpass@postgres:5432/videogen
+      REDIS_URL: redis://redis:6379/0
+      REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${S3_BUCKET:-videogen-outputs-dev}
+      AWS_REGION: us-east-2
+    volumes:
+      - ./app:/app/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://dev:devpass@postgres:5432/videogen
+      REDIS_URL: redis://redis:6379/0
+      REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${S3_BUCKET:-videogen-outputs-dev}
+      AWS_REGION: us-east-2
+    volumes:
+      - ./app:/app/app
+    command: celery -A app.orchestrator.celery_app worker --loglevel=info --concurrency=4
+
+volumes:
+  postgres_data:
