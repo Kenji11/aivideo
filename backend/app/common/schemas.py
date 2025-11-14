@@ -51,3 +51,19 @@ class VideoResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime]
     spec: Optional[Dict]
+
+class VideoListItem(BaseModel):
+    """Video item in list response"""
+    video_id: str
+    title: str
+    status: str
+    progress: float
+    final_video_url: Optional[str]
+    cost_usd: float
+    created_at: datetime
+    completed_at: Optional[datetime]
+
+class VideoListResponse(BaseModel):
+    """Response from videos list endpoint"""
+    videos: List[VideoListItem]
+    total: int
