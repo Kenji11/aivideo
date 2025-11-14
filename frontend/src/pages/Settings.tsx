@@ -101,13 +101,13 @@ export function Settings({ onBack }: SettingsProps) {
               </div>
               <button
                 onClick={() => setNotifications(!notifications)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors ${
-                  notifications ? 'bg-blue-600' : 'bg-slate-300'
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                  notifications ? 'bg-blue-600 dark:bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'
                 }`}
               >
                 <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                    notifications ? 'translate-x-5' : 'translate-x-1'
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform ${
+                    notifications ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>
@@ -120,13 +120,13 @@ export function Settings({ onBack }: SettingsProps) {
               </div>
               <button
                 onClick={() => setEmailDigest(!emailDigest)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors ${
-                  emailDigest ? 'bg-blue-600' : 'bg-slate-300'
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                  emailDigest ? 'bg-blue-600 dark:bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'
                 }`}
               >
                 <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                    emailDigest ? 'translate-x-5' : 'translate-x-1'
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform ${
+                    emailDigest ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>
@@ -153,13 +153,13 @@ export function Settings({ onBack }: SettingsProps) {
               </div>
               <button
                 onClick={() => setAutoDownload(!autoDownload)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors ${
-                  autoDownload ? 'bg-blue-600' : 'bg-slate-300'
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                  autoDownload ? 'bg-blue-600 dark:bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'
                 }`}
               >
                 <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                    autoDownload ? 'translate-x-5' : 'translate-x-1'
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg transition-transform ${
+                    autoDownload ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>
