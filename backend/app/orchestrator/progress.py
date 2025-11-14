@@ -1,8 +1,9 @@
 # Update DB progress/status
-from app.database import SessionLocal
-from app.common.models import VideoGeneration, VideoStatus
 from datetime import datetime
 from typing import Optional
+from sqlalchemy.orm import Session
+from app.database import SessionLocal
+from app.common.models import VideoGeneration, VideoStatus
 
 
 def update_progress(
@@ -10,15 +11,21 @@ def update_progress(
     status: str,
     progress: Optional[float] = None,
     **kwargs
-):
+) -> None:
     """
     Update video generation progress in database.
     
     Args:
         video_id: Unique identifier for the video
         status: Status string (e.g., "validating", "generating_animatic", "complete", "failed")
-        progress: Progress percentage (0-100)
-        **kwargs: Additional fields to update (current_phase, error, spec, animatic_urls, etc.)
+        progress: Progress percentage (0-100), optional
+        **kwargs: Additional fields to update
+            - current_phase: str
+            - spec: dict
+            - error_message: str
+            - animatic_urls: list
+            - total_cost: float
+            - generation_time: float
     """
     db = SessionLocal()
     try:
@@ -81,9 +88,9 @@ def update_progress(
         db.close()
 
 
-def update_cost(video_id: str, phase: str, cost: float):
+def update_cost(video_id: str, phase: str, cost: float) -> None:
     """
-    Update cost tracking for a specific phase.
+    Update cost breakdown for a specific phase.
     
     Args:
         video_id: Unique identifier for the video
@@ -91,20 +98,22 @@ def update_cost(video_id: str, phase: str, cost: float):
         cost: Cost in USD for this phase
     """
     db = SessionLocal()
+    
     try:
         video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
         
         if video:
-            # Initialize cost_breakdown if null
+            # Initialize cost_breakdown if None
             if video.cost_breakdown is None:
                 video.cost_breakdown = {}
             
             # Update phase cost
             video.cost_breakdown[phase] = cost
             
-            # Sum all costs and update total
+            # Recalculate total cost
             video.cost_usd = sum(video.cost_breakdown.values())
             
             db.commit()
+    
     finally:
         db.close()

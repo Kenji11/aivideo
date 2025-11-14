@@ -1,2 +1,56 @@
-{}
-
+{
+  "name": "Announcement",
+  "description": "Dramatic announcement video with cinematic impact",
+  "duration": 30,
+  "fps": 30,
+  "resolution": "1920x1080",
+  "beats": [
+    {
+      "name": "attention_grabber",
+      "start": 0,
+      "duration": 5,
+      "shot_type": "wide",
+      "action": "dramatic_intro",
+      "prompt_template": "Dramatic wide cinematic intro, {style_aesthetic}, attention-grabbing opening",
+      "camera_movement": "crane_down"
+    },
+    {
+      "name": "message_reveal",
+      "start": 5,
+      "duration": 10,
+      "shot_type": "medium",
+      "action": "show_message",
+      "prompt_template": "Medium shot revealing the announcement about {product_name}, {style_aesthetic}, impactful message",
+      "camera_movement": "push_in"
+    },
+    {
+      "name": "supporting_visual",
+      "start": 15,
+      "duration": 10,
+      "shot_type": "close_up",
+      "action": "visual_emphasis",
+      "prompt_template": "Close-up emphasizing key visual of {product_name}, {style_aesthetic}, powerful imagery",
+      "camera_movement": "slow_zoom"
+    },
+    {
+      "name": "call_to_action",
+      "start": 25,
+      "duration": 5,
+      "shot_type": "wide",
+      "action": "final_message",
+      "prompt_template": "Wide cinematic finale with {product_name}, {style_aesthetic}, memorable call-to-action",
+      "camera_movement": "crane_up"
+    }
+  ],
+  "transitions": [
+    {"type": "fade", "duration": 0.5},
+    {"type": "fade", "duration": 0.5},
+    {"type": "cut"}
+  ],
+  "audio": {
+    "music_style": "cinematic_epic",
+    "tempo": "moderate",
+    "mood": "inspiring"
+  },
+  "color_grading": "elegant_muted.cube"
+}
