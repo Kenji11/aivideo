@@ -23,3 +23,13 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-gray-400 dark:bg-slate-500;
 }
+
+/* Hide scrollbar for navigation */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
