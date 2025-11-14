@@ -17,6 +17,7 @@ import { VideoLibrary } from './pages/VideoLibrary';
 import { Billing } from './pages/Billing';
 import { API } from './pages/API';
 import { supabase, Project } from './lib/supabase';
+import { api } from './lib/api';
 
 type AppStep = 'projects' | 'create' | 'processing' | 'preview' | 'download' | 'templates' | 'settings' | 'analytics' | 'dashboard' | 'library' | 'billing' | 'api' | 'export';
 
@@ -32,6 +33,8 @@ function App() {
   const [processingProgress, setProcessingProgress] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [referenceAssets, setReferenceAssets] = useState<string[]>([]);
+  const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
 
   const steps = [
     { id: 1, name: 'Create', icon: Sparkles },
@@ -66,10 +69,48 @@ function App() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!prompt.trim() || !title.trim()) {
+      addNotification('error', 'Validation Error', 'Please fill in all required fields.');
+      return;
+    }
+
+    // Validate prompt length (backend requires min 10 chars)
+    if (prompt.trim().length < 10) {
+      addNotification('error', 'Validation Error', 'Prompt must be at least 10 characters long.');
+      return;
+    }
+
     setIsProcessing(true);
     setElapsedTime(0);
     setProcessingProgress(0);
-    setAppStep('processing');
+
+    try {
+      // Call API to generate video
+      const response = await api.generateVideo({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        prompt: prompt.trim(),
+        reference_assets: referenceAssets,
+      });
+
+      // Store video ID for tracking
+      setCurrentVideoId(response.video_id);
+      
+      // Show success notification
+      addNotification('success', 'Video Generation Started', response.message || 'Your video is being generated.');
+      
+      // Switch to processing view
+      setAppStep('processing');
+    } catch (error) {
+      // Handle errors
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start video generation. Please try again.';
+      addNotification('error', 'Generation Failed', errorMessage);
+      
+      // Reset processing state
+      setIsProcessing(false);
+    }
   };
 
   const handleProjectSelect = (project: Project) => {
@@ -321,6 +362,7 @@ function App() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Reference Materials
                 </label>
+                {/* TODO: Task 3 - Connect asset upload to collect asset IDs */}
                 <UploadZone disabled={isProcessing} />
               </div>
 
