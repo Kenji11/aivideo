@@ -89,7 +89,7 @@ def get_db():
 
 def init_db():
     """Initialize database (create tables)"""
-    from app.common.models import VideoGeneration
+    from app.common.models import VideoGeneration, Asset
     Base.metadata.create_all(bind=engine)
 ```
 
@@ -104,7 +104,7 @@ def init_db():
 
 **File:** `backend/app/common/models.py`
 ```python
-from sqlalchemy import Column, String, Float, DateTime, JSON, Enum as SQLEnum
+from sqlalchemy import Column, String, Float, DateTime, JSON, Enum as SQLEnum, Integer
 from sqlalchemy.sql import func
 from app.database import Base
 import enum
@@ -121,6 +121,40 @@ class VideoStatus(str, enum.Enum):
     COMPLETE = "complete"
     FAILED = "failed"
 
+class AssetType(str, enum.Enum):
+    """Asset type"""
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
+
+class AssetSource(str, enum.Enum):
+    """Asset source"""
+    USER_UPLOAD = "user_upload"
+    SYSTEM_GENERATED = "system_generated"
+
+class Asset(Base):
+    """Asset record for uploaded and generated assets"""
+    __tablename__ = "assets"
+    
+    # Primary
+    id = Column(String, primary_key=True)
+    user_id = Column(String, nullable=True)  # Null if system-generated
+    
+    # Asset details
+    s3_key = Column(String, nullable=False)  # S3 key/path
+    s3_url = Column(String, nullable=True)  # Full S3 URL or presigned URL
+    asset_type = Column(SQLEnum(AssetType), nullable=False)
+    source = Column(SQLEnum(AssetSource), nullable=False)
+    
+    # Metadata
+    file_name = Column(String, nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
+    mime_type = Column(String, nullable=True)
+    metadata = Column(JSON, default=dict)  # Additional metadata (dimensions, duration, etc.)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
 class VideoGeneration(Base):
     """Video generation record"""
     __tablename__ = "video_generations"
@@ -129,9 +163,14 @@ class VideoGeneration(Base):
     id = Column(String, primary_key=True)
     user_id = Column(String, nullable=True)
     
+    # Video details
+    title = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    
     # Input
     prompt = Column(String, nullable=False)
-    uploaded_assets = Column(JSON, default=list)
+    prompt_validated = Column(String, nullable=True)  # Validated/cleaned prompt after Phase 1
+    reference_assets = Column(JSON, default=list)  # List of asset IDs
     
     # Spec (from Phase 1)
     spec = Column(JSON, nullable=True)
@@ -145,7 +184,6 @@ class VideoGeneration(Base):
     
     # Phase Outputs
     animatic_urls = Column(JSON, default=list)
-    reference_urls = Column(JSON, default=dict)
     chunk_urls = Column(JSON, default=list)
     stitched_url = Column(String, nullable=True)
     refined_url = Column(String, nullable=True)
@@ -160,12 +198,15 @@ class VideoGeneration(Base):
 ```
 
 - [x] Create VideoStatus enum with all status values
+- [x] Create AssetType and AssetSource enums
+- [x] Create Asset model class for tracking uploaded and generated assets
 - [x] Create VideoGeneration model class
 - [x] Add primary fields (id, user_id)
-- [x] Add input fields (prompt, uploaded_assets)
+- [x] Add video details (title required, description optional)
+- [x] Add input fields (prompt, prompt_validated, reference_assets)
 - [x] Add spec fields from Phase 1
 - [x] Add status tracking fields
-- [x] Add phase output URL fields
+- [x] Add phase output URL fields (removed reference_urls - now tracked in assets table)
 - [x] Add metadata fields (cost, timing, timestamps)
 
 ### Task 3.4: Implement app/common/schemas.py
