@@ -1,0 +1,2 @@
+# FFmpeg stitching + transitions
+

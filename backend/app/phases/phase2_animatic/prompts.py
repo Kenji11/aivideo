@@ -1,0 +1,2 @@
+# Animatic prompt generation
+
