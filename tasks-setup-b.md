@@ -1,12 +1,13 @@
 # Setup Tasks - Part B: Shared Code & Database
 
 **Owner:** Either person (coordinate who does what)  
-**Time Estimate:** 1-2 hours  
 **Goal:** Implement shared code that both phases will use
 
 ---
 
-## Task 1: Implement app/config.py
+## PR #3: Configuration & Database Setup
+
+### Task 3.1: Implement app/config.py
 
 **File:** `backend/app/config.py`
 ```python
@@ -46,9 +47,15 @@ def get_settings() -> Settings:
     return Settings()
 ```
 
----
+- [ ] Create Settings class with all configuration fields
+- [ ] Add database configuration
+- [ ] Add Redis configuration
+- [ ] Add external API configuration (Replicate, OpenAI)
+- [ ] Add AWS configuration
+- [ ] Add application environment settings
+- [ ] Implement cached `get_settings()` function
 
-## Task 2: Implement app/database.py
+### Task 3.2: Implement app/database.py
 
 **File:** `backend/app/database.py`
 ```python
@@ -86,9 +93,14 @@ def init_db():
     Base.metadata.create_all(bind=engine)
 ```
 
----
+- [ ] Import settings and create SQLAlchemy engine
+- [ ] Configure connection pool settings
+- [ ] Create SessionLocal factory
+- [ ] Create Base class for models
+- [ ] Implement `get_db()` dependency function
+- [ ] Implement `init_db()` function to create tables
 
-## Task 3: Implement app/common/models.py
+### Task 3.3: Implement app/common/models.py
 
 **File:** `backend/app/common/models.py`
 ```python
@@ -147,9 +159,16 @@ class VideoGeneration(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
 ```
 
----
+- [ ] Create VideoStatus enum with all status values
+- [ ] Create VideoGeneration model class
+- [ ] Add primary fields (id, user_id)
+- [ ] Add input fields (prompt, uploaded_assets)
+- [ ] Add spec fields from Phase 1
+- [ ] Add status tracking fields
+- [ ] Add phase output URL fields
+- [ ] Add metadata fields (cost, timing, timestamps)
 
-## Task 4: Implement app/common/schemas.py
+### Task 3.4: Implement app/common/schemas.py
 
 **File:** `backend/app/common/schemas.py`
 ```python
@@ -208,9 +227,14 @@ class VideoResponse(BaseModel):
     spec: Optional[Dict]
 ```
 
----
+- [ ] Create PhaseInput schema for phase task inputs
+- [ ] Create PhaseOutput schema for phase task outputs
+- [ ] Create GenerateRequest schema for API
+- [ ] Create GenerateResponse schema for API
+- [ ] Create StatusResponse schema for status endpoint
+- [ ] Create VideoResponse schema for video endpoint
 
-## Task 5: Implement app/common/exceptions.py
+### Task 3.5: Implement app/common/exceptions.py
 
 **File:** `backend/app/common/exceptions.py`
 ```python
@@ -231,9 +255,12 @@ class ValidationException(VideoGenException):
     pass
 ```
 
----
+- [ ] Create VideoGenException base class
+- [ ] Create PhaseException for phase errors
+- [ ] Create ExternalAPIException for API errors
+- [ ] Create ValidationException for validation errors
 
-## Task 6: Implement app/common/constants.py
+### Task 3.6: Implement app/common/constants.py
 
 **File:** `backend/app/common/constants.py`
 ```python
@@ -264,9 +291,16 @@ PHASE5_TIMEOUT = 300
 PHASE6_TIMEOUT = 180
 ```
 
+- [ ] Add video specification constants
+- [ ] Add API cost constants
+- [ ] Add S3 path prefix constants
+- [ ] Add phase timeout constants
+
 ---
 
-## Task 7: Implement app/main.py
+## PR #4: FastAPI Application & Service Clients
+
+### Task 4.1: Implement app/main.py
 
 **File:** `backend/app/main.py`
 ```python
@@ -312,9 +346,16 @@ async def root():
     }
 ```
 
----
+- [ ] Create FastAPI app instance
+- [ ] Add CORS middleware
+- [ ] Include health router
+- [ ] Include generate router
+- [ ] Include status router
+- [ ] Include video router
+- [ ] Add startup event to initialize database
+- [ ] Add root endpoint
 
-## Task 8: Implement app/api/health.py
+### Task 4.2: Implement app/api/health.py
 
 **File:** `backend/app/api/health.py`
 ```python
@@ -328,11 +369,13 @@ async def health_check():
     return {"status": "ok"}
 ```
 
----
+- [ ] Create APIRouter instance
+- [ ] Implement health check endpoint
+- [ ] Return simple status response
 
-## Task 9: Implement Service Skeletons
+### Task 4.3: Implement Service Clients
 
-### 9.1 app/services/__init__.py
+#### 4.3a: app/services/__init__.py
 ```python
 from .replicate import replicate_client
 from .openai import openai_client
@@ -347,7 +390,10 @@ __all__ = [
 ]
 ```
 
-### 9.2 app/services/replicate.py
+- [ ] Import all service clients
+- [ ] Export in `__all__`
+
+#### 4.3b: app/services/replicate.py
 ```python
 import replicate
 from app.config import get_settings
@@ -365,7 +411,13 @@ class ReplicateClient:
 replicate_client = ReplicateClient()
 ```
 
-### 9.3 app/services/openai.py
+- [ ] Import replicate and get settings
+- [ ] Create ReplicateClient class
+- [ ] Initialize client with API token
+- [ ] Implement `run()` method
+- [ ] Create singleton instance
+
+#### 4.3c: app/services/openai.py
 ```python
 from openai import OpenAI
 from app.config import get_settings
@@ -383,7 +435,13 @@ class OpenAIClient:
 openai_client = OpenAIClient()
 ```
 
-### 9.4 app/services/s3.py
+- [ ] Import OpenAI and get settings
+- [ ] Create OpenAIClient class
+- [ ] Initialize client with API key
+- [ ] Add chat property
+- [ ] Create singleton instance
+
+#### 4.3d: app/services/s3.py
 ```python
 import boto3
 from app.config import get_settings
@@ -416,7 +474,14 @@ class S3Client:
 s3_client = S3Client()
 ```
 
-### 9.5 app/services/ffmpeg.py
+- [ ] Import boto3 and get settings
+- [ ] Create S3Client class
+- [ ] Initialize boto3 client with credentials
+- [ ] Implement `upload_file()` method
+- [ ] Implement `generate_presigned_url()` method
+- [ ] Create singleton instance
+
+#### 4.3e: app/services/ffmpeg.py
 ```python
 import subprocess
 
@@ -434,25 +499,29 @@ class FFmpegService:
 ffmpeg_service = FFmpegService()
 ```
 
+- [ ] Import subprocess
+- [ ] Create FFmpegService class
+- [ ] Implement `run_command()` method
+- [ ] Create singleton instance
+
 ---
 
-## ✅ Checkpoint
+## ✅ PR #3 & #4 Checklist
 
-After completing these tasks, you should have:
-- ✅ Configuration system working
-- ✅ Database models defined
-- ✅ Shared schemas for phase contracts
-- ✅ FastAPI app with health endpoint
-- ✅ Service clients (skeleton)
+Before merging:
+- [ ] Configuration system working
+- [ ] Database models defined
+- [ ] All shared schemas created
+- [ ] FastAPI app starts without errors
+- [ ] Health endpoint accessible at http://localhost:8000/health
+- [ ] API docs visible at http://localhost:8000/docs
+- [ ] All service clients instantiate without errors
 
-**Test:**
+**Test Commands:**
 ```bash
 docker-compose up --build
 curl http://localhost:8000/health
-# Should return: {"status": "ok"}
-
 curl http://localhost:8000/docs
-# Should show FastAPI docs
 ```
 
-**Next:** Person A → `tasks-phase-1a.md`, Person handling Phase 2 → `tasks-phase-2a.md`
+**Next:** Person A → `tasks-phase-1a.md`, Person B → `tasks-phase-2a.md`

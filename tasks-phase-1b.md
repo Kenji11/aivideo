@@ -1,419 +1,237 @@
 # Phase 1 Tasks - Part B: Implementation
 
 **Owner:** Person handling Phase 1  
-**Time Estimate:** 2-3 hours  
 **Goal:** Implement prompt validation service and task
 
 ---
 
-## Task 1: Implement Validation Service
+## PR #7: Validation Service
+
+### Task 7.1: Implement PromptValidationService Class
 
 **File:** `backend/app/phases/phase1_validate/service.py`
-```python
-from app.services.openai import openai_client
-from app.phases.phase1_validate.templates import load_template, validate_template_choice
-from app.phases.phase1_validate.schemas import VideoSpec, StyleSpec, ProductSpec, AudioSpec, BeatSpec, TransitionSpec
-from app.common.exceptions import ValidationException
-import json
-from typing import Dict, List
 
-class PromptValidationService:
-    """Service for validating and extracting structured specs from prompts"""
-    
-    def __init__(self):
-        self.openai = openai_client
-    
-    def validate_and_extract(self, prompt: str, assets: List[dict]) -> Dict:
-        """
-        Extract structured specification from natural language prompt.
-        
-        Args:
-            prompt: User's natural language prompt
-            assets: List of uploaded assets
-            
-        Returns:
-            Complete video specification dict
-        """
-        # Step 1: Extract basic intent from prompt
-        extracted = self._extract_intent(prompt)
-        
-        # Step 2: Load and merge with template
-        template_name = extracted.get('template', 'product_showcase')
-        
-        if not validate_template_choice(template_name):
-            template_name = 'product_showcase'  # Fallback
-        
-        template = load_template(template_name)
-        
-        # Step 3: Merge extracted data with template
-        full_spec = self._merge_with_template(extracted, template)
-        
-        # Step 4: Add uploaded assets
-        full_spec['uploaded_assets'] = assets
-        
-        # Step 5: Validate final spec
-        self._validate_spec(full_spec)
-        
-        return full_spec
-    
-    def _extract_intent(self, prompt: str) -> Dict:
-        """Use GPT-4 to extract structured intent from prompt"""
-        
-        system_prompt = """You are a video production assistant. Extract structured specifications from user prompts.
+- [ ] Import necessary dependencies (openai_client, templates, schemas, exceptions)
+- [ ] Create PromptValidationService class
+- [ ] Add `__init__` method to initialize OpenAI client
 
-Available templates:
-- product_showcase: Focus on product features and details (luxury items, tech gadgets, high-end products)
-- lifestyle_ad: Show product in real-world context (everyday products, consumer goods)
-- announcement: Brand message or campaign announcement (new launches, company news)
+### Task 7.2: Implement validate_and_extract Method
 
-Analyze the user's prompt and return JSON with:
-{
-    "template": "product_showcase",
-    "style": {
-        "aesthetic": "luxury" | "modern" | "minimalist" | "vibrant" | "elegant",
-        "color_palette": ["gold", "black", "white"],
-        "mood": "elegant" | "energetic" | "professional" | "casual",
-        "lighting": "dramatic" | "natural" | "studio" | "soft"
-    },
-    "product": {
-        "name": "luxury watch",
-        "category": "accessories" | "electronics" | "fashion" | "food" | "other"
-    },
-    "audio": {
-        "music_style": "orchestral" | "pop" | "electronic" | "acoustic",
-        "tempo": "slow" | "moderate" | "fast",
-        "mood": "sophisticated" | "energetic" | "inspiring" | "calm"
-    }
-}
+- [ ] Create `validate_and_extract(prompt, assets)` method signature
+- [ ] Add docstring explaining method purpose
+- [ ] Call `_extract_intent(prompt)` to get extracted data
+- [ ] Extract template_name with fallback to 'product_showcase'
+- [ ] Validate template choice
+- [ ] Load template using template loader
+- [ ] Call `_merge_with_template(extracted, template)`
+- [ ] Add uploaded assets to spec
+- [ ] Call `_validate_spec(full_spec)`
+- [ ] Return full spec dictionary
 
-IMPORTANT: Return ONLY valid JSON, no other text."""
+### Task 7.3: Implement _extract_intent Method
 
-        try:
-            response = self.openai.chat.completions.create(
-                model="gpt-4-turbo-preview",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.3
-            )
-            
-            extracted = json.loads(response.choices[0].message.content)
-            return extracted
-            
-        except Exception as e:
-            raise ValidationException(f"Failed to extract intent: {str(e)}")
-    
-    def _merge_with_template(self, extracted: Dict, template: Dict) -> Dict:
-        """Merge extracted data with template structure"""
-        
-        # Start with template as base
-        spec = template.copy()
-        
-        # Update with extracted values
-        spec['template'] = extracted.get('template', template['name'])
-        
-        # Merge style
-        if 'style' in extracted:
-            spec['style'] = extracted['style']
-        
-        # Merge product
-        if 'product' in extracted:
-            spec['product'] = extracted['product']
-        
-        # Merge audio
-        if 'audio' in extracted:
-            spec['audio'].update(extracted['audio'])
-        
-        # Enrich beat prompts with extracted data
-        for beat in spec['beats']:
-            beat['prompt_template'] = beat['prompt_template'].format(
-                product=spec.get('product', {}).get('name', 'product'),
-                background='elegant background',
-                style=spec.get('style', {}).get('aesthetic', 'modern'),
-                setting='modern setting'
-            )
-        
-        return spec
-    
-    def _validate_spec(self, spec: Dict):
-        """Validate final specification"""
-        
-        required_fields = ['template', 'duration', 'fps', 'resolution', 'beats', 'transitions']
-        
-        for field in required_fields:
-            if field not in spec:
-                raise ValidationException(f"Missing required field: {field}")
-        
-        # Validate beats
-        if not spec['beats']:
-            raise ValidationException("Spec must have at least one beat")
-        
-        # Validate total duration matches beats
-        total_duration = sum(beat['duration'] for beat in spec['beats'])
-        if abs(total_duration - spec['duration']) > 1:  # Allow 1s tolerance
-            raise ValidationException(f"Beat durations ({total_duration}s) don't match total duration ({spec['duration']}s)")
-```
+- [ ] Create `_extract_intent(prompt)` private method
+- [ ] Define system prompt for GPT-4 with template descriptions
+- [ ] Add JSON structure example in system prompt
+- [ ] Call OpenAI API with GPT-4 Turbo
+- [ ] Set response_format to json_object
+- [ ] Set temperature to 0.3 for consistency
+- [ ] Parse JSON response
+- [ ] Add try/except for API errors
+- [ ] Raise ValidationException on failure
+
+### Task 7.4: Implement _merge_with_template Method
+
+- [ ] Create `_merge_with_template(extracted, template)` private method
+- [ ] Copy template as base spec
+- [ ] Update template field from extracted data
+- [ ] Merge style from extracted if present
+- [ ] Merge product from extracted if present
+- [ ] Merge audio from extracted if present
+- [ ] Enrich beat prompts with extracted data (format prompt_template strings)
+- [ ] Return merged spec
+
+### Task 7.5: Implement _validate_spec Method
+
+- [ ] Create `_validate_spec(spec)` private method
+- [ ] Define required_fields list
+- [ ] Check all required fields are present
+- [ ] Raise ValidationException if any missing
+- [ ] Validate beats list is not empty
+- [ ] Calculate total duration from beats
+- [ ] Validate total duration matches spec duration (with 1s tolerance)
+- [ ] Raise ValidationException if duration mismatch
 
 ---
 
-## Task 2: Implement Phase 1 Task
+## PR #8: Phase 1 Task & Tests
+
+### Task 8.1: Implement Phase 1 Celery Task
 
 **File:** `backend/app/phases/phase1_validate/task.py`
-```python
-from app.orchestrator.celery_app import celery_app
-from app.common.schemas import PhaseOutput
-from app.phases.phase1_validate.service import PromptValidationService
-from app.common.constants import COST_GPT4_TURBO
-import time
-from typing import List
 
-@celery_app.task(bind=True)
-def validate_prompt(self, video_id: str, prompt: str, assets: List[dict]) -> dict:
-    """
-    Phase 1: Validate prompt and extract structured specification.
-    
-    Args:
-        video_id: Unique video ID
-        prompt: User's natural language prompt
-        assets: List of uploaded assets
-        
-    Returns:
-        PhaseOutput dict with extracted spec
-    """
-    start_time = time.time()
-    
-    try:
-        # Initialize service
-        service = PromptValidationService()
-        
-        # Extract and validate spec
-        spec = service.validate_and_extract(prompt, assets)
-        
-        # Success
-        output = PhaseOutput(
-            video_id=video_id,
-            phase="phase1_validate",
-            status="success",
-            output_data={"spec": spec},
-            cost_usd=COST_GPT4_TURBO,
-            duration_seconds=time.time() - start_time,
-            error_message=None
-        )
-        
-        return output.dict()
-        
-    except Exception as e:
-        # Failure
-        output = PhaseOutput(
-            video_id=video_id,
-            phase="phase1_validate",
-            status="failed",
-            output_data={},
-            cost_usd=0.0,
-            duration_seconds=time.time() - start_time,
-            error_message=str(e)
-        )
-        
-        return output.dict()
-```
+- [ ] Import celery_app from orchestrator
+- [ ] Import PhaseOutput from common.schemas
+- [ ] Import PromptValidationService
+- [ ] Import COST_GPT4_TURBO constant
+- [ ] Import time module
 
----
+### Task 8.2: Implement validate_prompt Task Function
 
-## Task 3: Create Unit Tests
+- [ ] Create `@celery_app.task(bind=True)` decorator
+- [ ] Define `validate_prompt(self, video_id, prompt, assets)` signature
+- [ ] Add docstring with Args and Returns
+- [ ] Record start_time
+- [ ] Wrap logic in try/except block
+
+### Task 8.3: Implement Success Path
+
+- [ ] Initialize PromptValidationService
+- [ ] Call service.validate_and_extract(prompt, assets)
+- [ ] Create PhaseOutput with success status
+- [ ] Set video_id, phase="phase1_validate"
+- [ ] Set output_data={"spec": spec}
+- [ ] Set cost_usd=COST_GPT4_TURBO
+- [ ] Calculate duration_seconds
+- [ ] Return output.dict()
+
+### Task 8.4: Implement Error Path
+
+- [ ] In except block, create PhaseOutput with failed status
+- [ ] Set empty output_data
+- [ ] Set cost_usd=0.0
+- [ ] Calculate duration_seconds
+- [ ] Set error_message=str(e)
+- [ ] Return output.dict()
+
+### Task 8.5: Create Unit Tests
 
 **File:** `backend/app/tests/test_phase1/test_validation.py`
-```python
-import pytest
-from app.phases.phase1_validate.service import PromptValidationService
-from app.phases.phase1_validate.templates import load_template, list_templates
-from app.common.exceptions import ValidationException
 
-def test_list_templates():
-    """Test template listing"""
-    templates = list_templates()
-    assert len(templates) == 3
-    assert "product_showcase" in templates
-    assert "lifestyle_ad" in templates
-    assert "announcement" in templates
+- [ ] Import pytest
+- [ ] Import PromptValidationService, templates functions, ValidationException
+- [ ] Create `test_list_templates()` - verify 3 templates exist
+- [ ] Create `test_load_template()` - verify product_showcase loads correctly
+- [ ] Create `test_load_invalid_template()` - verify raises ValueError
+- [ ] Create `test_validate_spec_missing_fields()` - verify catches missing fields
+- [ ] Add `@pytest.mark.skipif` for tests requiring API keys
+- [ ] Create `test_validate_prompt()` - test with real API (if key present)
 
-def test_load_template():
-    """Test template loading"""
-    template = load_template("product_showcase")
-    assert template['name'] == "product_showcase"
-    assert template['duration'] == 30
-    assert len(template['beats']) == 5
+### Task 8.6: Create Manual Test Script
 
-def test_load_invalid_template():
-    """Test loading invalid template raises error"""
-    with pytest.raises(ValueError):
-        load_template("nonexistent")
+**File:** `backend/test_phase1.py`
 
-@pytest.mark.skipif(
-    not os.getenv("OPENAI_API_KEY"),
-    reason="OpenAI API key not set"
-)
-def test_validate_prompt():
-    """Test prompt validation with real API call"""
-    service = PromptValidationService()
-    
-    prompt = "Create a luxury watch ad with gold aesthetics"
-    spec = service.validate_and_extract(prompt, [])
-    
-    assert spec['template'] in ['product_showcase', 'lifestyle_ad', 'announcement']
-    assert 'style' in spec
-    assert 'product' in spec
-    assert 'beats' in spec
-    assert len(spec['beats']) > 0
-
-def test_validate_spec_missing_fields():
-    """Test spec validation catches missing fields"""
-    service = PromptValidationService()
-    
-    invalid_spec = {"template": "product_showcase"}
-    
-    with pytest.raises(ValidationException):
-        service._validate_spec(invalid_spec)
-```
+- [ ] Add shebang and docstring
+- [ ] Import sys and add app to path
+- [ ] Import PromptValidationService and json
+- [ ] Create test_validation() function
+- [ ] Define 3 test prompts (luxury watch, sports shoes, product launch)
+- [ ] Print header
+- [ ] Loop through test prompts
+- [ ] For each: call validate_and_extract, print results
+- [ ] Save spec to `test_spec_{i}.json` file
+- [ ] Add exception handling with error printing
+- [ ] Add `if __name__ == "__main__"` block
 
 ---
 
-## Task 4: Manual Testing Script
+## PR #9: Orchestrator Integration
 
-**File:** `backend/test_phase1.py` (in repo root, not in app/)
-```python
-#!/usr/bin/env python3
-"""
-Manual test script for Phase 1
-Run: python test_phase1.py
-"""
+### Task 9.1: Implement Celery App Configuration
 
-import sys
-sys.path.insert(0, 'app')
+**File:** `backend/app/orchestrator/celery_app.py`
 
-from phases.phase1_validate.service import PromptValidationService
-import json
+- [ ] Import Celery from celery
+- [ ] Import get_settings
+- [ ] Get settings instance
+- [ ] Create Celery app with name 'video_gen'
+- [ ] Configure broker as settings.redis_url
+- [ ] Configure result_backend as settings.redis_url
+- [ ] Set task_serializer='json'
+- [ ] Set result_serializer='json'
+- [ ] Set accept_content=['json']
+- [ ] Set timezone='UTC'
+- [ ] Set enable_utc=True
 
-def test_validation():
-    """Test prompt validation"""
-    
-    service = PromptValidationService()
-    
-    test_prompts = [
-        "Create a sleek ad for luxury watches with gold aesthetics",
-        "Make an energetic video for sports shoes showing people running",
-        "Announce our new product launch with bold graphics"
-    ]
-    
-    print("Testing Phase 1: Prompt Validation\n")
-    print("=" * 60)
-    
-    for i, prompt in enumerate(test_prompts, 1):
-        print(f"\nTest {i}: {prompt}")
-        print("-" * 60)
-        
-        try:
-            spec = service.validate_and_extract(prompt, [])
-            
-            print(f"✅ Success!")
-            print(f"Template: {spec['template']}")
-            print(f"Style: {spec['style']['aesthetic']}")
-            print(f"Product: {spec['product']['name']}")
-            print(f"Beats: {len(spec['beats'])} scenes")
-            print(f"Audio: {spec['audio']['music_style']}")
-            
-            # Save full spec to file
-            filename = f"test_spec_{i}.json"
-            with open(filename, 'w') as f:
-                json.dump(spec, f, indent=2)
-            print(f"Full spec saved to: {filename}")
-            
-        except Exception as e:
-            print(f"❌ Error: {str(e)}")
-
-if __name__ == "__main__":
-    test_validation()
-```
-
----
-
-## Task 5: Update Orchestrator to Use Phase 1
+### Task 9.2: Implement Pipeline Orchestrator (Phase 1 Only)
 
 **File:** `backend/app/orchestrator/pipeline.py`
-```python
-from app.orchestrator.celery_app import celery_app
-from app.phases.phase1_validate.task import validate_prompt
-from app.orchestrator.progress import update_progress, update_cost
-import time
-from typing import List
 
-@celery_app.task
-def run_pipeline(video_id: str, prompt: str, assets: List[dict]):
-    """
-    Main orchestration task - will eventually chain all 6 phases.
-    Currently only Phase 1 is implemented.
-    """
-    start_time = time.time()
-    total_cost = 0.0
-    
-    try:
-        # Phase 1: Validate Prompt
-        update_progress(video_id, "validating", 10)
-        
-        result1 = validate_prompt.delay(video_id, prompt, assets).get(timeout=60)
-        
-        if result1['status'] != "success":
-            raise Exception(f"Phase 1 failed: {result1.get('error_message')}")
-        
-        total_cost += result1['cost_usd']
-        update_cost(video_id, "phase1", result1['cost_usd'])
-        
-        # TODO: Phase 2-6 will be added by other team members
-        
-        # For now, mark as complete after Phase 1
-        update_progress(
-            video_id,
-            "complete",
-            100,
-            spec=result1['output_data']['spec'],
-            total_cost=total_cost,
-            generation_time=time.time() - start_time
-        )
-        
-        return {
-            "video_id": video_id,
-            "status": "complete",
-            "spec": result1['output_data']['spec'],
-            "cost_usd": total_cost
-        }
-        
-    except Exception as e:
-        update_progress(video_id, "failed", None, error=str(e))
-        raise
-```
+- [ ] Import celery_app
+- [ ] Import validate_prompt task
+- [ ] Import update_progress, update_cost functions
+- [ ] Import time module
+- [ ] Create `@celery_app.task` decorator
+
+### Task 9.3: Implement run_pipeline Task
+
+- [ ] Define `run_pipeline(video_id, prompt, assets)` signature
+- [ ] Initialize start_time and total_cost
+- [ ] Wrap in try/except block
+- [ ] Call `update_progress(video_id, "validating", 10)`
+- [ ] Call `validate_prompt.delay(video_id, prompt, assets).get(timeout=60)`
+- [ ] Check if result1['status'] != "success", raise exception
+- [ ] Add result1['cost_usd'] to total_cost
+- [ ] Call `update_cost(video_id, "phase1", result1['cost_usd'])`
+- [ ] Add TODO comment for Phase 2-6
+- [ ] Call `update_progress` with complete status
+- [ ] Return result dictionary with video_id, status, spec, cost
+- [ ] In except block, call update_progress with failed status and re-raise
+
+### Task 9.4: Implement Progress Helper
+
+**File:** `backend/app/orchestrator/progress.py`
+
+- [ ] Import SessionLocal, VideoGeneration, VideoStatus
+- [ ] Import datetime and Optional
+
+### Task 9.5: Implement update_progress Function
+
+- [ ] Define `update_progress(video_id, status, progress, **kwargs)` signature
+- [ ] Create database session with SessionLocal()
+- [ ] Wrap in try/finally to close session
+- [ ] Query for video by id
+- [ ] If not found, create new VideoGeneration record
+- [ ] If found, update status and progress
+- [ ] Update current_phase from kwargs
+- [ ] Update spec, error, total_cost, generation_time from kwargs
+- [ ] Set completed_at if status is 'complete'
+- [ ] Commit changes
+
+### Task 9.6: Implement update_cost Function
+
+- [ ] Define `update_cost(video_id, phase, cost)` signature
+- [ ] Create database session
+- [ ] Query for video by id
+- [ ] If found, initialize cost_breakdown if null
+- [ ] Set cost_breakdown[phase] = cost
+- [ ] Sum all costs and update cost_usd
+- [ ] Commit changes
+- [ ] Close session in finally block
 
 ---
 
-## ✅ Checkpoint
+## ✅ PR #7, #8, #9 Checklist
 
-After completing these tasks, you should have:
-- ✅ Validation service implemented
-- ✅ Phase 1 Celery task working
-- ✅ Unit tests written
-- ✅ Manual test script ready
+Before merging:
+- [ ] PromptValidationService implemented and working
+- [ ] Phase 1 task implemented
+- [ ] Unit tests pass (or skip if no API keys)
+- [ ] Manual test script works
+- [ ] Celery app configured
+- [ ] Pipeline orchestrator calls Phase 1
+- [ ] Progress tracking updates database
 
-**Test Phase 1:**
+**Test Commands:**
 ```bash
 # Start services
-docker-compose up
+docker-compose up --build
 
-# In another terminal, run manual test
+# Run manual test
 docker-compose exec api python test_phase1.py
 
-# Should see:
-# ✅ Success for all 3 test prompts
-# JSON files created with full specs
+# Check for generated files
+ls test_spec_*.json
 ```
 
-**Phase 1 is complete!** The other person can now work on Phase 2 independently.
+**Phase 1 is complete!**
