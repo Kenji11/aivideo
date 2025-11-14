@@ -9,19 +9,22 @@ Clean, single-page video creation interface inspired by modern AI chat applicati
 
 ### 1. Top Header (Fixed)
 ```
-┌────────────────────────────────────────────────────┐
-│ 🎬 VideoAI Studio              My Projects        │
-└────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│ 🎬 VideoAI Studio              🌙/☀️    My Projects       │
+└────────────────────────────────────────────────────────────┘
 ```
 
 **Components:**
 - Left: Logo + Brand name "VideoAI Studio"
+- Middle-Right: Dark/Light mode toggle
 - Right: "My Projects" navigation link
 
 **Styling:**
 - Clean, minimal header
 - Fixed position at top
-- White background with subtle border
+- Light mode: White background
+- Dark mode: Dark slate background (#1E293B)
+- Smooth transitions between modes
 
 ---
 
@@ -303,6 +306,7 @@ export function FileThumbnail({ file, onRemove }: FileThumbnailProps) {
 
 ## Color Palette
 
+### Light Mode (Default)
 - **Primary**: Blue (#3B82F6) - Buttons, links
 - **Background**: Light gray (#F9FAFB) - Page background
 - **Surface**: White (#FFFFFF) - Form container
@@ -310,6 +314,22 @@ export function FileThumbnail({ file, onRemove }: FileThumbnailProps) {
 - **Muted**: Gray (#6B7280) - Secondary text
 - **Border**: Light gray (#E5E7EB) - Borders, dividers
 - **Warning**: Amber (#F59E0B) - Info messages
+
+### Dark Mode
+- **Primary**: Blue (#60A5FA) - Buttons, links (lighter for contrast)
+- **Background**: Dark gray (#0F172A) - Page background
+- **Surface**: Slate (#1E293B) - Form container
+- **Text**: Light gray (#F1F5F9) - Primary text
+- **Muted**: Gray (#94A3B8) - Secondary text
+- **Border**: Dark gray (#334155) - Borders, dividers
+- **Warning**: Amber (#FCD34D) - Info messages
+
+### Dark Mode Toggle
+- Located in top-right of header (before "My Projects")
+- Sun icon 🌞 for light mode
+- Moon icon 🌙 for dark mode
+- Smooth transition animation
+- Persists user preference in localStorage
 
 ---
 
