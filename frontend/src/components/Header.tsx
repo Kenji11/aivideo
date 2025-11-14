@@ -8,16 +8,24 @@ export function Header() {
     <header className="sticky top-0 z-50 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <div className="flex items-center gap-2">
-            <Film className="h-8 w-8 text-blue-500" />
-            <span className="text-xl font-bold text-gray-900 dark:text-gray-100">
+          {/* Logo with hover animation */}
+          <a 
+            href="/" 
+            className="flex items-center gap-2 group cursor-pointer"
+          >
+            <Film className="h-8 w-8 text-blue-500 transition-all duration-300 
+                           group-hover:scale-110 group-hover:rotate-12 
+                           group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+            <span className="text-xl font-bold text-gray-900 dark:text-gray-100 
+                           transition-all duration-300 group-hover:text-blue-600 
+                           dark:group-hover:text-blue-400">
               VideoAI
             </span>
-            <span className="text-xl font-normal text-gray-600 dark:text-gray-400">
+            <span className="text-xl font-normal text-gray-600 dark:text-gray-400 
+                           transition-all duration-300 group-hover:text-blue-500">
               Studio
             </span>
-          </div>
+          </a>
 
           {/* Right side */}
           <div className="flex items-center gap-4">
