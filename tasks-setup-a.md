@@ -1,14 +1,13 @@
 # Setup Tasks - Part A: Infrastructure & Docker
 
 **Owner:** Either person (coordinate who does what)  
-**Time Estimate:** 1-2 hours  
 **Goal:** Get local development environment running
 
 ---
 
-## Task 1: Create Project Structure
+## PR #1: Project Structure & Basic Files
 
-### 1.1 Initialize Backend
+### Task 1.1: Initialize Backend Structure
 ```bash
 mkdir videogen-pipeline
 cd videogen-pipeline
@@ -21,7 +20,12 @@ mkdir -p backend/alembic/versions
 cd backend
 ```
 
-### 1.2 Create Backend Files
+- [ ] Create root `videogen-pipeline` directory
+- [ ] Create `backend/app` directory structure
+- [ ] Create all phase directories in `backend/app/phases/`
+- [ ] Create `backend/alembic/versions` directory
+
+### Task 1.2: Create Root Level Files
 ```bash
 # Root level
 touch Dockerfile
@@ -30,13 +34,31 @@ touch requirements.txt
 touch .env.example
 touch README.md
 touch .gitignore
+```
 
+- [ ] Create `Dockerfile`
+- [ ] Create `docker-compose.yml`
+- [ ] Create `requirements.txt`
+- [ ] Create `.env.example`
+- [ ] Create `README.md`
+- [ ] Create `.gitignore`
+
+### Task 1.3: Create App Level Files
+```bash
 # App level
 touch app/__init__.py
 touch app/main.py
 touch app/config.py
 touch app/database.py
+```
 
+- [ ] Create `app/__init__.py`
+- [ ] Create `app/main.py`
+- [ ] Create `app/config.py`
+- [ ] Create `app/database.py`
+
+### Task 1.4: Create Common Files
+```bash
 # Common (shared code)
 touch app/common/__init__.py
 touch app/common/models.py
@@ -44,48 +66,105 @@ touch app/common/schemas.py
 touch app/common/exceptions.py
 touch app/common/logging.py
 touch app/common/constants.py
+```
 
+- [ ] Create `app/common/__init__.py`
+- [ ] Create `app/common/models.py`
+- [ ] Create `app/common/schemas.py`
+- [ ] Create `app/common/exceptions.py`
+- [ ] Create `app/common/logging.py`
+- [ ] Create `app/common/constants.py`
+
+### Task 1.5: Create Services Files
+```bash
 # Services (external APIs)
 touch app/services/__init__.py
 touch app/services/replicate.py
 touch app/services/openai.py
 touch app/services/s3.py
 touch app/services/ffmpeg.py
+```
 
+- [ ] Create `app/services/__init__.py`
+- [ ] Create `app/services/replicate.py`
+- [ ] Create `app/services/openai.py`
+- [ ] Create `app/services/s3.py`
+- [ ] Create `app/services/ffmpeg.py`
+
+### Task 1.6: Create API Files
+```bash
 # API endpoints
 touch app/api/__init__.py
 touch app/api/generate.py
 touch app/api/status.py
 touch app/api/video.py
 touch app/api/health.py
+```
 
+- [ ] Create `app/api/__init__.py`
+- [ ] Create `app/api/generate.py`
+- [ ] Create `app/api/status.py`
+- [ ] Create `app/api/video.py`
+- [ ] Create `app/api/health.py`
+
+### Task 1.7: Create Orchestrator Files
+```bash
 # Orchestrator
 touch app/orchestrator/__init__.py
 touch app/orchestrator/celery_app.py
 touch app/orchestrator/pipeline.py
 touch app/orchestrator/progress.py
 touch app/orchestrator/cost_tracker.py
+```
 
+- [ ] Create `app/orchestrator/__init__.py`
+- [ ] Create `app/orchestrator/celery_app.py`
+- [ ] Create `app/orchestrator/pipeline.py`
+- [ ] Create `app/orchestrator/progress.py`
+- [ ] Create `app/orchestrator/cost_tracker.py`
+
+### Task 1.8: Create Test Files
+```bash
 # Tests
 touch app/tests/conftest.py
 ```
 
-### 1.3 Create Phase Folders
+- [ ] Create `app/tests/conftest.py`
+
+### Task 1.9: Create Phase 1 Files
 ```bash
-# Phase 1 (Person handling Phase 1 will fill these)
+# Phase 1
 touch app/phases/phase1_validate/__init__.py
 touch app/phases/phase1_validate/task.py
 touch app/phases/phase1_validate/service.py
 touch app/phases/phase1_validate/schemas.py
 mkdir -p app/phases/phase1_validate/templates
+```
 
-# Phase 2 (Person handling Phase 2 will fill these)
+- [ ] Create `app/phases/phase1_validate/__init__.py`
+- [ ] Create `app/phases/phase1_validate/task.py`
+- [ ] Create `app/phases/phase1_validate/service.py`
+- [ ] Create `app/phases/phase1_validate/schemas.py`
+- [ ] Create `app/phases/phase1_validate/templates/` directory
+
+### Task 1.10: Create Phase 2 Files
+```bash
+# Phase 2
 touch app/phases/phase2_animatic/__init__.py
 touch app/phases/phase2_animatic/task.py
 touch app/phases/phase2_animatic/service.py
 touch app/phases/phase2_animatic/schemas.py
 touch app/phases/phase2_animatic/prompts.py
+```
 
+- [ ] Create `app/phases/phase2_animatic/__init__.py`
+- [ ] Create `app/phases/phase2_animatic/task.py`
+- [ ] Create `app/phases/phase2_animatic/service.py`
+- [ ] Create `app/phases/phase2_animatic/schemas.py`
+- [ ] Create `app/phases/phase2_animatic/prompts.py`
+
+### Task 1.11: Create Placeholder Phase Files
+```bash
 # Placeholder for other phases
 for phase in phase3_references phase4_chunks phase5_refine phase6_export; do
   touch app/phases/$phase/__init__.py
@@ -95,9 +174,16 @@ for phase in phase3_references phase4_chunks phase5_refine phase6_export; do
 done
 ```
 
+- [ ] Create phase3 placeholder files
+- [ ] Create phase4 placeholder files
+- [ ] Create phase5 placeholder files
+- [ ] Create phase6 placeholder files
+
 ---
 
-## Task 2: Create Dockerfile
+## PR #2: Docker Configuration
+
+### Task 2.1: Create Dockerfile
 
 **File:** `backend/Dockerfile`
 ```dockerfile
@@ -123,9 +209,13 @@ COPY . .
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
----
+- [ ] Create Dockerfile with Python 3.11 base image
+- [ ] Add FFmpeg installation
+- [ ] Add requirements.txt copy and pip install
+- [ ] Add application code copy
+- [ ] Set default uvicorn command
 
-## Task 3: Create requirements.txt
+### Task 2.2: Create requirements.txt
 
 **File:** `backend/requirements.txt`
 ```txt
@@ -154,9 +244,13 @@ python-dotenv==1.0.0
 python-multipart==0.0.6
 ```
 
----
+- [ ] Add FastAPI and Uvicorn dependencies
+- [ ] Add database dependencies (SQLAlchemy, Alembic, psycopg2)
+- [ ] Add task queue dependencies (Celery, Redis)
+- [ ] Add external API dependencies (OpenAI, Replicate, boto3)
+- [ ] Add utility dependencies
 
-## Task 4: Create docker-compose.yml
+### Task 2.3: Create docker-compose.yml
 
 **File:** `backend/docker-compose.yml`
 ```yaml
@@ -239,9 +333,14 @@ volumes:
   postgres_data:
 ```
 
----
+- [ ] Add postgres service with healthcheck
+- [ ] Add redis service with healthcheck
+- [ ] Add api service with environment variables
+- [ ] Add worker service with Celery command
+- [ ] Configure service dependencies
+- [ ] Add volume mounts for development
 
-## Task 5: Create .env.example
+### Task 2.4: Create .env.example
 
 **File:** `backend/.env.example`
 ```bash
@@ -262,9 +361,12 @@ S3_BUCKET=videogen-outputs-dev
 AWS_REGION=us-east-2
 ```
 
----
+- [ ] Add database URL example
+- [ ] Add Redis URL example
+- [ ] Add external API token placeholders
+- [ ] Add AWS configuration placeholders
 
-## Task 6: Create .gitignore
+### Task 2.5: Create .gitignore
 
 **File:** `backend/.gitignore`
 ```
@@ -303,9 +405,14 @@ Thumbs.db
 alembic/versions/*.pyc
 ```
 
----
+- [ ] Add Python-specific ignores
+- [ ] Add environment variable ignores
+- [ ] Add database file ignores
+- [ ] Add IDE ignores
+- [ ] Add OS-specific ignores
+- [ ] Add log file ignores
 
-## Task 7: Create .env file (LOCAL ONLY)
+### Task 2.6: Create Local Environment File
 ```bash
 # Copy example and fill in real values
 cp .env.example .env
@@ -314,9 +421,10 @@ cp .env.example .env
 # DO NOT COMMIT THIS FILE
 ```
 
----
+- [ ] Copy `.env.example` to `.env`
+- [ ] Fill in real API keys in `.env`
 
-## Task 8: Test Docker Setup
+### Task 2.7: Test Docker Setup
 ```bash
 # Build and start services
 docker-compose up --build
@@ -324,29 +432,26 @@ docker-compose up --build
 # In another terminal, verify services are running
 docker-compose ps
 
-# Expected output:
-# postgres: healthy
-# redis: healthy
-# api: running on port 8000
-# worker: running
-
 # Test API health
 curl http://localhost:8000/health
-# Should return: {"status": "ok"}
 
 # Stop services
 docker-compose down
 ```
 
+- [ ] Run `docker-compose up --build`
+- [ ] Verify all services show as healthy in `docker-compose ps`
+- [ ] Test health endpoint returns success
+- [ ] Stop services with `docker-compose down`
+
 ---
 
-## ✅ Checkpoint
+## ✅ PR #2 Checklist
 
-After completing these tasks, you should have:
-- ✅ Project structure created
-- ✅ Dockerfile configured
-- ✅ Docker Compose running (postgres, redis, api, worker)
-- ✅ All placeholder files created
-- ✅ Ready for implementing shared code in Setup Part B
+Before merging PR #2:
+- [ ] All Docker files created
+- [ ] Services start without errors
+- [ ] Health check endpoint responds
+- [ ] Can access API docs at http://localhost:8000/docs
 
 **Next:** Move to `tasks-setup-b.md`

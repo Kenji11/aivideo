@@ -1,12 +1,13 @@
 # Setup Tasks - Part B: Shared Code & Database
 
 **Owner:** Either person (coordinate who does what)  
-**Time Estimate:** 1-2 hours  
 **Goal:** Implement shared code that both phases will use
 
 ---
 
-## Task 1: Implement app/config.py
+## PR #3: Configuration & Database Setup
+
+### Task 3.1: Implement app/config.py
 
 **File:** `backend/app/config.py`
 ```python
@@ -46,9 +47,15 @@ def get_settings() -> Settings:
     return Settings()
 ```
 
----
+- [x] Create Settings class with all configuration fields
+- [x] Add database configuration
+- [x] Add Redis configuration
+- [x] Add external API configuration (Replicate, OpenAI)
+- [x] Add AWS configuration
+- [x] Add application environment settings
+- [x] Implement cached `get_settings()` function
 
-## Task 2: Implement app/database.py
+### Task 3.2: Implement app/database.py
 
 **File:** `backend/app/database.py`
 ```python
@@ -82,17 +89,22 @@ def get_db():
 
 def init_db():
     """Initialize database (create tables)"""
-    from app.common.models import VideoGeneration
+    from app.common.models import VideoGeneration, Asset
     Base.metadata.create_all(bind=engine)
 ```
 
----
+- [x] Import settings and create SQLAlchemy engine
+- [x] Configure connection pool settings
+- [x] Create SessionLocal factory
+- [x] Create Base class for models
+- [x] Implement `get_db()` dependency function
+- [x] Implement `init_db()` function to create tables
 
-## Task 3: Implement app/common/models.py
+### Task 3.3: Implement app/common/models.py
 
 **File:** `backend/app/common/models.py`
 ```python
-from sqlalchemy import Column, String, Float, DateTime, JSON, Enum as SQLEnum
+from sqlalchemy import Column, String, Float, DateTime, JSON, Enum as SQLEnum, Integer
 from sqlalchemy.sql import func
 from app.database import Base
 import enum
@@ -109,6 +121,40 @@ class VideoStatus(str, enum.Enum):
     COMPLETE = "complete"
     FAILED = "failed"
 
+class AssetType(str, enum.Enum):
+    """Asset type"""
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
+
+class AssetSource(str, enum.Enum):
+    """Asset source"""
+    USER_UPLOAD = "user_upload"
+    SYSTEM_GENERATED = "system_generated"
+
+class Asset(Base):
+    """Asset record for uploaded and generated assets"""
+    __tablename__ = "assets"
+    
+    # Primary
+    id = Column(String, primary_key=True)
+    user_id = Column(String, nullable=True)  # Null if system-generated
+    
+    # Asset details
+    s3_key = Column(String, nullable=False)  # S3 key/path
+    s3_url = Column(String, nullable=True)  # Full S3 URL or presigned URL
+    asset_type = Column(SQLEnum(AssetType), nullable=False)
+    source = Column(SQLEnum(AssetSource), nullable=False)
+    
+    # Metadata
+    file_name = Column(String, nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
+    mime_type = Column(String, nullable=True)
+    metadata = Column(JSON, default=dict)  # Additional metadata (dimensions, duration, etc.)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
 class VideoGeneration(Base):
     """Video generation record"""
     __tablename__ = "video_generations"
@@ -117,9 +163,14 @@ class VideoGeneration(Base):
     id = Column(String, primary_key=True)
     user_id = Column(String, nullable=True)
     
+    # Video details
+    title = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    
     # Input
     prompt = Column(String, nullable=False)
-    uploaded_assets = Column(JSON, default=list)
+    prompt_validated = Column(String, nullable=True)  # Validated/cleaned prompt after Phase 1
+    reference_assets = Column(JSON, default=list)  # List of asset IDs
     
     # Spec (from Phase 1)
     spec = Column(JSON, nullable=True)
@@ -133,7 +184,6 @@ class VideoGeneration(Base):
     
     # Phase Outputs
     animatic_urls = Column(JSON, default=list)
-    reference_urls = Column(JSON, default=dict)
     chunk_urls = Column(JSON, default=list)
     stitched_url = Column(String, nullable=True)
     refined_url = Column(String, nullable=True)
@@ -147,9 +197,19 @@ class VideoGeneration(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
 ```
 
----
+- [x] Create VideoStatus enum with all status values
+- [x] Create AssetType and AssetSource enums
+- [x] Create Asset model class for tracking uploaded and generated assets
+- [x] Create VideoGeneration model class
+- [x] Add primary fields (id, user_id)
+- [x] Add video details (title required, description optional)
+- [x] Add input fields (prompt, prompt_validated, reference_assets)
+- [x] Add spec fields from Phase 1
+- [x] Add status tracking fields
+- [x] Add phase output URL fields (removed reference_urls - now tracked in assets table)
+- [x] Add metadata fields (cost, timing, timestamps)
 
-## Task 4: Implement app/common/schemas.py
+### Task 3.4: Implement app/common/schemas.py
 
 **File:** `backend/app/common/schemas.py`
 ```python
@@ -208,9 +268,14 @@ class VideoResponse(BaseModel):
     spec: Optional[Dict]
 ```
 
----
+- [x] Create PhaseInput schema for phase task inputs
+- [x] Create PhaseOutput schema for phase task outputs
+- [x] Create GenerateRequest schema for API
+- [x] Create GenerateResponse schema for API
+- [x] Create StatusResponse schema for status endpoint
+- [x] Create VideoResponse schema for video endpoint
 
-## Task 5: Implement app/common/exceptions.py
+### Task 3.5: Implement app/common/exceptions.py
 
 **File:** `backend/app/common/exceptions.py`
 ```python
@@ -231,9 +296,12 @@ class ValidationException(VideoGenException):
     pass
 ```
 
----
+- [x] Create VideoGenException base class
+- [x] Create PhaseException for phase errors
+- [x] Create ExternalAPIException for API errors
+- [x] Create ValidationException for validation errors
 
-## Task 6: Implement app/common/constants.py
+### Task 3.6: Implement app/common/constants.py
 
 **File:** `backend/app/common/constants.py`
 ```python
@@ -264,9 +332,16 @@ PHASE5_TIMEOUT = 300
 PHASE6_TIMEOUT = 180
 ```
 
+- [x] Add video specification constants
+- [x] Add API cost constants
+- [x] Add S3 path prefix constants
+- [x] Add phase timeout constants
+
 ---
 
-## Task 7: Implement app/main.py
+## PR #4: FastAPI Application & Service Clients
+
+### Task 4.1: Implement app/main.py
 
 **File:** `backend/app/main.py`
 ```python
@@ -312,9 +387,16 @@ async def root():
     }
 ```
 
----
+- [ ] Create FastAPI app instance
+- [ ] Add CORS middleware
+- [ ] Include health router
+- [ ] Include generate router
+- [ ] Include status router
+- [ ] Include video router
+- [ ] Add startup event to initialize database
+- [ ] Add root endpoint
 
-## Task 8: Implement app/api/health.py
+### Task 4.2: Implement app/api/health.py
 
 **File:** `backend/app/api/health.py`
 ```python
@@ -328,11 +410,13 @@ async def health_check():
     return {"status": "ok"}
 ```
 
----
+- [ ] Create APIRouter instance
+- [ ] Implement health check endpoint
+- [ ] Return simple status response
 
-## Task 9: Implement Service Skeletons
+### Task 4.3: Implement Service Clients
 
-### 9.1 app/services/__init__.py
+#### 4.3a: app/services/__init__.py
 ```python
 from .replicate import replicate_client
 from .openai import openai_client
@@ -347,7 +431,10 @@ __all__ = [
 ]
 ```
 
-### 9.2 app/services/replicate.py
+- [ ] Import all service clients
+- [ ] Export in `__all__`
+
+#### 4.3b: app/services/replicate.py
 ```python
 import replicate
 from app.config import get_settings
@@ -365,7 +452,13 @@ class ReplicateClient:
 replicate_client = ReplicateClient()
 ```
 
-### 9.3 app/services/openai.py
+- [ ] Import replicate and get settings
+- [ ] Create ReplicateClient class
+- [ ] Initialize client with API token
+- [ ] Implement `run()` method
+- [ ] Create singleton instance
+
+#### 4.3c: app/services/openai.py
 ```python
 from openai import OpenAI
 from app.config import get_settings
@@ -383,7 +476,13 @@ class OpenAIClient:
 openai_client = OpenAIClient()
 ```
 
-### 9.4 app/services/s3.py
+- [ ] Import OpenAI and get settings
+- [ ] Create OpenAIClient class
+- [ ] Initialize client with API key
+- [ ] Add chat property
+- [ ] Create singleton instance
+
+#### 4.3d: app/services/s3.py
 ```python
 import boto3
 from app.config import get_settings
@@ -416,7 +515,14 @@ class S3Client:
 s3_client = S3Client()
 ```
 
-### 9.5 app/services/ffmpeg.py
+- [ ] Import boto3 and get settings
+- [ ] Create S3Client class
+- [ ] Initialize boto3 client with credentials
+- [ ] Implement `upload_file()` method
+- [ ] Implement `generate_presigned_url()` method
+- [ ] Create singleton instance
+
+#### 4.3e: app/services/ffmpeg.py
 ```python
 import subprocess
 
@@ -434,25 +540,29 @@ class FFmpegService:
 ffmpeg_service = FFmpegService()
 ```
 
+- [ ] Import subprocess
+- [ ] Create FFmpegService class
+- [ ] Implement `run_command()` method
+- [ ] Create singleton instance
+
 ---
 
-## ✅ Checkpoint
+## ✅ PR #3 & #4 Checklist
 
-After completing these tasks, you should have:
-- ✅ Configuration system working
-- ✅ Database models defined
-- ✅ Shared schemas for phase contracts
-- ✅ FastAPI app with health endpoint
-- ✅ Service clients (skeleton)
+Before merging:
+- [ ] Configuration system working
+- [ ] Database models defined
+- [ ] All shared schemas created
+- [ ] FastAPI app starts without errors
+- [ ] Health endpoint accessible at http://localhost:8000/health
+- [ ] API docs visible at http://localhost:8000/docs
+- [ ] All service clients instantiate without errors
 
-**Test:**
+**Test Commands:**
 ```bash
 docker-compose up --build
 curl http://localhost:8000/health
-# Should return: {"status": "ok"}
-
 curl http://localhost:8000/docs
-# Should show FastAPI docs
 ```
 
-**Next:** Person A → `tasks-phase-1a.md`, Person handling Phase 2 → `tasks-phase-2a.md`
+**Next:** Person A → `tasks-phase-1a.md`, Person B → `tasks-phase-2a.md`
