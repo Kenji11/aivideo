@@ -44,7 +44,7 @@ class Asset(Base):
     file_name = Column(String, nullable=True)
     file_size_bytes = Column(Integer, nullable=True)
     mime_type = Column(String, nullable=True)
-    metadata = Column(JSON, default=dict)  # Additional metadata (dimensions, duration, etc.)
+    asset_metadata = Column(JSON, default=dict)  # Additional metadata (dimensions, duration, etc.)
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
