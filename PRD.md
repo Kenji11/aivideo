@@ -951,7 +951,7 @@ class AnimaticGenerationService:
             # Upload to S3
             frame_url = s3_client.upload_image(
                 result[0],
-                bucket="videogen-outputs-prod",
+                bucket="ai-video-assets-prod",
                 key=f"videos/{video_id}/animatic/frame_{i:02d}.png"
             )
             
@@ -1172,7 +1172,7 @@ def generate_single_chunk(chunk_spec: dict) -> str:
     # Upload chunk
     chunk_url = s3_client.upload_video(
         result,
-        bucket="videogen-outputs-prod",
+        bucket="ai-video-assets-prod",
         key=f"videos/{chunk_spec['video_id']}/chunks/chunk_{chunk_spec['chunk_num']:02d}.mp4"
     )
     
@@ -1513,8 +1513,8 @@ docker-compose up
 
 #### Step 1: Create S3 Bucket
 ```bash
-aws s3 mb s3://videogen-outputs-prod --region us-east-2
-aws s3api put-bucket-cors --bucket videogen-outputs-prod --cors-configuration file://cors.json --region us-east-2
+aws s3 mb s3://ai-video-assets-prod --region us-east-2
+aws s3api put-bucket-cors --bucket ai-video-assets-prod --cors-configuration file://cors.json --region us-east-2
 ```
 
 #### Step 2: Create RDS PostgreSQL
@@ -1556,7 +1556,7 @@ eb create videogen-web \
     REDIS_URL=<elasticache_url> \
     REPLICATE_API_TOKEN=<token> \
     OPENAI_API_KEY=<key> \
-    S3_BUCKET=videogen-outputs-prod \
+    S3_BUCKET=ai-video-assets-prod \
     AWS_REGION=us-east-2
 ```
 
@@ -1571,7 +1571,7 @@ eb create videogen-worker \
     REDIS_URL=<elasticache_url> \
     REPLICATE_API_TOKEN=<token> \
     OPENAI_API_KEY=<key> \
-    S3_BUCKET=videogen-outputs-prod \
+    S3_BUCKET=ai-video-assets-prod \
     AWS_REGION=us-east-2
 ```
 
@@ -1888,7 +1888,7 @@ REPLICATE_API_TOKEN=r8_xxx...
 OPENAI_API_KEY=sk-xxx...
 AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=xxx...
-S3_BUCKET=videogen-outputs-prod
+S3_BUCKET=ai-video-assets-prod
 AWS_REGION=us-east-2
 ```
 
