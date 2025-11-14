@@ -85,19 +85,19 @@ export function Settings({ onBack }: SettingsProps) {
         <div className="card p-6">
           <div className="flex items-start justify-between mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900 flex items-center space-x-2">
-                <Bell className="w-5 h-5 text-orange-600" />
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
+                <Bell className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                 <span>Notifications</span>
               </h3>
-              <p className="text-sm text-slate-600 mt-1">Manage how you receive updates</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Manage how you receive updates</p>
             </div>
           </div>
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
               <div>
-                <p className="font-medium text-slate-900">Push Notifications</p>
-                <p className="text-sm text-slate-500">Get notified when videos are ready</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">Push Notifications</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Get notified when videos are ready</p>
               </div>
               <button
                 onClick={() => setNotifications(!notifications)}
@@ -113,10 +113,10 @@ export function Settings({ onBack }: SettingsProps) {
               </button>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
               <div>
-                <p className="font-medium text-slate-900">Email Digest</p>
-                <p className="text-sm text-slate-500">Weekly summary of your activity</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">Email Digest</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Weekly summary of your activity</p>
               </div>
               <button
                 onClick={() => setEmailDigest(!emailDigest)}
@@ -137,19 +137,19 @@ export function Settings({ onBack }: SettingsProps) {
         <div className="card p-6">
           <div className="flex items-start justify-between mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900 flex items-center space-x-2">
-                <Download className="w-5 h-5 text-green-600" />
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
+                <Download className="w-5 h-5 text-green-600 dark:text-green-400" />
                 <span>Downloads</span>
               </h3>
-              <p className="text-sm text-slate-600 mt-1">Control your video downloads</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Control your video downloads</p>
             </div>
           </div>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
               <div>
-                <p className="font-medium text-slate-900">Auto-download Videos</p>
-                <p className="text-sm text-slate-500">Automatically save videos when ready</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">Auto-download Videos</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Automatically save videos when ready</p>
               </div>
               <button
                 onClick={() => setAutoDownload(!autoDownload)}
@@ -165,15 +165,15 @@ export function Settings({ onBack }: SettingsProps) {
               </button>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
               <div>
-                <p className="font-medium text-slate-900">Quality</p>
-                <p className="text-sm text-slate-500">Default video quality preference</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">Quality</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Default video quality preference</p>
               </div>
               <select
                 value={quality}
                 onChange={(e) => setQuality(e.target.value as 'high' | 'medium' | 'ultra')}
-                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
               >
                 <option value="medium">Medium (720p)</option>
                 <option value="high">High (1080p)</option>
@@ -186,18 +186,18 @@ export function Settings({ onBack }: SettingsProps) {
         <div className="card p-6">
           <div className="flex items-start justify-between mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900 flex items-center space-x-2">
-                <Zap className="w-5 h-5 text-yellow-600" />
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
+                <Zap className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
                 <span>Performance</span>
               </h3>
-              <p className="text-sm text-slate-600 mt-1">Optimize your experience</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Optimize your experience</p>
             </div>
           </div>
 
           <div className="space-y-3">
-            <button className="w-full p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors text-left">
-              <p className="font-medium text-slate-900">Clear Cache</p>
-              <p className="text-sm text-slate-500">Remove temporary files to free up space</p>
+            <button className="w-full p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-left">
+              <p className="font-medium text-slate-900 dark:text-slate-100">Clear Cache</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Remove temporary files to free up space</p>
             </button>
           </div>
         </div>
@@ -205,26 +205,26 @@ export function Settings({ onBack }: SettingsProps) {
         <div className="card p-6">
           <div className="flex items-start justify-between mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900 flex items-center space-x-2">
-                <HelpCircle className="w-5 h-5 text-blue-600" />
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
+                <HelpCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 <span>Help & Support</span>
               </h3>
-              <p className="text-sm text-slate-600 mt-1">Get help and learn more</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Get help and learn more</p>
             </div>
           </div>
 
           <div className="space-y-3">
-            <button className="w-full p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors text-left">
-              <p className="font-medium text-slate-900">Documentation</p>
-              <p className="text-sm text-slate-500">Learn how to use VideoAI Studio</p>
+            <button className="w-full p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-left">
+              <p className="font-medium text-slate-900 dark:text-slate-100">Documentation</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Learn how to use VideoAI Studio</p>
             </button>
-            <button className="w-full p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors text-left">
-              <p className="font-medium text-slate-900">Contact Support</p>
-              <p className="text-sm text-slate-500">Get help from our support team</p>
+            <button className="w-full p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-left">
+              <p className="font-medium text-slate-900 dark:text-slate-100">Contact Support</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Get help from our support team</p>
             </button>
-            <button className="w-full p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors text-left">
-              <p className="font-medium text-slate-900">About</p>
-              <p className="text-sm text-slate-500">Learn about VideoAI Studio v1.0</p>
+            <button className="w-full p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-left">
+              <p className="font-medium text-slate-900 dark:text-slate-100">About</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Learn about VideoAI Studio v1.0</p>
             </button>
           </div>
         </div>
