@@ -1,2 +1,0 @@
-// shadcn button component
-
