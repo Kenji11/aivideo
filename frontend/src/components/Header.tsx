@@ -10,7 +10,7 @@ export function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo with hover animation */}
           <a 
-            href="/" 
+            href="#" 
             className="flex items-center gap-2.5 group cursor-pointer"
           >
             <div className="bg-blue-500 rounded-lg p-1.5 transition-transform duration-300 group-hover:scale-105">
@@ -47,7 +47,7 @@ export function Header() {
 
             {/* My Projects button */}
             <a
-              href="/projects"
+              href="#projects"
               className="flex items-center gap-2 px-4 py-2 rounded-lg
                        bg-gray-50 dark:bg-slate-800 
                        text-gray-700 dark:text-gray-300
