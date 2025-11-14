@@ -1,0 +1,288 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+PIPFILE.lock
+poetry.lock
+
+# Virtual Environments
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv
+.conda
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+.idea_modules/
+
+# VSCode
+.vscode/
+*.code-workspace
+.history/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Database
+*.db
+*.sqlite3
+*.sqlite
+db.sqlite3
+*.sql
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Temporary Files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.cache/
+tmp/
+temp/
+
+# Test Coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+nosetests.xml
+test-results/
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# Alembic
+alembic/versions/*.pyc
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# pytype
+.pytype/
+
+# Cython
+cython_debug/
+
+# Backend Specific
+backend/.env
+backend/test_*.json
+backend/test_*.mp4
+backend/test_*.png
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.next/
+frontend/out/
+frontend/.nuxt/
+frontend/.cache/
+frontend/.parcel-cache/
+
+# Frontend Environment
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Frontend Logs
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/lerna-debug.log*
+frontend/pnpm-debug.log*
+
+# Frontend Testing
+frontend/coverage/
+frontend/.nyc_output/
+
+# Frontend Build Tools
+frontend/.vite/
+frontend/.turbo/
+frontend/.vercel/
+frontend/.netlify/
+
+# AWS / Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+
+# Secrets / Keys
+*.pem
+*.key
+*.cert
+*.crt
+secrets.json
+credentials.json
+serviceAccount.json
+
+# Video Generation Outputs (local testing)
+videos/
+outputs/
+generated_videos/
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mkv
+
+# Image Outputs (local testing)
+images/
+generated_images/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.webp
+*.svg
+
+# Audio Outputs (local testing)
+audio/
+generated_audio/
+*.mp3
+*.wav
+*.flac
+*.aac
+*.ogg
+*.m4a
+
+# Documentation Build
+docs/_build/
+docs/.doctrees/
+site/
+
+# AI Model Files (if downloading models locally)
+models/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.onnx
+*.pb
+
+# Large Files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.iso
+
+# Backup Files
+*.bak
+*.backup
+*~
+
+# Package Manager
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Editor Configs (keep some, ignore others)
+# Keep .editorconfig, ignore others
+.editorconfig
+!.editorconfig
+
+# Keep GitHub Actions
+!.github/
+
+# Keep Alembic configs
+!alembic.ini
+!alembic/
+
+# Keep Docker configs
+!Dockerfile
+!docker-compose.yml
+!.dockerignore
+
+# Keep requirements
+!requirements.txt
+!pyproject.toml
+
+# Keep frontend configs
+!frontend/package.json
+!frontend/vite.config.ts
+!frontend/tsconfig.json
+!frontend/tailwind.config.js
+
+# Project Specific - Test Outputs
+test_spec_*.json
+test_animatic_result.json
+test_video_*.mp4
+
+# Project Specific - S3 Downloads (if testing locally)
+downloaded_videos/
+s3_cache/
+
+# Redis Dump
+dump.rdb
+
+# Postgres Data
+postgres_data/
+pgdata/
