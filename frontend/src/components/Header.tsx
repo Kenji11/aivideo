@@ -1,70 +1,94 @@
-import { Film, Moon, Sun, Folder } from 'lucide-react'
-import { useDarkMode } from '@/hooks/useDarkMode'
+import { Film, LogOut, Menu, X } from 'lucide-react';
+import { useState } from 'react';
 
-export function Header() {
-  const { darkMode, toggle } = useDarkMode()
-
-  return (
-    <header className="sticky top-0 z-50 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
-      <div className="max-w-7xl mx-auto px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo with hover animation */}
-          <a 
-            href="#" 
-            className="flex items-center gap-2.5 group cursor-pointer"
-          >
-            <div className="bg-blue-500 rounded-lg p-1.5 transition-transform duration-300 group-hover:scale-105">
-              <Film className="h-5 w-5 text-white transition-all duration-300 
-                             group-hover:rotate-12" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-base font-bold text-blue-600 dark:text-blue-400 
-                             transition-colors duration-300 group-hover:text-blue-700 
-                             dark:group-hover:text-blue-300 leading-tight">
-                VideoAI
-              </span>
-              <span className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight tracking-wide">
-                Studio
-              </span>
-            </div>
-          </a>
-
-          {/* Right side */}
-          <div className="flex items-center gap-3">
-            {/* Dark mode toggle */}
-            <button
-              onClick={toggle}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 
-                       transition-all duration-200 hover:scale-105"
-              aria-label="Toggle dark mode"
-            >
-              {darkMode ? (
-                <Sun className="h-5 w-5 text-yellow-500" />
-              ) : (
-                <Moon className="h-5 w-5 text-gray-600" />
-              )}
-            </button>
-
-            {/* My Projects button */}
-            <a
-              href="#projects"
-              className="flex items-center gap-2 px-4 py-2 rounded-lg
-                       bg-gray-50 dark:bg-slate-800 
-                       text-gray-700 dark:text-gray-300
-                       hover:bg-blue-50 dark:hover:bg-blue-900/20
-                       hover:text-blue-600 dark:hover:text-blue-400
-                       border border-gray-200 dark:border-slate-700
-                       hover:border-blue-300 dark:hover:border-blue-700
-                       font-medium text-sm transition-all duration-200
-                       hover:shadow-sm"
-            >
-              <Folder className="h-4 w-4" />
-              <span>My Projects</span>
-            </a>
-          </div>
-        </div>
-      </div>
-    </header>
-  )
+interface HeaderProps {
+  userName?: string;
+  onLogout?: () => void;
+  onProjectsClick?: () => void;
 }
 
+export function Header({ userName, onLogout, onProjectsClick }: HeaderProps) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  return (
+    <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          <div className="flex items-center space-x-2 cursor-pointer group" onClick={onProjectsClick}>
+            <div className="relative">
+              <Film className="w-8 h-8 text-blue-600 group-hover:scale-110 transition-transform" />
+              <div className="absolute inset-0 bg-blue-600/20 rounded-lg blur-md group-hover:blur-lg transition-all" />
+            </div>
+            <div>
+              <span className="text-xl font-bold gradient-text">VideoAI</span>
+              <span className="text-xs text-slate-500 block">Studio</span>
+            </div>
+          </div>
+
+          <div className="hidden md:flex items-center space-x-4">
+            <button
+              onClick={onProjectsClick}
+              className="text-sm font-medium text-slate-700 hover:text-slate-900 px-4 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              My Projects
+            </button>
+            {userName && (
+              <div className="flex items-center space-x-3 pl-4 border-l border-slate-200">
+                <div className="text-right">
+                  <p className="text-sm font-medium text-slate-900">
+                    {userName}
+                  </p>
+                  <p className="text-xs text-slate-500">Creator</p>
+                </div>
+                <button
+                  onClick={onLogout}
+                  className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                  title="Logout"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg"
+          >
+            {mobileMenuOpen ? (
+              <X className="w-6 h-6" />
+            ) : (
+              <Menu className="w-6 h-6" />
+            )}
+          </button>
+        </div>
+
+        {mobileMenuOpen && (
+          <div className="md:hidden pb-4 space-y-2 border-t border-slate-200 pt-4 animate-slide-in">
+            <button
+              onClick={onProjectsClick}
+              className="w-full text-left text-sm font-medium text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              My Projects
+            </button>
+            {userName && (
+              <>
+                <div className="px-4 py-2 text-sm">
+                  <p className="font-medium text-slate-900">{userName}</p>
+                  <p className="text-xs text-slate-500">Creator</p>
+                </div>
+                <button
+                  onClick={onLogout}
+                  className="w-full text-left text-sm font-medium text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-100 transition-colors flex items-center space-x-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </nav>
+  );
+}
