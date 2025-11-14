@@ -41,39 +41,39 @@ export function Settings({ onBack }: SettingsProps) {
     <div className="max-w-3xl mx-auto animate-fade-in">
       <button
         onClick={onBack}
-        className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 mb-6 transition-colors"
+        className="flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 mb-6 transition-colors"
       >
         <ArrowLeft className="w-5 h-5" />
         <span>Back</span>
       </button>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
-        <p className="text-slate-600 mt-1">Customize your VideoAI Studio experience</p>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Settings</h1>
+        <p className="text-slate-600 dark:text-slate-400 mt-1">Customize your VideoAI Studio experience</p>
       </div>
 
       <div className="space-y-6">
         <div className="card p-6">
           <div className="flex items-start justify-between mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900 flex items-center space-x-2">
-                <Moon className="w-5 h-5 text-blue-600" />
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center space-x-2">
+                <Moon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 <span>Appearance</span>
               </h3>
-              <p className="text-sm text-slate-600 mt-1">Customize how VideoAI Studio looks</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Customize how VideoAI Studio looks</p>
             </div>
           </div>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
               <div>
-                <p className="font-medium text-slate-900">Theme</p>
-                <p className="text-sm text-slate-500">Light or dark mode</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">Theme</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Light or dark mode</p>
               </div>
               <select
                 value={theme}
                 onChange={(e) => handleThemeChange(e.target.value as 'light' | 'dark')}
-                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
               >
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
