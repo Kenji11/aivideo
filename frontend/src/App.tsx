@@ -115,7 +115,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       <Header
         onProjectsClick={() => setAppStep(appStep === 'projects' ? 'create' : 'projects')}
       />
@@ -167,7 +167,7 @@ function App() {
               <div className="space-x-2 flex flex-shrink-0">
                 <button
                   onClick={() => setAppStep('dashboard')}
-                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 hover:bg-white rounded-lg transition-colors whitespace-nowrap text-sm"
+                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap text-sm"
                   title="Dashboard"
                 >
                   <BarChart3 className="w-5 h-5" />
@@ -175,7 +175,7 @@ function App() {
                 </button>
                 <button
                   onClick={() => setAppStep('templates')}
-                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 hover:bg-white rounded-lg transition-colors whitespace-nowrap text-sm"
+                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap text-sm"
                   title="Templates"
                 >
                   <Zap className="w-5 h-5" />
@@ -183,7 +183,7 @@ function App() {
                 </button>
                 <button
                   onClick={() => setAppStep('library')}
-                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 hover:bg-white rounded-lg transition-colors whitespace-nowrap text-sm"
+                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap text-sm"
                   title="Video Library"
                 >
                   <Library className="w-5 h-5" />
@@ -191,7 +191,7 @@ function App() {
                 </button>
                 <button
                   onClick={() => setAppStep('analytics')}
-                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 hover:bg-white rounded-lg transition-colors whitespace-nowrap text-sm"
+                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap text-sm"
                   title="Analytics"
                 >
                   <BarChart3 className="w-5 h-5" />
@@ -199,7 +199,7 @@ function App() {
                 </button>
                 <button
                   onClick={() => setAppStep('billing')}
-                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 hover:bg-white rounded-lg transition-colors whitespace-nowrap text-sm"
+                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap text-sm"
                   title="Billing"
                 >
                   <CreditCard className="w-5 h-5" />
@@ -207,7 +207,7 @@ function App() {
                 </button>
                 <button
                   onClick={() => setAppStep('api')}
-                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 hover:bg-white rounded-lg transition-colors whitespace-nowrap text-sm"
+                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap text-sm"
                   title="API"
                 >
                   <Code2 className="w-5 h-5" />
@@ -215,7 +215,7 @@ function App() {
                 </button>
                 <button
                   onClick={() => setAppStep('settings')}
-                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 hover:bg-white rounded-lg transition-colors whitespace-nowrap text-sm"
+                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap text-sm"
                   title="Settings"
                 >
                   <Settings className="w-5 h-5" />
@@ -233,10 +233,10 @@ function App() {
         {appStep === 'projects' && (
           <div className="animate-fade-in">
             <div className="mb-8">
-              <h2 className="text-3xl font-bold text-slate-900 mb-2">
+              <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
                 My Projects
               </h2>
-              <p className="text-slate-600">
+              <p className="text-slate-600 dark:text-slate-400">
                 Create and manage your AI-generated videos
               </p>
             </div>
@@ -244,7 +244,7 @@ function App() {
             {projects.length === 0 ? (
               <div className="card p-16 text-center">
                 <Film className="w-16 h-16 mx-auto text-slate-300 mb-4" />
-                <p className="text-slate-500 mb-6">No projects yet</p>
+                <p className="text-slate-500 dark:text-slate-400 mb-6">No projects yet</p>
                 <button
                   onClick={() => setAppStep('create')}
                   className="btn-primary"
@@ -269,10 +269,10 @@ function App() {
         {appStep === 'create' && (
           <div className="card p-8 animate-fade-in">
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-slate-900 mb-2">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
                 Create Your Video
               </h2>
-              <p className="text-slate-600">
+              <p className="text-slate-600 dark:text-slate-400">
                 Describe your vision and let AI bring it to life, or choose a template to get started
               </p>
             </div>
@@ -341,10 +341,10 @@ function App() {
             <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-6 animate-pulse-subtle">
               <Video className="w-10 h-10 text-blue-600" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
               AI is Creating Your Video
             </h2>
-            <p className="text-slate-600 mb-8">
+            <p className="text-slate-600 dark:text-slate-400 mb-8">
               Sit back and relax while our AI works its magic...
             </p>
 
@@ -364,11 +364,11 @@ function App() {
             </div>
             <div className="p-8 space-y-6">
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 mb-2">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
                   {title}
                 </h2>
                 {description && (
-                  <p className="text-slate-600">
+                  <p className="text-slate-600 dark:text-slate-400">
                     {description}
                   </p>
                 )}
@@ -376,12 +376,12 @@ function App() {
 
               <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
                 <div>
-                  <p className="text-xs text-slate-500">Duration</p>
-                  <p className="text-lg font-semibold text-slate-900">2:45</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Duration</p>
+                  <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">2:45</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Resolution</p>
-                  <p className="text-lg font-semibold text-slate-900">1080p</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Resolution</p>
+                  <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">1080p</p>
                 </div>
               </div>
 
@@ -423,10 +423,10 @@ function App() {
             <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-6">
               <Download className="w-10 h-10 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
               Download Complete!
             </h2>
-            <p className="text-slate-600 mb-8">
+            <p className="text-slate-600 dark:text-slate-400 mb-8">
               Your video is ready to share with the world
             </p>
             <div className="flex flex-col space-y-3">
