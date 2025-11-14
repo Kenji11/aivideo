@@ -40,12 +40,12 @@ export function ExportPanel({ onExport, onCancel }: ExportPanelProps) {
   return (
     <div className="card p-8 animate-fade-in space-y-8">
       <div>
-        <h3 className="text-2xl font-bold text-slate-900 mb-2">Export Video</h3>
-        <p className="text-slate-600">Choose format and quality for your final video</p>
+        <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">Export Video</h3>
+        <p className="text-slate-600 dark:text-slate-400">Choose format and quality for your final video</p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-4">
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-4">
           Output Format
         </label>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -56,19 +56,19 @@ export function ExportPanel({ onExport, onCancel }: ExportPanelProps) {
               className={`p-4 rounded-lg border-2 transition-all text-center ${
                 settings.format === opt.id
                   ? 'border-blue-600 bg-blue-50'
-                  : 'border-slate-200 hover:border-blue-400'
+                  : 'border-slate-200 dark:border-slate-700 hover:border-blue-400'
               }`}
             >
               <div className="text-2xl mb-2">{opt.icon}</div>
-              <p className="font-medium text-slate-900">{opt.name}</p>
-              <p className="text-xs text-slate-500">{opt.desc}</p>
+              <p className="font-medium text-slate-900 dark:text-slate-100">{opt.name}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{opt.desc}</p>
             </button>
           ))}
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-4">
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-4">
           Quality
         </label>
         <div className="space-y-3">
@@ -79,17 +79,17 @@ export function ExportPanel({ onExport, onCancel }: ExportPanelProps) {
               className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
                 settings.quality === qual
                   ? 'border-blue-600 bg-blue-50'
-                  : 'border-slate-200 hover:border-blue-400'
+                  : 'border-slate-200 dark:border-slate-700 hover:border-blue-400'
               }`}
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-slate-900 capitalize">{qual}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="font-medium text-slate-900 dark:text-slate-100 capitalize">{qual}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     {qualitySpecs[qual].res} • {qualitySpecs[qual].bitrate}
                   </p>
                 </div>
-                <span className="text-xs font-medium text-slate-600">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
                   ~{qualitySpecs[qual].size}
                 </span>
               </div>
@@ -98,8 +98,8 @@ export function ExportPanel({ onExport, onCancel }: ExportPanelProps) {
         </div>
       </div>
 
-      <div className="border-t border-slate-200 pt-6 space-y-4">
-        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+      <div className="border-t border-slate-200 dark:border-slate-700 pt-6 space-y-4">
+        <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
           <label className="flex items-center space-x-3 flex-1 cursor-pointer">
             <input
               type="checkbox"
@@ -108,13 +108,13 @@ export function ExportPanel({ onExport, onCancel }: ExportPanelProps) {
               className="w-5 h-5 rounded"
             />
             <div>
-              <p className="font-medium text-slate-900">Include Watermark</p>
-              <p className="text-xs text-slate-500">Add branding to your video</p>
+              <p className="font-medium text-slate-900 dark:text-slate-100">Include Watermark</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Add branding to your video</p>
             </div>
           </label>
         </div>
 
-        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+        <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
           <label className="flex items-center space-x-3 flex-1 cursor-pointer">
             <input
               type="checkbox"
@@ -123,8 +123,8 @@ export function ExportPanel({ onExport, onCancel }: ExportPanelProps) {
               className="w-5 h-5 rounded"
             />
             <div>
-              <p className="font-medium text-slate-900">Generate Subtitles</p>
-              <p className="text-xs text-slate-500">Auto-generate from audio</p>
+              <p className="font-medium text-slate-900 dark:text-slate-100">Generate Subtitles</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Auto-generate from audio</p>
             </div>
           </label>
         </div>

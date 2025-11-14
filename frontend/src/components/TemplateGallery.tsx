@@ -70,11 +70,11 @@ export function TemplateGallery({ templates, onSelect, isLoading = false }: Temp
           </div>
           <div className="p-4 space-y-3">
             <div>
-              <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+              <h3 className="font-semibold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 transition-colors">
                 {template.name}
               </h3>
               {template.description && (
-                <p className="text-sm text-slate-600 line-clamp-2 mt-1">
+                <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 mt-1">
                   {template.description}
                 </p>
               )}

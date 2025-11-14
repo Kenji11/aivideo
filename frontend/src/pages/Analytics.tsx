@@ -20,23 +20,23 @@ export function Analytics({ onBack }: AnalyticsProps) {
     <div className="max-w-6xl mx-auto animate-fade-in">
       <button
         onClick={onBack}
-        className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 mb-6 transition-colors"
+        className="flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 mb-6 transition-colors"
       >
         <ArrowLeft className="w-5 h-5" />
         <span>Back</span>
       </button>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Analytics</h1>
-        <p className="text-slate-600 mt-1">Track your video creation activity and performance</p>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Analytics</h1>
+        <p className="text-slate-600 dark:text-slate-400 mt-1">Track your video creation activity and performance</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-600">Videos Created</p>
-              <p className="text-3xl font-bold text-slate-900 mt-1">24</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Videos Created</p>
+              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1">24</p>
               <p className="text-xs text-green-600 mt-2">+3 this week</p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -48,8 +48,8 @@ export function Analytics({ onBack }: AnalyticsProps) {
         <div className="card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-600">Total Views</p>
-              <p className="text-3xl font-bold text-slate-900 mt-1">4.2K</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Total Views</p>
+              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1">4.2K</p>
               <p className="text-xs text-green-600 mt-2">+12% this month</p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -61,9 +61,9 @@ export function Analytics({ onBack }: AnalyticsProps) {
         <div className="card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-600">Total Duration</p>
-              <p className="text-3xl font-bold text-slate-900 mt-1">8h 24m</p>
-              <p className="text-xs text-slate-500 mt-2">Average 21m per video</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Total Duration</p>
+              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1">8h 24m</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Average 21m per video</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
               <Clock className="w-6 h-6 text-green-600" />
@@ -74,8 +74,8 @@ export function Analytics({ onBack }: AnalyticsProps) {
         <div className="card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-600">Growth Rate</p>
-              <p className="text-3xl font-bold text-slate-900 mt-1">18%</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Growth Rate</p>
+              <p className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1">18%</p>
               <p className="text-xs text-green-600 mt-2">Month over month</p>
             </div>
             <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -87,7 +87,7 @@ export function Analytics({ onBack }: AnalyticsProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="card p-6">
-          <h3 className="font-semibold text-slate-900 mb-4">Videos Created (This Week)</h3>
+          <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4">Videos Created (This Week)</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -106,7 +106,7 @@ export function Analytics({ onBack }: AnalyticsProps) {
         </div>
 
         <div className="card p-6">
-          <h3 className="font-semibold text-slate-900 mb-4">Views Trend</h3>
+          <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4">Views Trend</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -132,7 +132,7 @@ export function Analytics({ onBack }: AnalyticsProps) {
       </div>
 
       <div className="card p-6">
-        <h3 className="font-semibold text-slate-900 mb-4">Top Videos</h3>
+        <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4">Top Videos</h3>
         <div className="space-y-3">
           {[
             { title: 'Summer Travel Guide', views: 1240, date: '2 days ago' },
@@ -141,13 +141,13 @@ export function Analytics({ onBack }: AnalyticsProps) {
           ].map((video, idx) => (
             <div
               key={idx}
-              className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+              className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 transition-colors"
             >
               <div>
-                <p className="font-medium text-slate-900">{video.title}</p>
-                <p className="text-sm text-slate-500">{video.date}</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">{video.title}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{video.date}</p>
               </div>
-              <p className="text-lg font-semibold text-slate-900">{video.views}</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{video.views}</p>
             </div>
           ))}
         </div>

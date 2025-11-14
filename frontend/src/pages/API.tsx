@@ -64,37 +64,37 @@ export function API({ onBack }: APIProps) {
     <div className="max-w-6xl mx-auto animate-fade-in">
       <button
         onClick={onBack}
-        className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 mb-6 transition-colors"
+        className="flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 mb-6 transition-colors"
       >
         <ArrowLeft className="w-5 h-5" />
         <span>Back</span>
       </button>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">API Documentation</h1>
-        <p className="text-slate-600 mt-1">Integrate VideoAI Studio into your application</p>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">API Documentation</h1>
+        <p className="text-slate-600 dark:text-slate-400 mt-1">Integrate VideoAI Studio into your application</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="card p-6">
-          <p className="text-sm text-slate-600 mb-1">Base URL</p>
-          <p className="text-lg font-mono font-semibold text-slate-900 break-all">
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Base URL</p>
+          <p className="text-lg font-mono font-semibold text-slate-900 dark:text-slate-100 break-all">
             https://api.videoai.studio
           </p>
         </div>
         <div className="card p-6">
-          <p className="text-sm text-slate-600 mb-1">Authentication</p>
-          <p className="text-lg font-mono font-semibold text-slate-900">Bearer Token</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Authentication</p>
+          <p className="text-lg font-mono font-semibold text-slate-900 dark:text-slate-100">Bearer Token</p>
         </div>
         <div className="card p-6">
-          <p className="text-sm text-slate-600 mb-1">Rate Limit</p>
-          <p className="text-lg font-mono font-semibold text-slate-900">1000 req/min</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Rate Limit</p>
+          <p className="text-lg font-mono font-semibold text-slate-900 dark:text-slate-100">1000 req/min</p>
         </div>
       </div>
 
       <div className="card p-6 mb-8">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">Getting Your API Key</h3>
-        <ol className="space-y-3 text-slate-700">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Getting Your API Key</h3>
+        <ol className="space-y-3 text-slate-700 dark:text-slate-300">
           <li className="flex items-start space-x-3">
             <span className="font-bold text-blue-600">1.</span>
             <span>Go to your account settings</span>
@@ -115,11 +115,11 @@ export function API({ onBack }: APIProps) {
       </div>
 
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-slate-900">Endpoints</h2>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Endpoints</h2>
 
         {endpoints.map((endpoint) => (
           <div key={endpoint.id} className="card p-6">
-            <div className="mb-4 pb-4 border-b border-slate-200">
+            <div className="mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center space-x-4 mb-2">
                 <span
                   className={`px-3 py-1 rounded text-sm font-bold text-white ${
@@ -128,9 +128,9 @@ export function API({ onBack }: APIProps) {
                 >
                   {endpoint.method}
                 </span>
-                <code className="font-mono text-slate-900">{endpoint.path}</code>
+                <code className="font-mono text-slate-900 dark:text-slate-100">{endpoint.path}</code>
               </div>
-              <p className="text-slate-600">{endpoint.description}</p>
+              <p className="text-slate-600 dark:text-slate-400">{endpoint.description}</p>
             </div>
 
             <div className="bg-slate-900 rounded-lg p-4 mb-4 relative group">
@@ -153,7 +153,7 @@ export function API({ onBack }: APIProps) {
       </div>
 
       <div className="card p-6 mt-8">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center space-x-2">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center space-x-2">
           <Code className="w-5 h-5" />
           <span>Response Format</span>
         </h3>
@@ -174,8 +174,8 @@ export function API({ onBack }: APIProps) {
       </div>
 
       <div className="card p-6 mt-8">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">Need Help?</h3>
-        <p className="text-slate-600 mb-4">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Need Help?</h3>
+        <p className="text-slate-600 dark:text-slate-400 mb-4">
           Check our documentation, examples, and community forum for help with integration.
         </p>
         <div className="flex space-x-3">

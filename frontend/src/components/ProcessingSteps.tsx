@@ -22,7 +22,7 @@ export function ProcessingSteps({ steps, elapsedTime = 0 }: ProcessingStepsProps
       {steps.map((step, idx) => (
         <div
           key={idx}
-          className="flex items-center space-x-4 p-4 bg-slate-50 rounded-lg border border-slate-200 animate-slide-in"
+          className="flex items-center space-x-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700 animate-slide-in"
           style={{ animationDelay: `${idx * 100}ms` }}
         >
           <div className="flex-shrink-0">
@@ -44,9 +44,9 @@ export function ProcessingSteps({ steps, elapsedTime = 0 }: ProcessingStepsProps
               step.status === 'pending'
                 ? 'text-slate-400'
                 : step.status === 'processing'
-                  ? 'text-slate-900'
+                  ? 'text-slate-900 dark:text-slate-100'
                   : step.status === 'completed'
-                    ? 'text-slate-700'
+                    ? 'text-slate-700 dark:text-slate-300'
                     : 'text-red-700'
             }`}
           >
@@ -56,7 +56,7 @@ export function ProcessingSteps({ steps, elapsedTime = 0 }: ProcessingStepsProps
       ))}
 
       {elapsedTime > 0 && (
-        <div className="text-center text-sm text-slate-500 mt-4">
+        <div className="text-center text-sm text-slate-500 dark:text-slate-400 mt-4">
           Elapsed time: {formatTime(elapsedTime)}
         </div>
       )}

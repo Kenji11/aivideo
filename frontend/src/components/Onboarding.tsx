@@ -55,25 +55,25 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
         <div className="p-8 space-y-6">
           <div className="text-center space-y-2">
-            <h2 className="text-2xl font-bold text-slate-900">{step.title}</h2>
-            <p className="text-slate-600">{step.description}</p>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{step.title}</h2>
+            <p className="text-slate-600 dark:text-slate-400">{step.description}</p>
           </div>
 
           <div className="h-32 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg flex items-center justify-center">
-            <p className="text-center text-slate-700 px-4">{step.content}</p>
+            <p className="text-center text-slate-700 dark:text-slate-300 px-4">{step.content}</p>
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
               <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
-              <span className="text-sm text-slate-700">
+              <span className="text-sm text-slate-700 dark:text-slate-300">
                 Step {currentStep + 1} of {steps.length}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="flex space-x-3 p-6 border-t border-slate-200">
+        <div className="flex space-x-3 p-6 border-t border-slate-200 dark:border-slate-700">
           {currentStep > 0 && (
             <button
               onClick={() => setCurrentStep(currentStep - 1)}

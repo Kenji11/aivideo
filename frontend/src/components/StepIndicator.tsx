@@ -22,14 +22,14 @@ export function StepIndicator({ steps, currentStep }: StepIndicatorProps) {
                 className={`step-circle ${
                   currentStep >= step.id
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
-                    : 'bg-white text-slate-400 border-2 border-slate-200'
+                    : 'bg-white text-slate-400 border-2 border-slate-200 dark:border-slate-700'
                 }`}
               >
                 <step.icon className="w-6 h-6" />
               </div>
               <span
                 className={`mt-2 text-sm font-medium ${
-                  currentStep >= step.id ? 'text-slate-900' : 'text-slate-400'
+                  currentStep >= step.id ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400'
                 }`}
               >
                 {step.name}

@@ -38,11 +38,11 @@ export function ShareModal({ projectId, projectTitle, onClose }: ShareModalProps
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-md w-full animate-fade-in">
-        <div className="flex items-center justify-between p-6 border-b border-slate-200">
-          <h2 className="text-xl font-bold text-slate-900">Share Project</h2>
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Share Project</h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors"
+            className="text-slate-400 hover:text-slate-600 dark:text-slate-400 transition-colors"
           >
             <X className="w-6 h-6" />
           </button>
@@ -50,17 +50,17 @@ export function ShareModal({ projectId, projectTitle, onClose }: ShareModalProps
 
         <div className="p-6 space-y-6">
           <div>
-            <p className="text-sm font-medium text-slate-700 mb-3">Share via Link</p>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Share via Link</p>
             <div className="flex items-center space-x-2">
               <input
                 type="text"
                 value={shareLink}
                 readOnly
-                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-sm text-slate-600"
+                className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700/50 text-sm text-slate-600 dark:text-slate-400"
               />
               <button
                 onClick={handleCopyLink}
-                className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 rounded-lg transition-colors"
               >
                 {copied ? (
                   <Check className="w-5 h-5 text-green-600" />
@@ -71,8 +71,8 @@ export function ShareModal({ projectId, projectTitle, onClose }: ShareModalProps
             </div>
           </div>
 
-          <div className="border-t border-slate-200 pt-6">
-            <p className="text-sm font-medium text-slate-700 mb-3">Share with Collaborators</p>
+          <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Share with Collaborators</p>
             <form onSubmit={handleAddEmail} className="space-y-3">
               <div className="flex items-center space-x-2">
                 <div className="flex-1 relative">
@@ -88,7 +88,7 @@ export function ShareModal({ projectId, projectTitle, onClose }: ShareModalProps
                 <select
                   value={permission}
                   onChange={(e) => setPermission(e.target.value as 'view' | 'comment' | 'edit')}
-                  className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="view">View</option>
                   <option value="comment">Comment</option>
@@ -109,14 +109,14 @@ export function ShareModal({ projectId, projectTitle, onClose }: ShareModalProps
                 {sharedEmails.map((email) => (
                   <div
                     key={email}
-                    className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                    className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg"
                   >
-                    <span className="text-sm text-slate-700">{email}</span>
+                    <span className="text-sm text-slate-700 dark:text-slate-300">{email}</span>
                     <button
                       onClick={() =>
                         setSharedEmails(sharedEmails.filter((e) => e !== email))
                       }
-                      className="text-slate-400 hover:text-slate-600"
+                      className="text-slate-400 hover:text-slate-600 dark:text-slate-400"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -127,7 +127,7 @@ export function ShareModal({ projectId, projectTitle, onClose }: ShareModalProps
           </div>
         </div>
 
-        <div className="flex space-x-3 p-6 border-t border-slate-200">
+        <div className="flex space-x-3 p-6 border-t border-slate-200 dark:border-slate-700">
           <button
             onClick={onClose}
             className="flex-1 btn-secondary"

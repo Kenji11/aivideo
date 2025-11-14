@@ -72,15 +72,15 @@ export function Billing({ onBack }: BillingProps) {
     <div className="max-w-6xl mx-auto animate-fade-in">
       <button
         onClick={onBack}
-        className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 mb-6 transition-colors"
+        className="flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 mb-6 transition-colors"
       >
         <ArrowLeft className="w-5 h-5" />
         <span>Back</span>
       </button>
 
       <div className="mb-12">
-        <h1 className="text-3xl font-bold text-slate-900">Billing & Plans</h1>
-        <p className="text-slate-600 mt-1">Choose the perfect plan for your needs</p>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Billing & Plans</h1>
+        <p className="text-slate-600 dark:text-slate-400 mt-1">Choose the perfect plan for your needs</p>
       </div>
 
       <div className="flex items-center justify-center space-x-6 mb-12">
@@ -89,7 +89,7 @@ export function Billing({ onBack }: BillingProps) {
           className={`px-6 py-2 rounded-lg font-medium transition-all ${
             billingCycle === 'monthly'
               ? 'bg-blue-600 text-white'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
           }`}
         >
           Monthly
@@ -99,7 +99,7 @@ export function Billing({ onBack }: BillingProps) {
           className={`px-6 py-2 rounded-lg font-medium transition-all ${
             billingCycle === 'yearly'
               ? 'bg-blue-600 text-white'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
           }`}
         >
           Yearly <span className="text-xs ml-2">Save 20%</span>
@@ -119,12 +119,12 @@ export function Billing({ onBack }: BillingProps) {
                 plan.highlighted ? 'ring-2 ring-blue-600 transform lg:scale-105' : ''
               }`}
             >
-              <div className={`p-6 ${plan.highlighted ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white' : 'bg-slate-50'}`}>
+              <div className={`p-6 ${plan.highlighted ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white' : 'bg-slate-50 dark:bg-slate-700/50'}`}>
                 <div className="flex items-center space-x-3 mb-2">
                   <Icon className="w-8 h-8" />
                   <h3 className="text-2xl font-bold">{plan.name}</h3>
                 </div>
-                <p className={`text-sm ${plan.highlighted ? 'text-blue-100' : 'text-slate-600'}`}>
+                <p className={`text-sm ${plan.highlighted ? 'text-blue-100' : 'text-slate-600 dark:text-slate-400'}`}>
                   {plan.description}
                 </p>
               </div>
@@ -132,12 +132,12 @@ export function Billing({ onBack }: BillingProps) {
               <div className="p-6 space-y-6">
                 <div>
                   {plan.price === 0 ? (
-                    <p className="text-4xl font-bold text-slate-900">Free</p>
+                    <p className="text-4xl font-bold text-slate-900 dark:text-slate-100">Free</p>
                   ) : (
                     <>
                       <div className="flex items-baseline space-x-2">
-                        <span className="text-4xl font-bold text-slate-900">${displayPrice}</span>
-                        <span className="text-slate-600">/{billingCycle === 'yearly' ? 'year' : 'month'}</span>
+                        <span className="text-4xl font-bold text-slate-900 dark:text-slate-100">${displayPrice}</span>
+                        <span className="text-slate-600 dark:text-slate-400">/{billingCycle === 'yearly' ? 'year' : 'month'}</span>
                       </div>
                       {billingCycle === 'yearly' && plan.price > 0 && (
                         <p className="text-xs text-green-600 mt-2">Save ${(plan.price * 12 - displayPrice).toFixed(0)}/year</p>
@@ -150,7 +150,7 @@ export function Billing({ onBack }: BillingProps) {
                   className={`w-full py-3 px-4 rounded-lg font-medium transition-all ${
                     plan.id === 'pro'
                       ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'border-2 border-slate-300 text-slate-900 hover:border-blue-600 hover:text-blue-600'
+                      : 'border-2 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 hover:border-blue-600 hover:text-blue-600'
                   }`}
                 >
                   {plan.cta}
@@ -160,7 +160,7 @@ export function Billing({ onBack }: BillingProps) {
                   {plan.features.map((feature, idx) => (
                     <div key={idx} className="flex items-start space-x-3">
                       <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm text-slate-700">{feature}</span>
+                      <span className="text-sm text-slate-700 dark:text-slate-300">{feature}</span>
                     </div>
                   ))}
                 </div>
@@ -171,7 +171,7 @@ export function Billing({ onBack }: BillingProps) {
       </div>
 
       <div className="mt-16 card p-8">
-        <h3 className="text-xl font-bold text-slate-900 mb-4">Frequently Asked Questions</h3>
+        <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">Frequently Asked Questions</h3>
         <div className="space-y-4">
           {[
             {
@@ -191,9 +191,9 @@ export function Billing({ onBack }: BillingProps) {
               a: 'We\'ll notify you before reaching your limit. You can either upgrade or wait for your monthly reset.',
             },
           ].map((faq, idx) => (
-            <div key={idx} className="border-b border-slate-200 pb-4 last:border-b-0">
-              <p className="font-medium text-slate-900 mb-2">{faq.q}</p>
-              <p className="text-slate-600">{faq.a}</p>
+            <div key={idx} className="border-b border-slate-200 dark:border-slate-700 pb-4 last:border-b-0">
+              <p className="font-medium text-slate-900 dark:text-slate-100 mb-2">{faq.q}</p>
+              <p className="text-slate-600 dark:text-slate-400">{faq.a}</p>
             </div>
           ))}
         </div>

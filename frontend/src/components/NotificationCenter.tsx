@@ -72,14 +72,14 @@ export function NotificationCenter({ notifications, onDismiss }: NotificationCen
                 {getIcon(notification.type)}
               </div>
               <div className="flex-1">
-                <p className="font-medium text-slate-900">{notification.title}</p>
-                <p className="text-sm text-slate-600 mt-0.5">{notification.message}</p>
-                <p className="text-xs text-slate-500 mt-2">{formatTime(notification.timestamp)}</p>
+                <p className="font-medium text-slate-900 dark:text-slate-100">{notification.title}</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">{notification.message}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{formatTime(notification.timestamp)}</p>
               </div>
             </div>
             <button
               onClick={() => onDismiss(notification.id)}
-              className="text-slate-400 hover:text-slate-600 flex-shrink-0"
+              className="text-slate-400 hover:text-slate-600 dark:text-slate-400 flex-shrink-0"
             >
               <X className="w-4 h-4" />
             </button>
@@ -93,7 +93,7 @@ export function NotificationCenter({ notifications, onDismiss }: NotificationCen
 export function NotificationBell({ count }: { count: number }) {
   return (
     <div className="relative">
-      <Bell className="w-6 h-6 text-slate-700 hover:text-slate-900 cursor-pointer transition-colors" />
+      <Bell className="w-6 h-6 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:text-slate-100 cursor-pointer transition-colors" />
       {count > 0 && (
         <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
           {count > 9 ? '9+' : count}

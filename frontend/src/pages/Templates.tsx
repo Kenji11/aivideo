@@ -76,15 +76,15 @@ export function Templates({ onBack, onSelectTemplate }: TemplatesProps) {
     <div className="max-w-6xl mx-auto animate-fade-in">
       <button
         onClick={onBack}
-        className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 mb-6 transition-colors"
+        className="flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 mb-6 transition-colors"
       >
         <ArrowLeft className="w-5 h-5" />
         <span>Back</span>
       </button>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Templates</h1>
-        <p className="text-slate-600 mt-1">Choose from professionally designed templates to jumpstart your video</p>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Templates</h1>
+        <p className="text-slate-600 dark:text-slate-400 mt-1">Choose from professionally designed templates to jumpstart your video</p>
       </div>
 
       <div className="card p-6 mb-8">
@@ -108,7 +108,7 @@ export function Templates({ onBack, onSelectTemplate }: TemplatesProps) {
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                   (cat.id === 'all' && !selectedCategory) || selectedCategory === cat.id
                     ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
                 }`}
               >
                 {cat.name}
@@ -125,7 +125,7 @@ export function Templates({ onBack, onSelectTemplate }: TemplatesProps) {
 
       {filteredTemplates.length === 0 && (
         <div className="card p-16 text-center">
-          <p className="text-slate-500">No templates found matching your criteria</p>
+          <p className="text-slate-500 dark:text-slate-400">No templates found matching your criteria</p>
         </div>
       )}
     </div>

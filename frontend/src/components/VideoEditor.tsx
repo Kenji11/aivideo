@@ -30,7 +30,7 @@ export function VideoEditor({ onSave, onCancel }: VideoEditorProps) {
   return (
     <div className="card p-6 space-y-6 animate-fade-in">
       <div>
-        <h3 className="font-semibold text-slate-900 mb-4 flex items-center space-x-2">
+        <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center space-x-2">
           <Sliders className="w-5 h-5 text-blue-600" />
           <span>Video Settings</span>
         </h3>
@@ -38,7 +38,7 @@ export function VideoEditor({ onSave, onCancel }: VideoEditorProps) {
 
       <div className="space-y-4">
         <div>
-          <label className="flex items-center justify-between text-sm font-medium text-slate-700 mb-2">
+          <label className="flex items-center justify-between text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             <span>Duration</span>
             <span className="text-blue-600">{settings.duration}s</span>
           </label>
@@ -56,7 +56,7 @@ export function VideoEditor({ onSave, onCancel }: VideoEditorProps) {
         </div>
 
         <div>
-          <label className="flex items-center justify-between text-sm font-medium text-slate-700 mb-2">
+          <label className="flex items-center justify-between text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             <span className="flex items-center space-x-2">
               <Volume2 className="w-4 h-4" />
               <span>Volume</span>
@@ -76,7 +76,7 @@ export function VideoEditor({ onSave, onCancel }: VideoEditorProps) {
         </div>
 
         <div>
-          <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 mb-2">
+          <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             <Palette className="w-4 h-4" />
             <span>Background Color</span>
           </label>
@@ -87,7 +87,7 @@ export function VideoEditor({ onSave, onCancel }: VideoEditorProps) {
               onChange={(e) =>
                 setSettings({ ...settings, backgroundColor: e.target.value })
               }
-              className="w-12 h-10 rounded border border-slate-300 cursor-pointer"
+              className="w-12 h-10 rounded border border-slate-300 dark:border-slate-600 cursor-pointer"
             />
             <input
               type="text"
@@ -95,13 +95,13 @@ export function VideoEditor({ onSave, onCancel }: VideoEditorProps) {
               onChange={(e) =>
                 setSettings({ ...settings, backgroundColor: e.target.value })
               }
-              className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm"
+              className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm"
             />
           </div>
         </div>
 
         <div>
-          <label className="flex items-center justify-between text-sm font-medium text-slate-700 mb-2">
+          <label className="flex items-center justify-between text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             <span className="flex items-center space-x-2">
               <Type className="w-4 h-4" />
               <span>Text Size</span>
@@ -122,7 +122,7 @@ export function VideoEditor({ onSave, onCancel }: VideoEditorProps) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             Background Music
           </label>
           <select
@@ -130,7 +130,7 @@ export function VideoEditor({ onSave, onCancel }: VideoEditorProps) {
             onChange={(e) =>
               setSettings({ ...settings, musicTrack: e.target.value })
             }
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
             <option value="uplifting">Uplifting (Royalty-Free)</option>
             <option value="ambient">Ambient (Royalty-Free)</option>
@@ -141,7 +141,7 @@ export function VideoEditor({ onSave, onCancel }: VideoEditorProps) {
         </div>
       </div>
 
-      <div className="flex space-x-3 pt-4 border-t border-slate-200">
+      <div className="flex space-x-3 pt-4 border-t border-slate-200 dark:border-slate-700">
         <button onClick={onCancel} className="flex-1 btn-secondary">
           Cancel
         </button>

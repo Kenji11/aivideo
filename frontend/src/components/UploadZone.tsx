@@ -58,17 +58,17 @@ export function UploadZone({ onFilesSelected, disabled = false }: UploadZoneProp
         onDrop={handleDrop}
         className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
           disabled
-            ? 'opacity-50 cursor-not-allowed border-slate-300'
+            ? 'opacity-50 cursor-not-allowed border-slate-300 dark:border-slate-600'
             : isDragActive
               ? 'border-blue-500 bg-blue-50'
-              : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50'
+              : 'border-slate-300 dark:border-slate-600 hover:border-blue-400 hover:bg-blue-50'
         }`}
       >
         <Upload className={`w-12 h-12 mx-auto mb-3 ${isDragActive ? 'text-blue-600' : 'text-slate-400'}`} />
-        <p className="text-sm font-medium text-slate-700 mb-1">
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
           {selectedFiles.length > 0 ? 'Files selected' : 'Drag & drop or click to upload'}
         </p>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
           Images, videos, or PDFs to guide the AI
         </p>
         <input
@@ -90,14 +90,14 @@ export function UploadZone({ onFilesSelected, disabled = false }: UploadZoneProp
               className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-900 truncate">{file.name}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{file.name}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   {(file.size / 1024 / 1024).toFixed(2)} MB
                 </p>
               </div>
               <button
                 onClick={() => setSelectedFiles(selectedFiles.filter((_, i) => i !== idx))}
-                className="ml-3 text-slate-400 hover:text-slate-600"
+                className="ml-3 text-slate-400 hover:text-slate-600 dark:text-slate-400"
               >
                 ×
               </button>

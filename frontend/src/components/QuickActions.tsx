@@ -11,7 +11,7 @@ export function QuickActions({ onNewProject, onViewProjects, recentProjects = []
     <div className="card p-6 mb-8">
       <div className="flex items-center space-x-2 mb-4">
         <Zap className="w-5 h-5 text-orange-600" />
-        <h3 className="font-semibold text-slate-900">Quick Actions</h3>
+        <h3 className="font-semibold text-slate-900 dark:text-slate-100">Quick Actions</h3>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -23,8 +23,8 @@ export function QuickActions({ onNewProject, onViewProjects, recentProjects = []
             <Plus className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p className="font-medium text-slate-900">Create New Video</p>
-            <p className="text-xs text-slate-600">Start from scratch</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100">Create New Video</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400">Start from scratch</p>
           </div>
         </button>
 
@@ -36,15 +36,15 @@ export function QuickActions({ onNewProject, onViewProjects, recentProjects = []
             <FolderOpen className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p className="font-medium text-slate-900">My Projects</p>
-            <p className="text-xs text-slate-600">View all videos</p>
+            <p className="font-medium text-slate-900 dark:text-slate-100">My Projects</p>
+            <p className="text-xs text-slate-600 dark:text-slate-400">View all videos</p>
           </div>
         </button>
       </div>
 
       {recentProjects.length > 0 && (
-        <div className="mt-6 pt-6 border-t border-slate-200">
-          <p className="text-sm font-medium text-slate-700 mb-3 flex items-center space-x-2">
+        <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3 flex items-center space-x-2">
             <RotateCcw className="w-4 h-4" />
             <span>Recent</span>
           </p>
@@ -52,9 +52,9 @@ export function QuickActions({ onNewProject, onViewProjects, recentProjects = []
             {recentProjects.slice(0, 3).map((project) => (
               <button
                 key={project.id}
-                className="w-full text-left p-2 rounded-lg hover:bg-slate-100 transition-colors group"
+                className="w-full text-left p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 transition-colors group"
               >
-                <p className="text-sm text-slate-900 group-hover:text-blue-600 truncate">{project.title}</p>
+                <p className="text-sm text-slate-900 dark:text-slate-100 group-hover:text-blue-600 truncate">{project.title}</p>
               </button>
             ))}
           </div>
