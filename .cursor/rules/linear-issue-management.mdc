@@ -1,0 +1,148 @@
+---
+description: Standardizes Linear issue creation with automatic project and team detection
+globs: **/*.md
+---
+
+# Rule: Linear Issue Management
+
+## Purpose
+
+Automatically configure and use correct Linear project and team settings for this workspace.
+
+## First-Time Setup (Self-Configuring)
+
+**When creating a Linear issue for the first time in this workspace**, OR when user says **"initiate linear issue rule"** or **"setup linear config"**, the AI MUST:
+
+1. **Check for configuration file**: `.cursor/linear-config.md`
+2. **If file does NOT exist**, prompt the user:
+   ```
+   🔧 Linear Configuration Setup
+   
+   I need to configure Linear defaults for this workspace.
+   
+   Please provide:
+   1. Default Team (e.g., "Gauntlet AI", "Engineering")
+   2. Default Project (e.g., "gauntletai.com", "Backend API")
+   3. Default Assignee (e.g., "Zac Smith", "me")
+   
+   Or type "auto" to fetch available options from Linear.
+   ```
+
+3. **Fetch Linear metadata** (if user types "auto"):
+   - Use `mcp_Linear_list_teams` to show available teams
+   - Use `mcp_Linear_list_projects` to show available projects
+   - Use `mcp_Linear_list_users` to show available users
+   - Present options to user for selection
+
+4. **Create configuration file** at `.cursor/linear-config.md`:
+   ```markdown
+   # Linear Configuration for [Workspace Name]
+   
+   **Last Updated**: [Date]
+   **Workspace**: [Path]
+   
+   ## Defaults
+   
+   - **Team**: [Team Name]
+   - **Project**: [Project Name]
+   - **Assignee**: [User Name]
+   
+   ## Notes
+   
+   This configuration is automatically used when creating Linear issues.
+   To change defaults, edit this file or delete it to reconfigure.
+   ```
+
+5. **Save configuration** and proceed with issue creation
+
+## Normal Operation (After Configuration)
+
+When creating Linear issues:
+
+1. **Read configuration** from `.cursor/linear-config.md`
+2. **Apply defaults automatically**:
+   - Team: Use configured default team
+   - Project: Use configured default project (unless user specifies different)
+   - Assignee: Use configured default assignee (unless user specifies different)
+
+3. **Allow overrides**: If user explicitly mentions a different project, team, or assignee, use that instead
+
+## Configuration File Location
+
+```
+.cursor/linear-config.md
+```
+
+Single file, simple format, easy to edit manually or regenerate.
+
+## Issue Creation Standards
+
+1. **Always include**:
+   - Clear title
+   - Detailed description
+   - Assignee (default or specified)
+   - Project (default or specified)
+   - Team (default or specified)
+
+2. **Optional fields**:
+   - Priority (only if user specifies)
+   - Due date (only if user specifies)
+   - Labels (only if user specifies)
+   - State (defaults to "Todo" unless specified)
+
+## Examples
+
+### First Time (No Config):
+```
+User: "Create a Linear task for fixing the footer bug"
+AI: "🔧 I need to configure Linear defaults first.
+     What team should I use? Type 'auto' to see options."
+User: "auto"
+AI: [Shows teams: "Gauntlet AI", "CodeShock"]
+User: "Gauntlet AI"
+AI: [Shows projects in Gauntlet AI team]
+User: "gauntletai.com"
+AI: [Creates config, then creates issue]
+```
+
+### After Configuration:
+```
+User: "Create a Linear task for the API endpoint"
+AI: [Reads config, uses "Gauntlet AI" team and "gauntletai.com" project]
+    [Creates issue automatically]
+```
+
+### With Override:
+```
+User: "Create a Linear task for HQ project about dashboard"
+AI: [Reads config for team/assignee, but uses "HQ" project instead]
+    [Creates issue with override]
+```
+
+## Manual Setup Trigger
+
+You can manually trigger the setup process at any time by saying:
+- **"initiate linear issue rule"**
+- **"setup linear config"**
+- **"configure linear defaults"**
+
+This will run the setup even if a config file already exists (allowing you to reconfigure).
+
+## Reconfiguration
+
+To reconfigure:
+1. Delete `.cursor/linear-config.md`
+2. Next Linear operation will trigger setup again
+
+OR
+
+1. Manually edit `.cursor/linear-config.md`
+2. Changes take effect immediately
+
+OR
+
+1. Say **"initiate linear issue rule"** to run setup wizard again
+
+## No Maintenance Required
+
+This is a simple, static configuration. No weekly updates, no complex file structures, just one config file with defaults.
