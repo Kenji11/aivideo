@@ -11,79 +11,79 @@
 
 **File:** `backend/app/phases/phase2_animatic/task.py`
 
-- [ ] Import celery_app from orchestrator
-- [ ] Import PhaseOutput from common.schemas
-- [ ] Import AnimaticGenerationService
-- [ ] Import time module
-- [ ] Import Dict from typing
+- [x] Import celery_app from orchestrator
+- [x] Import PhaseOutput from common.schemas
+- [x] Import AnimaticGenerationService
+- [x] Import time module
+- [x] Import Dict from typing
 
 ### Task 12.2: Implement generate_animatic Task Function
 
-- [ ] Create `@celery_app.task(bind=True)` decorator
-- [ ] Define `generate_animatic(self, video_id, spec)` signature
-- [ ] Add docstring with Args and Returns
-- [ ] Record start_time
-- [ ] Wrap logic in try/except block
+- [x] Create `@celery_app.task(bind=True)` decorator
+- [x] Define `generate_animatic(self, video_id, spec)` signature
+- [x] Add docstring with Args and Returns
+- [x] Record start_time
+- [x] Wrap logic in try/except block
 
 ### Task 12.3: Implement Success Path
 
-- [ ] Initialize AnimaticGenerationService
-- [ ] Call service.generate_frames(video_id, spec)
-- [ ] Create PhaseOutput with success status
-- [ ] Set video_id, phase="phase2_animatic"
-- [ ] Set output_data={"animatic_urls": frame_urls}
-- [ ] Set cost_usd=service.total_cost
-- [ ] Calculate duration_seconds
-- [ ] Set error_message=None
-- [ ] Return output.dict()
+- [x] Initialize AnimaticGenerationService
+- [x] Call service.generate_frames(video_id, spec)
+- [x] Create PhaseOutput with success status
+- [x] Set video_id, phase="phase2_animatic"
+- [x] Set output_data={"animatic_urls": frame_urls}
+- [x] Set cost_usd=service.total_cost
+- [x] Calculate duration_seconds
+- [x] Set error_message=None
+- [x] Return output.dict()
 
 ### Task 12.4: Implement Error Path
 
-- [ ] In except block, create PhaseOutput with failed status
-- [ ] Set empty output_data
-- [ ] Set cost_usd=0.0
-- [ ] Calculate duration_seconds
-- [ ] Set error_message=str(e)
-- [ ] Return output.dict()
+- [x] In except block, create PhaseOutput with failed status
+- [x] Set empty output_data
+- [x] Set cost_usd=0.0
+- [x] Calculate duration_seconds
+- [x] Set error_message=str(e)
+- [x] Return output.dict()
 
 ### Task 12.5: Create Manual Test Script
 
 **File:** `backend/test_phase2.py`
 
-- [ ] Add shebang and docstring
-- [ ] Import sys and add app to path
-- [ ] Import AnimaticGenerationService, generate_animatic_prompt, json
+- [x] Add shebang and docstring
+- [x] Import sys and add app to path
+- [x] Import AnimaticGenerationService, generate_animatic_prompt, json
 
 ### Task 12.6: Implement test_prompt_generation Function
 
-- [ ] Create `test_prompt_generation()` function
-- [ ] Print test header
-- [ ] Define test_beats list with 3 different beat types
-- [ ] Define style dictionary
-- [ ] Loop through test_beats
-- [ ] Generate prompt for each beat
-- [ ] Print beat name, action, and generated prompt
+- [x] Create `test_prompt_generation()` function
+- [x] Print test header
+- [x] Define test_beats list with 3 different beat types
+- [x] Define style dictionary
+- [x] Loop through test_beats
+- [x] Generate prompt for each beat
+- [x] Print beat name, action, and generated prompt
 
 ### Task 12.7: Implement test_full_generation Function
 
-- [ ] Create `test_full_generation()` function
-- [ ] Print test header
-- [ ] Try to load test_spec_1.json (from Phase 1)
-- [ ] If FileNotFoundError, print warning and return
-- [ ] Print spec template and beat count
-- [ ] Initialize AnimaticGenerationService
-- [ ] Define test_video_id
-- [ ] Call service.generate_frames(test_video_id, spec)
-- [ ] Print success message with frame count and cost
-- [ ] Print all frame URLs
-- [ ] Save result to test_animatic_result.json
-- [ ] Add exception handling with error printing
+- [x] Create `test_full_generation()` function
+- [x] Print test header
+- [x] Try to load test_spec_1.json (from Phase 1)
+- [x] If FileNotFoundError, print warning and return
+- [x] Print spec template and beat count
+- [x] Initialize AnimaticGenerationService
+- [x] Define test_video_id
+- [x] Call service.generate_frames(test_video_id, spec)
+- [x] Print success message with frame count and cost
+- [x] Print all frame URLs
+- [x] Save result to test_animatic_result.json
+- [x] Add exception handling with error printing
 
 ### Task 12.8: Add Main Block
 
-- [ ] Add `if __name__ == "__main__"` block
-- [ ] Call test_prompt_generation()
-- [ ] Add commented call to test_full_generation()
+- [x] Add `if __name__ == "__main__"` block
+- [x] Call test_prompt_generation()
+- [x] Add commented call to test_full_generation()
 
 ---
 
@@ -93,25 +93,25 @@
 
 **File:** `backend/app/orchestrator/pipeline.py`
 
-- [ ] Add import for generate_animatic task from phase2_animatic.task
+- [x] Add import for generate_animatic task from phase2_animatic.task
 
 ### Task 13.2: Integrate Phase 2 into Pipeline
 
-- [ ] After Phase 1 success, add `update_progress(video_id, "generating_animatic", 25)`
-- [ ] Call `generate_animatic.delay(video_id, result1['output_data']['spec']).get(timeout=300)`
-- [ ] Store result as result2
-- [ ] Check if result2['status'] != "success", raise exception with error message
-- [ ] Add result2['cost_usd'] to total_cost
-- [ ] Call `update_cost(video_id, "phase2", result2['cost_usd'])`
-- [ ] Update TODO comment to say "Phase 3-6"
-- [ ] Update final update_progress call to include animatic_urls parameter
-- [ ] Update return dictionary to include animatic_urls and updated cost/time
+- [x] After Phase 1 success, add `update_progress(video_id, "generating_animatic", 25)`
+- [x] Call `generate_animatic.delay(video_id, result1['output_data']['spec']).get(timeout=300)`
+- [x] Store result as result2
+- [x] Check if result2['status'] != "success", raise exception with error message
+- [x] Add result2['cost_usd'] to total_cost
+- [x] Call `update_cost(video_id, "phase2", result2['cost_usd'])`
+- [x] Update TODO comment to say "Phase 3-6"
+- [x] Update final update_progress call to include animatic_urls parameter
+- [x] Update return dictionary to include animatic_urls and updated cost/time
 
 ### Task 13.3: Update Return Statement
 
-- [ ] Add "animatic_urls": result2['output_data']['animatic_urls'] to return dict
-- [ ] Update "cost_usd" to use updated total_cost
-- [ ] Update "generation_time" to use calculated time
+- [x] Add "animatic_urls": result2['output_data']['animatic_urls'] to return dict
+- [x] Update "cost_usd" to use updated total_cost
+- [x] Update "generation_time" to use calculated time
 
 ---
 
@@ -121,52 +121,52 @@
 
 **File:** `backend/app/tests/test_integration/test_phase1_and_2.py`
 
-- [ ] Import pytest, uuid, os
-- [ ] Import validate_prompt and generate_animatic tasks
+- [x] Import pytest, uuid, os
+- [x] Import validate_prompt and generate_animatic tasks
 
 ### Task 14.2: Implement Integration Test
 
-- [ ] Create `test_phase1_and_phase2_integration()` function
-- [ ] Add `@pytest.mark.integration` decorator
-- [ ] Add `@pytest.mark.skipif` for API keys check
-- [ ] Generate test video_id with uuid
-- [ ] Define test prompt and empty assets list
+- [x] Create `test_phase1_and_phase2_integration()` function
+- [x] Add `@pytest.mark.integration` decorator
+- [x] Add `@pytest.mark.skipif` for API keys check
+- [x] Generate test video_id with uuid
+- [x] Define test prompt and empty assets list
 
 ### Task 14.3: Test Phase 1 in Integration
 
-- [ ] Print "Testing Phase 1" message
-- [ ] Call validate_prompt(video_id, prompt, assets)
-- [ ] Assert result1['status'] == 'success'
-- [ ] Assert 'spec' in result1['output_data']
-- [ ] Extract spec from output_data
-- [ ] Print completion message with template
+- [x] Print "Testing Phase 1" message
+- [x] Call validate_prompt(video_id, prompt, assets)
+- [x] Assert result1['status'] == 'success'
+- [x] Assert 'spec' in result1['output_data']
+- [x] Extract spec from output_data
+- [x] Print completion message with template
 
 ### Task 14.4: Test Phase 2 in Integration
 
-- [ ] Print "Testing Phase 2" message
-- [ ] Call generate_animatic(video_id, spec)
-- [ ] Assert result2['status'] == 'success'
-- [ ] Assert 'animatic_urls' in result2['output_data']
-- [ ] Extract frame_urls from output_data
-- [ ] Print completion message with frame count
-- [ ] Print total cost (sum of both phases)
+- [x] Print "Testing Phase 2" message
+- [x] Call generate_animatic(video_id, spec)
+- [x] Assert result2['status'] == 'success'
+- [x] Assert 'animatic_urls' in result2['output_data']
+- [x] Extract frame_urls from output_data
+- [x] Print completion message with frame count
+- [x] Print total cost (sum of both phases)
 
 ### Task 14.5: Verify Integration Results
 
-- [ ] Assert len(frame_urls) == len(spec['beats'])
-- [ ] Loop through frame_urls
-- [ ] Assert each url starts with 's3://'
+- [x] Assert len(frame_urls) == len(spec['beats'])
+- [x] Loop through frame_urls
+- [x] Assert each url starts with 's3://'
 
 ---
 
 ## ✅ PR #12, #13, #14 Checklist
 
 Before merging:
-- [ ] Phase 2 task implemented
-- [ ] Manual test script created
-- [ ] Orchestrator updated to call Phase 2
-- [ ] Integration test written and passing (or skipped if no keys)
-- [ ] Both phases work together end-to-end
+- [x] Phase 2 task implemented
+- [x] Manual test script created
+- [x] Orchestrator updated to call Phase 2
+- [x] Integration test written and passing (or skipped if no keys)
+- [x] Both phases work together end-to-end
 
 **Test Commands:**
 ```bash

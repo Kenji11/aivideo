@@ -34,7 +34,10 @@
 - **Compute**: Elastic Beanstalk (Web + Worker tiers)
 - **Database**: RDS PostgreSQL (db.t4g.micro)
 - **Cache**: ElastiCache Redis (t4g.micro)
-- **Storage**: S3 (video outputs)
+- **Storage**: S3 (video outputs, reference assets, frame animations)
+  - ✅ `ai-video-assets-dev` (development) - Created
+  - ✅ `ai-video-assets-prod` (production) - Created
+  - Region: us-east-2
 - **CDN**: CloudFront (frontend + video delivery)
 - **Load Balancer**: Application Load Balancer
 - **Region**: us-east-2 (Ohio) for all services except CloudFront (global)
@@ -243,7 +246,7 @@ REPLICATE_API_TOKEN=r8_...
 OPENAI_API_KEY=sk-...
 AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=...
-S3_BUCKET=videogen-outputs-prod
+S3_BUCKET=ai-video-assets-prod
 AWS_REGION=us-east-2
 ```
 

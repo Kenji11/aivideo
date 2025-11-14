@@ -2,6 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import generate, status, video, health
 from app.database import init_db
+from app.common.logging import setup_logging
+
+# Initialize logging
+setup_logging("INFO")
 
 # Create FastAPI app
 app = FastAPI(
