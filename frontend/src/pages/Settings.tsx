@@ -1,16 +1,39 @@
 import { ArrowLeft, Moon, Bell, Download, Zap, HelpCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface SettingsProps {
   onBack: () => void;
 }
 
 export function Settings({ onBack }: SettingsProps) {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    // Check localStorage or system preference
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'dark' || saved === 'light') return saved;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return 'light';
+  });
   const [notifications, setNotifications] = useState(true);
   const [autoDownload, setAutoDownload] = useState(false);
   const [quality, setQuality] = useState<'high' | 'medium' | 'ultra'>('high');
   const [emailDigest, setEmailDigest] = useState(true);
+
+  // Apply theme changes
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const handleThemeChange = (newTheme: 'light' | 'dark') => {
+    setTheme(newTheme);
+  };
 
   const toggleSwitch = (value: boolean) => value;
 
@@ -49,8 +72,8 @@ export function Settings({ onBack }: SettingsProps) {
               </div>
               <select
                 value={theme}
-                onChange={(e) => setTheme(e.target.value as 'light' | 'dark')}
-                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                onChange={(e) => handleThemeChange(e.target.value as 'light' | 'dark')}
+                className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
               >
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
