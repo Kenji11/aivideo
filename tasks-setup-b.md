@@ -387,14 +387,14 @@ async def root():
     }
 ```
 
-- [ ] Create FastAPI app instance
-- [ ] Add CORS middleware
-- [ ] Include health router
-- [ ] Include generate router
-- [ ] Include status router
-- [ ] Include video router
-- [ ] Add startup event to initialize database
-- [ ] Add root endpoint
+- [x] Create FastAPI app instance
+- [x] Add CORS middleware
+- [x] Include health router
+- [x] Include generate router
+- [x] Include status router
+- [x] Include video router
+- [x] Add startup event to initialize database
+- [x] Add root endpoint
 
 ### Task 4.2: Implement app/api/health.py
 
@@ -410,9 +410,9 @@ async def health_check():
     return {"status": "ok"}
 ```
 
-- [ ] Create APIRouter instance
-- [ ] Implement health check endpoint
-- [ ] Return simple status response
+- [x] Create APIRouter instance
+- [x] Implement health check endpoint
+- [x] Return simple status response
 
 ### Task 4.3: Implement Service Clients
 
@@ -431,8 +431,8 @@ __all__ = [
 ]
 ```
 
-- [ ] Import all service clients
-- [ ] Export in `__all__`
+- [x] Import all service clients
+- [x] Export in `__all__`
 
 #### 4.3b: app/services/replicate.py
 ```python
@@ -452,11 +452,11 @@ class ReplicateClient:
 replicate_client = ReplicateClient()
 ```
 
-- [ ] Import replicate and get settings
-- [ ] Create ReplicateClient class
-- [ ] Initialize client with API token
-- [ ] Implement `run()` method
-- [ ] Create singleton instance
+- [x] Import replicate and get settings
+- [x] Create ReplicateClient class
+- [x] Initialize client with API token
+- [x] Implement `run()` method
+- [x] Create singleton instance
 
 #### 4.3c: app/services/openai.py
 ```python
@@ -476,11 +476,11 @@ class OpenAIClient:
 openai_client = OpenAIClient()
 ```
 
-- [ ] Import OpenAI and get settings
-- [ ] Create OpenAIClient class
-- [ ] Initialize client with API key
-- [ ] Add chat property
-- [ ] Create singleton instance
+- [x] Import OpenAI and get settings
+- [x] Create OpenAIClient class
+- [x] Initialize client with API key
+- [x] Add chat property
+- [x] Create singleton instance
 
 #### 4.3d: app/services/s3.py
 ```python
@@ -515,12 +515,12 @@ class S3Client:
 s3_client = S3Client()
 ```
 
-- [ ] Import boto3 and get settings
-- [ ] Create S3Client class
-- [ ] Initialize boto3 client with credentials
-- [ ] Implement `upload_file()` method
-- [ ] Implement `generate_presigned_url()` method
-- [ ] Create singleton instance
+- [x] Import boto3 and get settings
+- [x] Create S3Client class
+- [x] Initialize boto3 client with credentials
+- [x] Implement `upload_file()` method
+- [x] Implement `generate_presigned_url()` method
+- [x] Create singleton instance
 
 #### 4.3e: app/services/ffmpeg.py
 ```python
@@ -540,10 +540,10 @@ class FFmpegService:
 ffmpeg_service = FFmpegService()
 ```
 
-- [ ] Import subprocess
-- [ ] Create FFmpegService class
-- [ ] Implement `run_command()` method
-- [ ] Create singleton instance
+- [x] Import subprocess
+- [x] Create FFmpegService class
+- [x] Implement `run_command()` method
+- [x] Create singleton instance
 
 ---
 
