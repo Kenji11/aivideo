@@ -1,31 +1,33 @@
-from typing import Dict, List
 import time
 from app.orchestrator.celery_app import celery_app
 from app.common.schemas import PhaseOutput
-from app.common.constants import COST_GPT4_TURBO
 from app.phases.phase1_validate.service import PromptValidationService
+from app.common.constants import COST_GPT4_TURBO
 
 
 @celery_app.task(bind=True)
-def validate_prompt(self, video_id: str, prompt: str, assets: List[str]) -> Dict:
+def validate_prompt(self, video_id: str, prompt: str, assets: list = None):
     """
-    Phase 1: Validate prompt and extract structured specification.
+    Phase 1: Validate and extract video specification from user prompt.
     
     Args:
-        video_id: Unique identifier for the video
-        prompt: User's natural language prompt
-        assets: List of asset IDs to use as references
+        video_id: Unique video generation ID
+        prompt: User's video description
+        assets: Optional list of uploaded assets
         
     Returns:
-        Dictionary representation of PhaseOutput with status, output_data, cost, etc.
+        PhaseOutput dict with spec or error
     """
     start_time = time.time()
     
+    if assets is None:
+        assets = []
+    
     try:
-        # Initialize service
+        # Initialize validation service
         service = PromptValidationService()
         
-        # Validate and extract spec
+        # Validate and extract specification
         spec = service.validate_and_extract(prompt, assets)
         
         # Calculate duration
@@ -45,10 +47,10 @@ def validate_prompt(self, video_id: str, prompt: str, assets: List[str]) -> Dict
         return output.dict()
         
     except Exception as e:
-        # Calculate duration even on error
+        # Calculate duration
         duration_seconds = time.time() - start_time
         
-        # Create error output
+        # Create failure output
         output = PhaseOutput(
             video_id=video_id,
             phase="phase1_validate",

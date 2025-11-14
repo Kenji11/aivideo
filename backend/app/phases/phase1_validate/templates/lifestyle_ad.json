@@ -1,2 +1,66 @@
-{}
-
+{
+  "name": "Lifestyle Ad",
+  "description": "Energetic lifestyle advertisement with real-world usage",
+  "duration": 30,
+  "fps": 30,
+  "resolution": "1920x1080",
+  "beats": [
+    {
+      "name": "scene_setter",
+      "start": 0,
+      "duration": 4,
+      "shot_type": "wide",
+      "action": "establish_environment",
+      "prompt_template": "Wide establishing shot, vibrant lifestyle setting, {style_aesthetic}, dynamic energy",
+      "camera_movement": "pan"
+    },
+    {
+      "name": "person_intro",
+      "start": 4,
+      "duration": 5,
+      "shot_type": "medium",
+      "action": "introduce_character",
+      "prompt_template": "Medium shot of person in lifestyle context, {style_aesthetic}, authentic moment",
+      "camera_movement": "tracking"
+    },
+    {
+      "name": "product_interaction",
+      "start": 9,
+      "duration": 8,
+      "shot_type": "close_up",
+      "action": "use_product",
+      "prompt_template": "Close-up of person using {product_name}, {style_aesthetic}, natural interaction",
+      "camera_movement": "handheld"
+    },
+    {
+      "name": "benefit_showcase",
+      "start": 17,
+      "duration": 8,
+      "shot_type": "medium",
+      "action": "show_benefit",
+      "prompt_template": "Medium shot showing benefit of {product_name}, {style_aesthetic}, positive emotion",
+      "camera_movement": "dolly_out"
+    },
+    {
+      "name": "final_shot",
+      "start": 25,
+      "duration": 5,
+      "shot_type": "close_up",
+      "action": "product_branding",
+      "prompt_template": "Hero close-up of {product_name} with branding, {style_aesthetic}, memorable ending",
+      "camera_movement": "static"
+    }
+  ],
+  "transitions": [
+    {"type": "cut"},
+    {"type": "cut"},
+    {"type": "fade", "duration": 0.5},
+    {"type": "cut"}
+  ],
+  "audio": {
+    "music_style": "upbeat_pop",
+    "tempo": "fast",
+    "mood": "energetic"
+  },
+  "color_grading": "modern_vibrant.cube"
+}
