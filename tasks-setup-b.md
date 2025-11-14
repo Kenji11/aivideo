@@ -47,13 +47,13 @@ def get_settings() -> Settings:
     return Settings()
 ```
 
-- [ ] Create Settings class with all configuration fields
-- [ ] Add database configuration
-- [ ] Add Redis configuration
-- [ ] Add external API configuration (Replicate, OpenAI)
-- [ ] Add AWS configuration
-- [ ] Add application environment settings
-- [ ] Implement cached `get_settings()` function
+- [x] Create Settings class with all configuration fields
+- [x] Add database configuration
+- [x] Add Redis configuration
+- [x] Add external API configuration (Replicate, OpenAI)
+- [x] Add AWS configuration
+- [x] Add application environment settings
+- [x] Implement cached `get_settings()` function
 
 ### Task 3.2: Implement app/database.py
 
@@ -93,12 +93,12 @@ def init_db():
     Base.metadata.create_all(bind=engine)
 ```
 
-- [ ] Import settings and create SQLAlchemy engine
-- [ ] Configure connection pool settings
-- [ ] Create SessionLocal factory
-- [ ] Create Base class for models
-- [ ] Implement `get_db()` dependency function
-- [ ] Implement `init_db()` function to create tables
+- [x] Import settings and create SQLAlchemy engine
+- [x] Configure connection pool settings
+- [x] Create SessionLocal factory
+- [x] Create Base class for models
+- [x] Implement `get_db()` dependency function
+- [x] Implement `init_db()` function to create tables
 
 ### Task 3.3: Implement app/common/models.py
 
@@ -159,14 +159,14 @@ class VideoGeneration(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
 ```
 
-- [ ] Create VideoStatus enum with all status values
-- [ ] Create VideoGeneration model class
-- [ ] Add primary fields (id, user_id)
-- [ ] Add input fields (prompt, uploaded_assets)
-- [ ] Add spec fields from Phase 1
-- [ ] Add status tracking fields
-- [ ] Add phase output URL fields
-- [ ] Add metadata fields (cost, timing, timestamps)
+- [x] Create VideoStatus enum with all status values
+- [x] Create VideoGeneration model class
+- [x] Add primary fields (id, user_id)
+- [x] Add input fields (prompt, uploaded_assets)
+- [x] Add spec fields from Phase 1
+- [x] Add status tracking fields
+- [x] Add phase output URL fields
+- [x] Add metadata fields (cost, timing, timestamps)
 
 ### Task 3.4: Implement app/common/schemas.py
 
@@ -227,12 +227,12 @@ class VideoResponse(BaseModel):
     spec: Optional[Dict]
 ```
 
-- [ ] Create PhaseInput schema for phase task inputs
-- [ ] Create PhaseOutput schema for phase task outputs
-- [ ] Create GenerateRequest schema for API
-- [ ] Create GenerateResponse schema for API
-- [ ] Create StatusResponse schema for status endpoint
-- [ ] Create VideoResponse schema for video endpoint
+- [x] Create PhaseInput schema for phase task inputs
+- [x] Create PhaseOutput schema for phase task outputs
+- [x] Create GenerateRequest schema for API
+- [x] Create GenerateResponse schema for API
+- [x] Create StatusResponse schema for status endpoint
+- [x] Create VideoResponse schema for video endpoint
 
 ### Task 3.5: Implement app/common/exceptions.py
 
@@ -255,10 +255,10 @@ class ValidationException(VideoGenException):
     pass
 ```
 
-- [ ] Create VideoGenException base class
-- [ ] Create PhaseException for phase errors
-- [ ] Create ExternalAPIException for API errors
-- [ ] Create ValidationException for validation errors
+- [x] Create VideoGenException base class
+- [x] Create PhaseException for phase errors
+- [x] Create ExternalAPIException for API errors
+- [x] Create ValidationException for validation errors
 
 ### Task 3.6: Implement app/common/constants.py
 
@@ -291,10 +291,10 @@ PHASE5_TIMEOUT = 300
 PHASE6_TIMEOUT = 180
 ```
 
-- [ ] Add video specification constants
-- [ ] Add API cost constants
-- [ ] Add S3 path prefix constants
-- [ ] Add phase timeout constants
+- [x] Add video specification constants
+- [x] Add API cost constants
+- [x] Add S3 path prefix constants
+- [x] Add phase timeout constants
 
 ---
 

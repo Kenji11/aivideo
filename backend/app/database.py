@@ -28,5 +28,5 @@ def get_db():
 
 def init_db():
     """Initialize database (create tables)"""
-    from app.common.models import VideoGeneration
+    from app.common.models import VideoGeneration, Asset
     Base.metadata.create_all(bind=engine)
