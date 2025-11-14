@@ -2,14 +2,22 @@
 
 ## Current Status
 **Project Phase**: Initialization  
+**PRD Version**: 2.0  
 **Date**: November 14, 2025  
-**Day**: 0 (Pre-Development)
+**Day**: 0 (Pre-Development)  
+**Team Size**: 3 people  
+**Region**: AWS us-east-2 (Ohio)
 
 ## What Just Happened
 1. ✅ Created project repository
-2. ✅ Comprehensive PRD documented (1,716 lines)
-3. ✅ Memory bank initialized with all core files
-4. 🔄 Git repository being initialized (in progress)
+2. ✅ Comprehensive PRD v2.0 documented (1,954 lines)
+3. ✅ Architecture diagrams added (Mermaid):
+   - `architecture-deployment.mermaid` (82 lines) - AWS infrastructure
+   - `architecture-pipeline.mermaid` (118 lines) - Six-phase workflow
+4. ✅ Memory bank initialized with all core files
+5. ✅ Git repository initialized and pushed to GitHub
+6. ✅ Pulled latest changes from remote
+7. 🔄 Updating memory bank with PRD v2.0 changes
 
 ## Current Focus
 **Setting up project foundation and git repository**
@@ -23,11 +31,20 @@
 
 ## Recent Decisions
 
-### Architectural Decisions
-1. **Hybrid Approach**: Template-driven structure + AI content generation
+### Architectural Decisions (PRD v2.0)
+1. **3-Person Team Structure**: Phase-based vertical slices
+   - Person A: Phase 1 (Validation) + Phase 2 (Animatic) + Generate Form
+   - Person B: Phase 3 (References) + Phase 4 (Chunks) + Progress Indicator
+   - Person C: Phase 5 (Refinement) + Phase 6 (Export) + Video Player
+   - Why: Zero merge conflicts, parallel development, clear ownership
+
+2. **AWS Region**: us-east-2 (Ohio)
+   - Why: Cost-effective, low latency, good availability
+   
+3. **Hybrid Approach**: Template-driven structure + AI content generation
    - Why: Reliability (90%+ success rate) + Creativity
    
-2. **Six-Phase Pipeline**: Progressive refinement pattern
+4. **Six-Phase Pipeline**: Progressive refinement pattern
    - Phase 1: Validation (GPT-4)
    - Phase 2: Animatic (SDXL, internal reference)
    - Phase 3: References (SDXL)
@@ -35,18 +52,23 @@
    - Phase 5: Refinement (FFmpeg + MusicGen)
    - Phase 6: Export (S3)
 
-3. **AWS Elastic Beanstalk**: Over ECS or Lambda
+5. **AWS Elastic Beanstalk**: Over ECS or Lambda
    - Why: Simpler deployment, auto-scaling, managed load balancer
    - Cost: ~$87/month (~$25 for competition week)
+   - Region: us-east-2 for all services
 
-4. **Celery + Redis**: For job queue and workers
+6. **Celery + Redis**: For job queue and workers
    - Why: Proven, scales well, supports parallel tasks
    - Pattern: Group execution for 15 video chunks
 
-5. **Development vs Final Models**:
+7. **Development vs Final Models**:
    - Dev: Zeroscope ($0.10/chunk) - Fast iteration
    - Final: AnimateDiff ($0.20/chunk) - High quality
    - Saves ~$150 during development
+
+8. **Visual Documentation**: Added Mermaid diagrams
+   - Deployment architecture (CloudFront → ALB → EB → S3/RDS/ElastiCache)
+   - Pipeline workflow (6 phases with inputs/outputs)
 
 ### Template Strategy
 Start with 3 templates:
@@ -58,30 +80,37 @@ Start with 3 templates:
 
 ### Immediate (Today)
 1. ✅ Initialize git repository
-2. ✅ Create memory bank
-3. ⏳ Push to GitHub
-4. 🔲 Create directory structure
-5. 🔲 Set up Docker Compose
-6. 🔲 Create .env.example file
+2. ✅ Create memory bank (v1)
+3. ✅ Push to GitHub
+4. ✅ Pull updated PRD v2.0 and diagrams
+5. 🔄 Update memory bank (v2 with team structure)
+6. 🔲 Create directory structure (phase-based folders)
+7. 🔲 Set up Docker Compose
+8. 🔲 Create .env.example file
 
-### Day 1 (Tomorrow)
-**Backend Foundation**
-- FastAPI app skeleton with CORS
-- SQLAlchemy models and database setup
-- Celery configuration with Redis
-- Basic API endpoints (POST /generate, GET /status, GET /video)
-- Service clients (Replicate, OpenAI, S3)
+### Day 1 Morning (All Together - 2 hours)
+**Shared Foundation** - Zero conflicts if done together first
+- ✅ Review PRD v2.0 and architecture
+- 🔲 Write `common/schemas.py` (PhaseInput/Output contracts)
+- 🔲 Write `common/models.py` (VideoGeneration database model)
+- 🔲 Write `orchestrator/pipeline.py` skeleton
+- 🔲 Set up shared `services/` (API client interfaces)
+- 🔲 Agree on Git workflow (feature branches, PR review)
+- 🔲 Set up Docker Compose
+- 🔲 Test: Can everyone run `docker-compose up` successfully?
 
-**Frontend Foundation**
-- Vite + React + TypeScript setup
-- Tailwind CSS + shadcn/ui installation
-- Basic components (GenerateForm, ProgressIndicator, VideoPlayer)
-- API client with polling logic
+### Day 1 Afternoon (Parallel - 6 hours)
+**Person A** (Phases 1+2):
+- Phase 1: Prompt validation (OpenAI integration, templates)
+- Phase 2: Animatic generation (SDXL, S3 uploads)
 
-**Infrastructure**
-- Local Docker Compose working
-- Database migrations setup
-- Redis queue functional
+**Person B** (Phases 3+4):
+- Phase 3: Reference assets (style guide generation)
+- Phase 4: Chunk generation (parallel execution, stitching)
+
+**Person C** (Phases 5+6):
+- Phase 5: Refinement (FFmpeg, MusicGen)
+- Phase 6: Export (S3 upload, cleanup)
 
 ### Day 1-2 (MVP - 48 hours)
 **Complete all 6 pipeline phases**

@@ -9,6 +9,7 @@
 - **UI Primitives**: Radix UI
 - **Deployment**: S3 + CloudFront (static hosting + CDN)
 - **Package Manager**: npm
+- **Region**: us-east-2 (S3), Global (CloudFront)
 
 ### Backend
 - **Framework**: FastAPI (Python 3.11)
@@ -19,6 +20,7 @@
 - **ORM**: SQLAlchemy 2.x
 - **Migrations**: Alembic
 - **Deployment**: Elastic Beanstalk (Docker containers)
+- **Region**: us-east-2 (all AWS services)
 
 ### AI/ML Services
 - **OpenAI**: GPT-4 Turbo (prompt validation)
@@ -28,13 +30,14 @@
   - AnimateDiff: Video generation (final/high-quality)
   - MusicGen: Background music generation
 
-### Infrastructure (AWS)
+### Infrastructure (AWS - us-east-2)
 - **Compute**: Elastic Beanstalk (Web + Worker tiers)
 - **Database**: RDS PostgreSQL (db.t4g.micro)
 - **Cache**: ElastiCache Redis (t4g.micro)
 - **Storage**: S3 (video outputs)
 - **CDN**: CloudFront (frontend + video delivery)
 - **Load Balancer**: Application Load Balancer
+- **Region**: us-east-2 (Ohio) for all services except CloudFront (global)
 
 ### Development Tools
 - **Containerization**: Docker + Docker Compose
@@ -83,7 +86,8 @@ docker-compose up -d
 # - Redis: localhost:6379
 ```
 
-### Project Structure
+### Project Structure (Phase-Based)
+
 ```
 aivideo/
 ├── backend/
@@ -91,27 +95,49 @@ aivideo/
 │   │   ├── main.py              # FastAPI entry point
 │   │   ├── config.py            # Environment config
 │   │   ├── database.py          # SQLAlchemy setup
-│   │   ├── models.py            # Database models
-│   │   ├── schemas.py           # Pydantic schemas
-│   │   ├── api/                 # API endpoints
-│   │   ├── tasks/               # Celery tasks (pipeline phases)
-│   │   ├── services/            # External API clients
-│   │   └── templates/           # Video templates (JSON)
-│   ├── tests/
+│   │   ├── common/              # ⚠️ SHARED - Define together
+│   │   │   ├── models.py        # VideoGeneration model
+│   │   │   ├── schemas.py       # PhaseInput/Output
+│   │   │   └── exceptions.py
+│   │   ├── services/            # ⚠️ SHARED - API clients
+│   │   │   ├── replicate.py
+│   │   │   ├── openai.py
+│   │   │   ├── s3.py
+│   │   │   └── ffmpeg.py
+│   │   ├── api/                 # ⚠️ SHARED - Endpoints
+│   │   │   ├── generate.py      # POST /api/generate
+│   │   │   ├── status.py        # GET /api/status/:id
+│   │   │   └── video.py         # GET /api/video/:id
+│   │   ├── orchestrator/        # ⚠️ SHARED - Pipeline
+│   │   │   ├── celery_app.py
+│   │   │   └── pipeline.py
+│   │   ├── phases/              # ⭐ MAIN WORK - Each person owns 2
+│   │   │   ├── phase1_validate/ # 👤 PERSON A
+│   │   │   ├── phase2_animatic/ # 👤 PERSON A
+│   │   │   ├── phase3_references/ # 👤 PERSON B
+│   │   │   ├── phase4_chunks/   # 👤 PERSON B
+│   │   │   ├── phase5_refine/   # 👤 PERSON C
+│   │   │   └── phase6_export/   # 👤 PERSON C
+│   │   └── tests/
 │   ├── Dockerfile
-│   ├── requirements.txt
-│   └── pyproject.toml
+│   ├── docker-compose.yml
+│   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── components/          # React components
-│   │   ├── hooks/               # Custom hooks
-│   │   ├── lib/                 # Utilities, API client
-│   │   └── types/               # TypeScript types
-│   ├── public/
+│   │   ├── features/            # ⭐ MAIN WORK - Each person owns 1
+│   │   │   ├── generate/        # 👤 PERSON A
+│   │   │   ├── progress/        # 👤 PERSON B
+│   │   │   └── video/           # 👤 PERSON C
+│   │   ├── shared/              # ⚠️ SHARED - Touch rarely
+│   │   │   ├── components/ui/   # shadcn
+│   │   │   ├── lib/api.ts
+│   │   │   └── types/
+│   │   └── App.tsx
 │   ├── package.json
 │   └── vite.config.ts
-├── docker-compose.yml
-├── PRD.md
+├── architecture-deployment.mermaid  # NEW: AWS infrastructure
+├── architecture-pipeline.mermaid    # NEW: Six-phase workflow
+├── PRD.md                           # v2.0 with team structure
 ├── memory-bank/
 └── README.md
 ```
@@ -218,7 +244,7 @@ OPENAI_API_KEY=sk-...
 AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=...
 S3_BUCKET=videogen-outputs-prod
-S3_REGION=us-east-1
+AWS_REGION=us-east-2
 ```
 
 ## Known Technical Challenges

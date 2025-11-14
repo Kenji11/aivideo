@@ -8,8 +8,20 @@
 - AI fills in creative content within constraints
 - Best of both worlds: consistency + creativity
 
+### Team Collaboration Pattern (PRD v2.0)
+**Phase-Based Vertical Slices**
+- 3-person team, each owns 2 complete phases
+- Zero merge conflicts (separate directories)
+- Parallel development from Day 1
+- Shared contracts defined upfront (`common/`)
+
+**Ownership:**
+- Person A: `phases/phase1_validate/` + `phases/phase2_animatic/` + `features/generate/`
+- Person B: `phases/phase3_references/` + `phases/phase4_chunks/` + `features/progress/`
+- Person C: `phases/phase5_refine/` + `phases/phase6_export/` + `features/video/`
+
 ### Deployment Pattern
-**Multi-Tier AWS Architecture**
+**Multi-Tier AWS Architecture (us-east-2)**
 ```
 Frontend (S3 + CloudFront)
     ↓
@@ -23,6 +35,10 @@ Worker Tier (Elastic Beanstalk - Celery)
     ↓
 Storage (S3) + Database (RDS Postgres)
 ```
+
+**Visual Diagrams:**
+- `architecture-deployment.mermaid` - Full AWS infrastructure
+- `architecture-pipeline.mermaid` - Six-phase workflow
 
 ## Core Design Patterns
 
