@@ -1,0 +1,82 @@
+graph TB
+    subgraph Internet
+        Users[End Users<br/>Web Browsers]
+    end
+
+    subgraph AWS Cloud
+        subgraph CDN Layer
+            CF[CloudFront CDN<br/>Global Edge Locations]
+        end
+
+        subgraph Static Hosting
+            S3Frontend[S3 Bucket<br/>React Frontend<br/>- index.html<br/>- bundle.js<br/>- assets/]
+        end
+
+        subgraph Load Balancing
+            ALB[Application Load Balancer<br/>Port 80/443 → 8000]
+        end
+
+        subgraph Elastic Beanstalk - Web Tier
+            EB1[EC2 Instance<br/>t3.small<br/>Docker: FastAPI<br/>Port 8000]
+            EB2[EC2 Instance<br/>t3.small<br/>Docker: FastAPI<br/>Port 8000]
+        end
+
+        subgraph Elastic Beanstalk - Worker Tier
+            Worker1[EC2 Instance<br/>t3.medium<br/>Docker: Celery Worker<br/>Concurrency: 4]
+            Worker2[EC2 Instance<br/>t3.medium<br/>Docker: Celery Worker<br/>Concurrency: 4]
+        end
+
+        subgraph Data Layer
+            Redis[(ElastiCache Redis<br/>t4g.micro<br/>Job Queue + Results)]
+            Postgres[(RDS PostgreSQL<br/>db.t4g.micro<br/>Video Metadata)]
+        end
+
+        subgraph Storage
+            S3Videos[S3 Bucket<br/>Video Storage<br/>- /animatic/<br/>- /references/<br/>- /chunks/<br/>- /final.mp4]
+        end
+
+        subgraph External APIs
+            Replicate[Replicate API<br/>- SDXL<br/>- Zeroscope<br/>- AnimateDiff<br/>- MusicGen]
+            OpenAI[OpenAI API<br/>GPT-4 Turbo]
+        end
+    end
+
+    Users -->|HTTPS| CF
+    CF -->|Static Assets| S3Frontend
+    CF -->|API Calls| ALB
+    ALB -->|Round Robin| EB1
+    ALB -->|Round Robin| EB2
+    
+    EB1 -->|Push Jobs| Redis
+    EB2 -->|Push Jobs| Redis
+    EB1 -->|Read/Write| Postgres
+    EB2 -->|Read/Write| Postgres
+    
+    Redis -->|Pull Jobs| Worker1
+    Redis -->|Pull Jobs| Worker2
+    
+    Worker1 -->|Store Results| Redis
+    Worker2 -->|Store Results| Redis
+    Worker1 -->|Upload/Download| S3Videos
+    Worker2 -->|Upload/Download| S3Videos
+    Worker1 -->|API Calls| Replicate
+    Worker2 -->|API Calls| Replicate
+    Worker1 -->|API Calls| OpenAI
+    Worker2 -->|API Calls| OpenAI
+    
+    Worker1 -->|Update Status| Postgres
+    Worker2 -->|Update Status| Postgres
+
+    style Users fill:#e1f5ff
+    style CF fill:#ff9900
+    style S3Frontend fill:#ff9900
+    style ALB fill:#ff9900
+    style EB1 fill:#ff9900
+    style EB2 fill:#ff9900
+    style Worker1 fill:#ff9900
+    style Worker2 fill:#ff9900
+    style Redis fill:#dc382d
+    style Postgres fill:#336791
+    style S3Videos fill:#ff9900
+    style Replicate fill:#6366f1
+    style OpenAI fill:#10a37f

@@ -1,0 +1,118 @@
+graph TB
+    Start([User Submits Prompt<br/>'Create luxury watch ad'])
+    
+    subgraph Phase 1 - Prompt Validation
+        P1Start[Receive Prompt + Assets]
+        P1LLM[OpenAI GPT-4 Turbo<br/>Extract Structured Spec]
+        P1Template[Load Template<br/>product_showcase.json]
+        P1Validate[Validate & Merge Spec]
+        P1Output[Structured Spec JSON<br/>- template<br/>- duration: 30s<br/>- beats: 5<br/>- style<br/>- audio]
+        
+        P1Start --> P1LLM
+        P1LLM --> P1Template
+        P1Template --> P1Validate
+        P1Validate --> P1Output
+    end
+    
+    subgraph Phase 2 - Animatic Generation
+        P2Start[Extract Keyframes<br/>1 per 2s = 15 frames]
+        P2Generate[Generate Low-Res Frames<br/>SDXL with 'sketch' style<br/>512x512, minimal detail]
+        P2Store[Store to S3<br/>/animatic/frame_00.png<br/>through frame_14.png]
+        P2Output[List of 15 Animatic URLs<br/>Used as motion reference]
+        
+        P2Start --> P2Generate
+        P2Generate --> P2Store
+        P2Store --> P2Output
+    end
+    
+    subgraph Phase 3 - Reference Assets
+        P3Start[Generate Reference Assets]
+        P3Style[Generate Style Guide<br/>SDXL 1024x1024<br/>Defines aesthetic]
+        P3Product[Generate Product Reference<br/>or use uploaded asset]
+        P3Logo[Use Uploaded Logo<br/>if provided]
+        P3Store[Store to S3<br/>/references/]
+        P3Output[Reference Asset URLs<br/>- style_guide.png<br/>- product.png<br/>- logo.png]
+        
+        P3Start --> P3Style
+        P3Start --> P3Product
+        P3Start --> P3Logo
+        P3Style --> P3Store
+        P3Product --> P3Store
+        P3Logo --> P3Store
+        P3Store --> P3Output
+    end
+    
+    subgraph Phase 4 - Chunked Video Generation
+        P4Start[Create Chunk Specifications<br/>15 chunks x 2s each]
+        P4Parallel[Parallel Execution<br/>Celery group tasks]
+        
+        subgraph Chunk Generation
+            P4C1[Chunk 1: 0-2s<br/>Zeroscope/AnimateDiff<br/>+ Animatic frame 0<br/>+ Style guide]
+            P4C2[Chunk 2: 1.5-3.5s<br/>0.5s overlap]
+            P4C3[Chunk 3: 3-5s]
+            P4Cn[... Chunk 15: 28-30s]
+        end
+        
+        P4Stitch[Stitch Chunks<br/>FFmpeg + Transitions<br/>fade, cut, fade, cut]
+        P4Output[Stitched Video<br/>30s, 1024x576]
+        
+        P4Start --> P4Parallel
+        P4Parallel --> P4C1
+        P4Parallel --> P4C2
+        P4Parallel --> P4C3
+        P4Parallel --> P4Cn
+        P4C1 --> P4Stitch
+        P4C2 --> P4Stitch
+        P4C3 --> P4Stitch
+        P4Cn --> P4Stitch
+        P4Stitch --> P4Output
+    end
+    
+    subgraph Phase 5 - Refinement
+        P5Start[Refine Stitched Video]
+        P5Smooth[Temporal Smoothing<br/>Optical flow interpolation<br/>Fix chunk boundaries]
+        P5Upscale[Upscale to 1080p<br/>FFmpeg or Real-ESRGAN<br/>1920x1080]
+        P5Color[Color Grading<br/>Apply LUT based on template<br/>cinematic_warm.cube]
+        P5Music[Generate Background Music<br/>MusicGen 30s<br/>orchestral, sophisticated]
+        P5Mix[Mix Audio<br/>Add music at 30% volume]
+        P5Encode[Final Encode<br/>H.264, 23 CRF<br/>AAC audio 192k]
+        P5Output[Final Video<br/>30s, 1080p, 30fps]
+        
+        P5Start --> P5Smooth
+        P5Smooth --> P5Upscale
+        P5Upscale --> P5Color
+        P5Color --> P5Music
+        P5Music --> P5Mix
+        P5Mix --> P5Encode
+        P5Encode --> P5Output
+    end
+    
+    subgraph Phase 6 - Preview & Export
+        P6Upload[Upload to S3<br/>/videos/uuid/final.mp4]
+        P6URL[Generate Pre-signed URL<br/>Valid for 1 hour]
+        P6DB[Update Database<br/>status = 'complete'<br/>final_video_url<br/>cost_usd<br/>generation_time]
+        P6Cleanup[Delete Intermediates<br/>/animatic/, /chunks/<br/>Keep final for 7 days]
+        P6Output[Return Video URL to User<br/>Ready for preview/download]
+        
+        P6Upload --> P6URL
+        P6URL --> P6DB
+        P6DB --> P6Cleanup
+        P6Cleanup --> P6Output
+    end
+    
+    Start --> P1Start
+    P1Output --> P2Start
+    P2Output --> P3Start
+    P3Output --> P4Start
+    P4Output --> P5Start
+    P5Output --> P6Upload
+    P6Output --> End([User Downloads Video])
+    
+    style Start fill:#e1f5ff
+    style End fill:#d4edda
+    style P1Output fill:#fff3cd
+    style P2Output fill:#fff3cd
+    style P3Output fill:#fff3cd
+    style P4Output fill:#fff3cd
+    style P5Output fill:#fff3cd
+    style P6Output fill:#d4edda
