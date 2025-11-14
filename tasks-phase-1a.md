@@ -1,251 +1,67 @@
 # Phase 1 Tasks - Part A: Template System
 
 **Owner:** Person handling Phase 1  
-**Time Estimate:** 1-2 hours  
 **Goal:** Create template system and validation service
 
 ---
 
-## Task 1: Create Template JSON Files
+## PR #5: Template JSON Files
 
-### 1.1 Create directory
+### Task 5.1: Create Templates Directory
 ```bash
 mkdir -p backend/app/phases/phase1_validate/templates
 ```
 
-### 1.2 Create product_showcase.json
+- [ ] Create `templates/` directory in phase1_validate
+
+### Task 5.2: Create product_showcase.json
 
 **File:** `backend/app/phases/phase1_validate/templates/product_showcase.json`
-```json
-{
-  "name": "product_showcase",
-  "description": "Highlights product features and details",
-  "default_duration": 30,
-  "fps": 30,
-  "resolution": "1080p",
-  
-  "beats": [
-    {
-      "name": "hero_shot",
-      "start": 0,
-      "duration": 3,
-      "shot_type": "close_up",
-      "action": "product_reveal",
-      "prompt_template": "{product} on {background}, {style} aesthetic, dramatic reveal",
-      "camera_movement": "slow_zoom_in"
-    },
-    {
-      "name": "detail_showcase",
-      "start": 3,
-      "duration": 5,
-      "shot_type": "macro",
-      "action": "feature_highlight",
-      "prompt_template": "extreme close-up of {product} details, {style} lighting",
-      "camera_movement": "pan_across"
-    },
-    {
-      "name": "lifestyle_context",
-      "start": 8,
-      "duration": 7,
-      "shot_type": "medium",
-      "action": "usage_scenario",
-      "prompt_template": "person using {product} in {setting}, {style} aesthetic",
-      "camera_movement": "static"
-    },
-    {
-      "name": "brand_moment",
-      "start": 15,
-      "duration": 10,
-      "shot_type": "wide",
-      "action": "brand_story",
-      "prompt_template": "{product} in elegant setting, {style} aesthetic, cinematic",
-      "camera_movement": "slow_dolly"
-    },
-    {
-      "name": "call_to_action",
-      "start": 25,
-      "duration": 5,
-      "shot_type": "close_up",
-      "action": "final_impression",
-      "prompt_template": "{product} with brand logo, {style} aesthetic",
-      "camera_movement": "static"
-    }
-  ],
-  
-  "transitions": [
-    {"type": "fade", "duration": 0.5},
-    {"type": "cut"},
-    {"type": "fade", "duration": 0.5},
-    {"type": "cut"}
-  ],
-  
-  "audio": {
-    "music_style": "elegant orchestral",
-    "tempo": "moderate",
-    "mood": "sophisticated"
-  },
-  
-  "color_grading": {
-    "lut": "cinematic_warm.cube",
-    "contrast": 1.1,
-    "saturation": 1.05
-  }
-}
-```
 
-### 1.3 Create lifestyle_ad.json
+- [ ] Create file `product_showcase.json`
+- [ ] Add name and description fields
+- [ ] Add default duration, fps, resolution
+- [ ] Add beat #1: hero_shot (0-3s, close_up, product_reveal)
+- [ ] Add beat #2: detail_showcase (3-8s, macro, feature_highlight)
+- [ ] Add beat #3: lifestyle_context (8-15s, medium, usage_scenario)
+- [ ] Add beat #4: brand_moment (15-25s, wide, brand_story)
+- [ ] Add beat #5: call_to_action (25-30s, close_up, final_impression)
+- [ ] Add transitions array (fade, cut, fade, cut)
+- [ ] Add audio configuration (orchestral, moderate, sophisticated)
+- [ ] Add color_grading configuration (cinematic_warm.cube)
+
+### Task 5.3: Create lifestyle_ad.json
 
 **File:** `backend/app/phases/phase1_validate/templates/lifestyle_ad.json`
-```json
-{
-  "name": "lifestyle_ad",
-  "description": "Shows product in real-world context",
-  "default_duration": 30,
-  "fps": 30,
-  "resolution": "1080p",
-  
-  "beats": [
-    {
-      "name": "scene_setter",
-      "start": 0,
-      "duration": 4,
-      "shot_type": "wide",
-      "action": "establish_environment",
-      "prompt_template": "{setting} with natural lighting, vibrant {style}",
-      "camera_movement": "slow_pan"
-    },
-    {
-      "name": "person_intro",
-      "start": 4,
-      "duration": 5,
-      "shot_type": "medium",
-      "action": "introduce_character",
-      "prompt_template": "person in {setting}, happy and energetic, {style} aesthetic",
-      "camera_movement": "follow"
-    },
-    {
-      "name": "product_interaction",
-      "start": 9,
-      "duration": 8,
-      "shot_type": "close_up",
-      "action": "use_product",
-      "prompt_template": "person using {product}, natural interaction, {style}",
-      "camera_movement": "dynamic"
-    },
-    {
-      "name": "benefit_showcase",
-      "start": 17,
-      "duration": 8,
-      "shot_type": "medium",
-      "action": "show_benefit",
-      "prompt_template": "person enjoying {product} benefit, smile, {style} lighting",
-      "camera_movement": "static"
-    },
-    {
-      "name": "final_shot",
-      "start": 25,
-      "duration": 5,
-      "shot_type": "close_up",
-      "action": "product_branding",
-      "prompt_template": "{product} with logo, clean background, {style}",
-      "camera_movement": "static"
-    }
-  ],
-  
-  "transitions": [
-    {"type": "cut"},
-    {"type": "cut"},
-    {"type": "fade", "duration": 0.3},
-    {"type": "cut"}
-  ],
-  
-  "audio": {
-    "music_style": "upbeat pop",
-    "tempo": "fast",
-    "mood": "energetic"
-  },
-  
-  "color_grading": {
-    "lut": "modern_vibrant.cube",
-    "contrast": 1.15,
-    "saturation": 1.2
-  }
-}
-```
 
-### 1.4 Create announcement.json
+- [ ] Create file `lifestyle_ad.json`
+- [ ] Add name and description fields
+- [ ] Add default duration, fps, resolution
+- [ ] Add beat #1: scene_setter (0-4s, wide, establish_environment)
+- [ ] Add beat #2: person_intro (4-9s, medium, introduce_character)
+- [ ] Add beat #3: product_interaction (9-17s, close_up, use_product)
+- [ ] Add beat #4: benefit_showcase (17-25s, medium, show_benefit)
+- [ ] Add beat #5: final_shot (25-30s, close_up, product_branding)
+- [ ] Add transitions array (cut, cut, fade, cut)
+- [ ] Add audio configuration (upbeat pop, fast, energetic)
+- [ ] Add color_grading configuration (modern_vibrant.cube)
+
+### Task 5.4: Create announcement.json
 
 **File:** `backend/app/phases/phase1_validate/templates/announcement.json`
-```json
-{
-  "name": "announcement",
-  "description": "Brand message or campaign announcement",
-  "default_duration": 30,
-  "fps": 30,
-  "resolution": "1080p",
-  
-  "beats": [
-    {
-      "name": "attention_grabber",
-      "start": 0,
-      "duration": 5,
-      "shot_type": "wide",
-      "action": "dramatic_intro",
-      "prompt_template": "bold graphic design, {style} colors, dramatic lighting",
-      "camera_movement": "zoom_in"
-    },
-    {
-      "name": "message_reveal",
-      "start": 5,
-      "duration": 10,
-      "shot_type": "medium",
-      "action": "show_message",
-      "prompt_template": "text overlay, clean design, {style} aesthetic",
-      "camera_movement": "static"
-    },
-    {
-      "name": "supporting_visual",
-      "start": 15,
-      "duration": 10,
-      "shot_type": "close_up",
-      "action": "visual_emphasis",
-      "prompt_template": "{product} or brand visual, bold {style}",
-      "camera_movement": "slow_push"
-    },
-    {
-      "name": "call_to_action",
-      "start": 25,
-      "duration": 5,
-      "shot_type": "wide",
-      "action": "final_message",
-      "prompt_template": "brand logo and CTA, clean minimal {style}",
-      "camera_movement": "static"
-    }
-  ],
-  
-  "transitions": [
-    {"type": "fade", "duration": 0.5},
-    {"type": "fade", "duration": 0.5},
-    {"type": "cut"}
-  ],
-  
-  "audio": {
-    "music_style": "cinematic epic",
-    "tempo": "moderate",
-    "mood": "inspiring"
-  },
-  
-  "color_grading": {
-    "lut": "elegant_muted.cube",
-    "contrast": 1.2,
-    "saturation": 0.95
-  }
-}
-```
 
----
+- [ ] Create file `announcement.json`
+- [ ] Add name and description fields
+- [ ] Add default duration, fps, resolution
+- [ ] Add beat #1: attention_grabber (0-5s, wide, dramatic_intro)
+- [ ] Add beat #2: message_reveal (5-15s, medium, show_message)
+- [ ] Add beat #3: supporting_visual (15-25s, close_up, visual_emphasis)
+- [ ] Add beat #4: call_to_action (25-30s, wide, final_message)
+- [ ] Add transitions array (fade, fade, cut)
+- [ ] Add audio configuration (cinematic epic, moderate, inspiring)
+- [ ] Add color_grading configuration (elegant_muted.cube)
 
-## Task 2: Create Template Loader Utility
+### Task 5.5: Create Template Loader Utility
 
 **File:** `backend/app/phases/phase1_validate/templates/__init__.py`
 ```python
@@ -278,9 +94,18 @@ def validate_template_choice(template_name: str) -> bool:
     return template_name in list_templates()
 ```
 
+- [ ] Import json and Path
+- [ ] Define TEMPLATES_DIR constant
+- [ ] Implement `load_template()` function
+- [ ] Add error handling for missing templates
+- [ ] Implement `list_templates()` function
+- [ ] Implement `validate_template_choice()` function
+
 ---
 
-## Task 3: Create Phase 1 Schemas
+## PR #6: Phase 1 Schemas
+
+### Task 6.1: Create Phase 1 Schemas
 
 **File:** `backend/app/phases/phase1_validate/schemas.py`
 ```python
@@ -289,7 +114,7 @@ from typing import Dict, List, Optional
 
 class StyleSpec(BaseModel):
     """Visual style specification"""
-    aesthetic: str  # e.g., "luxury", "modern", "minimalist"
+    aesthetic: str
     color_palette: List[str]
     mood: str
     lighting: str
@@ -317,7 +142,7 @@ class BeatSpec(BaseModel):
 
 class TransitionSpec(BaseModel):
     """Transition specification"""
-    type: str  # "cut", "fade", etc.
+    type: str
     duration: Optional[float] = None
 
 class VideoSpec(BaseModel):
@@ -334,26 +159,32 @@ class VideoSpec(BaseModel):
     uploaded_assets: List[Dict] = []
 ```
 
+- [ ] Import BaseModel from pydantic
+- [ ] Create StyleSpec model (aesthetic, color_palette, mood, lighting)
+- [ ] Create ProductSpec model (name, category)
+- [ ] Create AudioSpec model (music_style, tempo, mood)
+- [ ] Create BeatSpec model (name, start, duration, shot_type, action, prompt_template, camera_movement)
+- [ ] Create TransitionSpec model (type, duration)
+- [ ] Create VideoSpec model with all sub-models and uploaded_assets
+
 ---
 
-## ✅ Checkpoint
+## ✅ PR #5 & #6 Checklist
 
-After completing these tasks, you should have:
-- ✅ 3 template JSON files created
-- ✅ Template loader utility
-- ✅ Phase 1 schemas defined
+Before merging:
+- [ ] All 3 template JSON files created and valid
+- [ ] Template loader utility works
+- [ ] All Phase 1 schemas defined
+- [ ] Can import and use schemas without errors
 
-**Test:**
+**Test Commands:**
 ```python
-# In Python shell or test file
+# In Python shell
 from app.phases.phase1_validate.templates import load_template, list_templates
 
 print(list_templates())
-# Should print: ['product_showcase', 'lifestyle_ad', 'announcement']
-
 template = load_template('product_showcase')
 print(template['name'])
-# Should print: product_showcase
 ```
 
 **Next:** Move to `tasks-phase-1b.md`
