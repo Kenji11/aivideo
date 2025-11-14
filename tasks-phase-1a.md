@@ -12,54 +12,54 @@
 mkdir -p backend/app/phases/phase1_validate/templates
 ```
 
-- [ ] Create `templates/` directory in phase1_validate
+- [x] Create `templates/` directory in phase1_validate
 
 ### Task 5.2: Create product_showcase.json
 
 **File:** `backend/app/phases/phase1_validate/templates/product_showcase.json`
 
-- [ ] Create file `product_showcase.json`
-- [ ] Add name and description fields
-- [ ] Add default duration, fps, resolution
-- [ ] Add beat #1: hero_shot (0-3s, close_up, product_reveal)
-- [ ] Add beat #2: detail_showcase (3-8s, macro, feature_highlight)
-- [ ] Add beat #3: lifestyle_context (8-15s, medium, usage_scenario)
-- [ ] Add beat #4: brand_moment (15-25s, wide, brand_story)
-- [ ] Add beat #5: call_to_action (25-30s, close_up, final_impression)
-- [ ] Add transitions array (fade, cut, fade, cut)
-- [ ] Add audio configuration (orchestral, moderate, sophisticated)
-- [ ] Add color_grading configuration (cinematic_warm.cube)
+- [x] Create file `product_showcase.json`
+- [x] Add name and description fields
+- [x] Add default duration, fps, resolution
+- [x] Add beat #1: hero_shot (0-3s, close_up, product_reveal)
+- [x] Add beat #2: detail_showcase (3-8s, macro, feature_highlight)
+- [x] Add beat #3: lifestyle_context (8-15s, medium, usage_scenario)
+- [x] Add beat #4: brand_moment (15-25s, wide, brand_story)
+- [x] Add beat #5: call_to_action (25-30s, close_up, final_impression)
+- [x] Add transitions array (fade, cut, fade, cut)
+- [x] Add audio configuration (orchestral, moderate, sophisticated)
+- [x] Add color_grading configuration (cinematic_warm.cube)
 
 ### Task 5.3: Create lifestyle_ad.json
 
 **File:** `backend/app/phases/phase1_validate/templates/lifestyle_ad.json`
 
-- [ ] Create file `lifestyle_ad.json`
-- [ ] Add name and description fields
-- [ ] Add default duration, fps, resolution
-- [ ] Add beat #1: scene_setter (0-4s, wide, establish_environment)
-- [ ] Add beat #2: person_intro (4-9s, medium, introduce_character)
-- [ ] Add beat #3: product_interaction (9-17s, close_up, use_product)
-- [ ] Add beat #4: benefit_showcase (17-25s, medium, show_benefit)
-- [ ] Add beat #5: final_shot (25-30s, close_up, product_branding)
-- [ ] Add transitions array (cut, cut, fade, cut)
-- [ ] Add audio configuration (upbeat pop, fast, energetic)
-- [ ] Add color_grading configuration (modern_vibrant.cube)
+- [x] Create file `lifestyle_ad.json`
+- [x] Add name and description fields
+- [x] Add default duration, fps, resolution
+- [x] Add beat #1: scene_setter (0-4s, wide, establish_environment)
+- [x] Add beat #2: person_intro (4-9s, medium, introduce_character)
+- [x] Add beat #3: product_interaction (9-17s, close_up, use_product)
+- [x] Add beat #4: benefit_showcase (17-25s, medium, show_benefit)
+- [x] Add beat #5: final_shot (25-30s, close_up, product_branding)
+- [x] Add transitions array (cut, cut, fade, cut)
+- [x] Add audio configuration (upbeat pop, fast, energetic)
+- [x] Add color_grading configuration (modern_vibrant.cube)
 
 ### Task 5.4: Create announcement.json
 
 **File:** `backend/app/phases/phase1_validate/templates/announcement.json`
 
-- [ ] Create file `announcement.json`
-- [ ] Add name and description fields
-- [ ] Add default duration, fps, resolution
-- [ ] Add beat #1: attention_grabber (0-5s, wide, dramatic_intro)
-- [ ] Add beat #2: message_reveal (5-15s, medium, show_message)
-- [ ] Add beat #3: supporting_visual (15-25s, close_up, visual_emphasis)
-- [ ] Add beat #4: call_to_action (25-30s, wide, final_message)
-- [ ] Add transitions array (fade, fade, cut)
-- [ ] Add audio configuration (cinematic epic, moderate, inspiring)
-- [ ] Add color_grading configuration (elegant_muted.cube)
+- [x] Create file `announcement.json`
+- [x] Add name and description fields
+- [x] Add default duration, fps, resolution
+- [x] Add beat #1: attention_grabber (0-5s, wide, dramatic_intro)
+- [x] Add beat #2: message_reveal (5-15s, medium, show_message)
+- [x] Add beat #3: supporting_visual (15-25s, close_up, visual_emphasis)
+- [x] Add beat #4: call_to_action (25-30s, wide, final_message)
+- [x] Add transitions array (fade, fade, cut)
+- [x] Add audio configuration (cinematic epic, moderate, inspiring)
+- [x] Add color_grading configuration (elegant_muted.cube)
 
 ### Task 5.5: Create Template Loader Utility
 
@@ -94,12 +94,12 @@ def validate_template_choice(template_name: str) -> bool:
     return template_name in list_templates()
 ```
 
-- [ ] Import json and Path
-- [ ] Define TEMPLATES_DIR constant
-- [ ] Implement `load_template()` function
-- [ ] Add error handling for missing templates
-- [ ] Implement `list_templates()` function
-- [ ] Implement `validate_template_choice()` function
+- [x] Import json and Path
+- [x] Define TEMPLATES_DIR constant
+- [x] Implement `load_template()` function
+- [x] Add error handling for missing templates
+- [x] Implement `list_templates()` function
+- [x] Implement `validate_template_choice()` function
 
 ---
 
@@ -159,23 +159,23 @@ class VideoSpec(BaseModel):
     uploaded_assets: List[Dict] = []
 ```
 
-- [ ] Import BaseModel from pydantic
-- [ ] Create StyleSpec model (aesthetic, color_palette, mood, lighting)
-- [ ] Create ProductSpec model (name, category)
-- [ ] Create AudioSpec model (music_style, tempo, mood)
-- [ ] Create BeatSpec model (name, start, duration, shot_type, action, prompt_template, camera_movement)
-- [ ] Create TransitionSpec model (type, duration)
-- [ ] Create VideoSpec model with all sub-models and uploaded_assets
+- [x] Import BaseModel from pydantic
+- [x] Create StyleSpec model (aesthetic, color_palette, mood, lighting)
+- [x] Create ProductSpec model (name, category)
+- [x] Create AudioSpec model (music_style, tempo, mood)
+- [x] Create BeatSpec model (name, start, duration, shot_type, action, prompt_template, camera_movement)
+- [x] Create TransitionSpec model (type, duration)
+- [x] Create VideoSpec model with all sub-models and uploaded_assets
 
 ---
 
 ## ✅ PR #5 & #6 Checklist
 
 Before merging:
-- [ ] All 3 template JSON files created and valid
-- [ ] Template loader utility works
-- [ ] All Phase 1 schemas defined
-- [ ] Can import and use schemas without errors
+- [x] All 3 template JSON files created and valid
+- [x] Template loader utility works
+- [x] All Phase 1 schemas defined
+- [x] Can import and use schemas without errors
 
 **Test Commands:**
 ```python

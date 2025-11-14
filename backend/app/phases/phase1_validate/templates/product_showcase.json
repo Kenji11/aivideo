@@ -1,2 +1,66 @@
-{}
-
+{
+  "name": "Product Showcase",
+  "description": "Professional product reveal with cinematic quality",
+  "duration": 30,
+  "fps": 30,
+  "resolution": "1920x1080",
+  "beats": [
+    {
+      "name": "hero_shot",
+      "start": 0,
+      "duration": 3,
+      "shot_type": "close_up",
+      "action": "product_reveal",
+      "prompt_template": "Cinematic close-up of {product_name}, dramatic lighting, professional product photography, {style_aesthetic}",
+      "camera_movement": "slow_dolly_in"
+    },
+    {
+      "name": "detail_showcase",
+      "start": 3,
+      "duration": 5,
+      "shot_type": "macro",
+      "action": "feature_highlight",
+      "prompt_template": "Extreme macro shot highlighting the details of {product_name}, {style_aesthetic}, premium quality",
+      "camera_movement": "pan_across"
+    },
+    {
+      "name": "lifestyle_context",
+      "start": 8,
+      "duration": 7,
+      "shot_type": "medium",
+      "action": "usage_scenario",
+      "prompt_template": "{product_name} in lifestyle context, {style_aesthetic}, aspirational setting",
+      "camera_movement": "orbit"
+    },
+    {
+      "name": "brand_moment",
+      "start": 15,
+      "duration": 10,
+      "shot_type": "wide",
+      "action": "brand_story",
+      "prompt_template": "Wide cinematic shot of {product_name}, {style_aesthetic}, brand storytelling, emotional connection",
+      "camera_movement": "crane_up"
+    },
+    {
+      "name": "call_to_action",
+      "start": 25,
+      "duration": 5,
+      "shot_type": "close_up",
+      "action": "final_impression",
+      "prompt_template": "Hero close-up of {product_name}, {style_aesthetic}, final powerful impression",
+      "camera_movement": "static"
+    }
+  ],
+  "transitions": [
+    {"type": "fade", "duration": 0.5},
+    {"type": "cut"},
+    {"type": "fade", "duration": 0.5},
+    {"type": "cut"}
+  ],
+  "audio": {
+    "music_style": "orchestral",
+    "tempo": "moderate",
+    "mood": "sophisticated"
+  },
+  "color_grading": "cinematic_warm.cube"
+}
