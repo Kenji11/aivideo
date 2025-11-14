@@ -37,7 +37,7 @@ export function GenerateForm() {
   const isValid = projectTitle.trim().length > 0 && prompt.trim().length > 0
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 rounded-lg shadow-sm p-8 space-y-8">
+    <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-8 space-y-8">
       <FormHeader />
       
       <ProjectInfoSection
