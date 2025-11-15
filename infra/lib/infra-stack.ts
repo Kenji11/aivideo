@@ -3,7 +3,6 @@ import { Construct } from 'constructs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as rds from 'aws-cdk-lib/aws-rds';
-import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
@@ -11,6 +10,8 @@ import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53targets from 'aws-cdk-lib/aws-route53-targets';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 export interface DaveVictorVincentAIVideoGenerationStackProps extends cdk.StackProps {
   hostedZoneId: string;
@@ -71,22 +72,22 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       'Allow PostgreSQL access from ECS'
     );
 
-    // Create Secrets Manager secret for database credentials
-    const dbSecret = new secretsmanager.Secret(this, 'DatabaseSecret', {
-      description: 'Aurora Postgres database credentials',
-      generateSecretString: {
-        secretStringTemplate: JSON.stringify({ username: 'aivideo' }),
-        generateStringKey: 'password',
-        excludeCharacters: '"@/\\',
-      },
-    });
+    // Load DB credentials from .env
+    const dbUsername = process.env.DB_USERNAME || 'aivideo';
+    const dbPassword = process.env.DB_PASSWORD;
+
+    if (!dbPassword) {
+      throw new Error("DB_PASSWORD must be set in your .env file");
+    }
 
     // Create Aurora Serverless v2 cluster
     const auroraCluster = new rds.DatabaseCluster(this, 'AuroraCluster', {
       engine: rds.DatabaseClusterEngine.auroraPostgres({
         version: rds.AuroraPostgresEngineVersion.VER_17_5,
       }),
-      credentials: rds.Credentials.fromSecret(dbSecret),
+      credentials: rds.Credentials.fromUsername(dbUsername, {
+        password: cdk.SecretValue.unsafePlainText(dbPassword),
+      }),
       serverlessV2MinCapacity: 0.5,
       serverlessV2MaxCapacity: 1,
       defaultDatabaseName: 'videogen',
@@ -110,10 +111,6 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       exportName: 'ECSSecurityGroupId',
     });
 
-    new cdk.CfnOutput(this, 'DatabaseSecretArn', {
-      value: dbSecret.secretArn,
-      exportName: 'DatabaseSecretArn',
-    });
 
     new cdk.CfnOutput(this, 'AuroraClusterEndpoint', {
       value: auroraCluster.clusterEndpoint.hostname,
@@ -142,7 +139,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       ],
     });
 
-    // Grant permissions for ECR, Secrets Manager, and S3
+    // Grant permissions for ECR and S3
     taskExecutionRole.addToPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
@@ -156,7 +153,6 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       })
     );
 
-    dbSecret.grantRead(taskExecutionRole);
     videoBucket.grantReadWrite(taskExecutionRole);
 
     // Security group for Redis
@@ -198,6 +194,13 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
           protocol: ecs.Protocol.TCP,
         },
       ],
+      healthCheck: {
+        command: ['CMD-SHELL', 'redis-cli ping || exit 1'],
+        interval: cdk.Duration.seconds(30),
+        timeout: cdk.Duration.seconds(5),
+        retries: 3,
+        startPeriod: cdk.Duration.seconds(60),
+      },
     });
 
     const redisService = new ecs.FargateService(this, 'RedisService', {
@@ -205,6 +208,10 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       taskDefinition: redisTaskDefinition,
       desiredCount: 1,
       securityGroups: [redisSecurityGroup],
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PUBLIC,
+      },
+      assignPublicIp: true,
       cloudMapOptions: {
         name: 'redis',
         cloudMapNamespace: namespace,
@@ -235,9 +242,8 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         AURORA_ENDPOINT: auroraCluster.clusterEndpoint.hostname,
         AURORA_PORT: auroraCluster.clusterEndpoint.port.toString(),
         AURORA_DB_NAME: 'videogen',
-      },
-      secrets: {
-        DATABASE_SECRET: ecs.Secret.fromSecretsManager(dbSecret),
+        DATABASE_USERNAME: dbUsername,
+        DATABASE_PASSWORD: dbPassword,
       },
       portMappings: [
         {
@@ -246,11 +252,11 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         },
       ],
       healthCheck: {
-        command: ['CMD-SHELL', 'curl -f http://localhost:8000/health || exit 1'],
+        command: ['CMD-SHELL', 'python -c "import urllib.request; urllib.request.urlopen(\'http://localhost:8000/health\').close()" || exit 1'],
         interval: cdk.Duration.seconds(30),
-        timeout: cdk.Duration.seconds(5),
+        timeout: cdk.Duration.seconds(10),
         retries: 3,
-        startPeriod: cdk.Duration.seconds(60),
+        startPeriod: cdk.Duration.seconds(120),
       },
     });
 
@@ -259,60 +265,85 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       taskDefinition: apiTaskDefinition,
       desiredCount: 1,
       securityGroups: [ecsSecurityGroup],
-    });
-
-    // Worker Service
-    const workerTaskDefinition = new ecs.FargateTaskDefinition(this, 'WorkerTaskDefinition', {
-      memoryLimitMiB: 512,
-      cpu: 256,
-      executionRole: taskExecutionRole,
-    });
-
-    const workerContainer = workerTaskDefinition.addContainer('WorkerContainer', {
-      image: ecs.ContainerImage.fromRegistry(imageUri),
-      memoryLimitMiB: 512,
-      logging: ecs.LogDrivers.awsLogs({
-        streamPrefix: 'worker',
-        logGroup,
-      }),
-      command: [
-        'celery',
-        '-A',
-        'app.orchestrator.celery_app',
-        'worker',
-        '--loglevel=info',
-        '--concurrency=4',
-      ],
-      environment: {
-        REDIS_URL: 'redis://redis.aivideo.local:6379/0',
-        S3_BUCKET: videoBucket.bucketName,
-        AWS_REGION: this.region,
-        AURORA_ENDPOINT: auroraCluster.clusterEndpoint.hostname,
-        AURORA_PORT: auroraCluster.clusterEndpoint.port.toString(),
-        AURORA_DB_NAME: 'videogen',
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PUBLIC,
       },
-      secrets: {
-        DATABASE_SECRET: ecs.Secret.fromSecretsManager(dbSecret),
-      },
+      assignPublicIp: true,
+      enableExecuteCommand: true,
     });
+    
+    // Ensure Redis is ready before starting API
+    apiService.node.addDependency(redisService);
 
-    const workerService = new ecs.FargateService(this, 'WorkerService', {
-      cluster,
-      taskDefinition: workerTaskDefinition,
-      desiredCount: 1,
-      securityGroups: [ecsSecurityGroup],
-    });
+    // // Worker Service
+    // const workerTaskDefinition = new ecs.FargateTaskDefinition(this, 'WorkerTaskDefinition', {
+    //   memoryLimitMiB: 512,
+    //   cpu: 256,
+    //   executionRole: taskExecutionRole,
+    // });
 
-    // Export cluster name
-    new cdk.CfnOutput(this, 'ClusterName', {
-      value: cluster.clusterName,
-      exportName: 'ClusterName',
-    });
+    // const workerContainer = workerTaskDefinition.addContainer('WorkerContainer', {
+    //   image: ecs.ContainerImage.fromRegistry(imageUri),
+    //   memoryLimitMiB: 512,
+    //   logging: ecs.LogDrivers.awsLogs({
+    //     streamPrefix: 'worker',
+    //     logGroup,
+    //   }),
+    //   command: [
+    //     'celery',
+    //     '-A',
+    //     'app.orchestrator.celery_app',
+    //     'worker',
+    //     '--loglevel=info',
+    //     '--concurrency=4',
+    //   ],
+    //   environment: {
+    //     REDIS_URL: 'redis://redis.aivideo.local:6379/0',
+    //     S3_BUCKET: videoBucket.bucketName,
+    //     AWS_REGION: this.region,
+    //     AURORA_ENDPOINT: auroraCluster.clusterEndpoint.hostname,
+    //     AURORA_PORT: auroraCluster.clusterEndpoint.port.toString(),
+    //     AURORA_DB_NAME: 'videogen',
+    //   },
+    //   environment: {
+    //     ...existing environment vars...,
+    //     DATABASE_USERNAME: dbUsername,
+    //     DATABASE_PASSWORD: dbPassword,
+    //   },
+    //   healthCheck: {
+    //     command: ['CMD-SHELL', 'celery -A app.orchestrator.celery_app inspect ping || exit 1'],
+    //     interval: cdk.Duration.seconds(30),
+    //     timeout: cdk.Duration.seconds(10),
+    //     retries: 3,
+    //     startPeriod: cdk.Duration.seconds(120),
+    //   },
+    // });
 
-    new cdk.CfnOutput(this, 'APIServiceName', {
-      value: apiService.serviceName,
-      exportName: 'APIServiceName',
-    });
+    // const workerService = new ecs.FargateService(this, 'WorkerService', {
+    //   cluster,
+    //   taskDefinition: workerTaskDefinition,
+    //   desiredCount: 1,
+    //   securityGroups: [ecsSecurityGroup],
+    //   vpcSubnets: {
+    //     subnetType: ec2.SubnetType.PUBLIC,
+    //   },
+    //   assignPublicIp: true,
+    //   enableExecuteCommand: true,
+    // });
+    
+    // // Ensure Redis is ready before starting Worker
+    // workerService.node.addDependency(redisService);
+
+    // // Export cluster name
+    // new cdk.CfnOutput(this, 'ClusterName', {
+    //   value: cluster.clusterName,
+    //   exportName: 'ClusterName',
+    // });
+
+    // new cdk.CfnOutput(this, 'APIServiceName', {
+    //   value: apiService.serviceName,
+    //   exportName: 'APIServiceName',
+    // });
 
     // // Stage 4: Application Load Balancer
     // // Security group for ALB
