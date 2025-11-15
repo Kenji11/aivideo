@@ -11,12 +11,12 @@
 
 **File:** `frontend/src/App.tsx`
 
-- [ ] Update `handleSubmit` function to call `/api/generate` endpoint
-- [ ] Send `title`, `description`, `prompt`, and `reference_assets` in request body
-- [ ] Handle response with `video_id` and store it in state
-- [ ] Update UI to show processing state after successful submission
-- [ ] Add error handling for failed API calls
-- [ ] Display error messages to user if generation fails to start
+- [x] Update `handleSubmit` function to call `/api/generate` endpoint
+- [x] Send `title`, `description`, `prompt`, and `reference_assets` in request body
+- [x] Handle response with `video_id` and store it in state
+- [x] Update UI to show processing state after successful submission
+- [x] Add error handling for failed API calls
+- [x] Display error messages to user if generation fails to start
 
 **Details:**
 - Endpoint: `POST /api/generate`
@@ -29,21 +29,21 @@
 
 **File:** `backend/app/api/upload.py` (new file)
 
-- [ ] Create new API router for upload endpoints
-- [ ] Implement `POST /api/upload` endpoint
-- [ ] Accept multipart/form-data with file(s)
-- [ ] Validate file types (images, videos, PDFs)
-- [ ] Upload files to S3 using S3Client
-- [ ] Create Asset record in database with:
+- [x] Create new API router for upload endpoints
+- [x] Implement `POST /api/upload` endpoint
+- [x] Accept multipart/form-data with file(s)
+- [x] Validate file types (images, videos, PDFs)
+- [x] Upload files to S3 using S3Client
+- [x] Create Asset record in database with:
   - `id` (UUID)
   - `s3_key` and `s3_url`
   - `asset_type` (IMAGE, VIDEO, AUDIO)
   - `source` (USER_UPLOAD)
   - `file_name`, `file_size_bytes`, `mime_type`
   - `asset_metadata` (dimensions, duration if applicable)
-- [ ] Return asset ID(s) in response
-- [ ] Add error handling for upload failures
-- [ ] Register router in `backend/app/main.py`
+- [x] Return asset ID(s) in response
+- [x] Add error handling for upload failures
+- [x] Register router in `backend/app/main.py`
 
 **Details:**
 - Use FastAPI's `UploadFile` for file handling
@@ -56,19 +56,35 @@
 
 **File:** `frontend/src/components/UploadZone.tsx`
 
-- [ ] Update `handleFiles` to upload files to `/api/upload` endpoint
-- [ ] Show upload progress indicator
-- [ ] Store returned asset IDs in component state
-- [ ] Pass asset IDs to parent component via `onFilesSelected` callback
-- [ ] Update `onFilesSelected` prop type to include asset IDs
-- [ ] Handle upload errors and display to user
-- [ ] Update `App.tsx` to collect asset IDs from UploadZone
-- [ ] Include asset IDs in video generation request
+- [x] Update `handleFiles` to upload files to `/api/upload` endpoint
+- [x] Show upload progress indicator
+- [x] Store returned asset IDs in component state
+- [x] Pass asset IDs to parent component via `onAssetsUploaded` callback
+- [x] Update callback prop type to include asset IDs
+- [x] Handle upload errors and display to user
+- [x] Update `App.tsx` to collect asset IDs from UploadZone
+- [x] Include asset IDs in video generation request
+- [x] Create `GET /api/assets` endpoint in backend
+- [x] Accept optional `user_id` query parameter (defaults to MOCK_USER_ID)
+- [x] Query Asset table filtered by user_id
+- [x] Return list of assets with metadata (asset_id, filename, asset_type, file_size_bytes, s3_url, created_at)
+- [x] Add API function to fetch assets in `frontend/src/lib/api.ts`
+- [x] Create component or section to display uploaded assets on video gen page
+- [x] Fetch assets on page load using GET `/api/assets`
+- [x] Display assets in a list/table format with checkboxes
+- [x] Allow selecting/deselecting assets via checkboxes
+- [x] Store selected asset IDs in state
+- [x] Include selected asset IDs in video generation request
+- [x] Add "Refresh Assets" button to reload list
+- [x] Show loading state while fetching assets
+- [x] Handle empty state (no assets uploaded yet)
 
 **Details:**
 - Upload files immediately when selected
 - Store asset IDs to pass to video generation endpoint
 - Show loading state during upload
+- Backend endpoint: `GET /api/assets?user_id={user_id}`
+- Frontend should display previously uploaded assets with selection checkboxes
 
 ---
 
@@ -171,4 +187,25 @@ curl http://localhost:8000/api/video/{video_id}
 ```
 
 **Next:** After integration testing, proceed to Phase 3 implementation
+
+---
+
+### Task 9: My Projects Page Should Fetch All Videos
+
+**File:** `frontend/src/App.tsx`
+
+- [ ] Add API function to fetch all videos in `frontend/src/lib/api.ts`
+- [ ] Fetch videos from `/api/videos` endpoint when "My Projects" page loads
+- [ ] Map backend video data to Project format (or update Project type)
+- [ ] Display videos in the projects grid using ProjectCard component
+- [ ] Show loading state while fetching videos
+- [ ] Handle error state if fetch fails
+- [ ] Update projects state with fetched videos
+- [ ] Refresh projects list when returning to "My Projects" page
+
+**Details:**
+- Endpoint: `GET /api/videos` (already exists)
+- Returns list of videos with: video_id, title, status, progress, final_video_url, cost_usd, created_at, completed_at
+- Should filter by user_id (using MOCK_USER_ID for now)
+- Replace or supplement existing Supabase projects data
 

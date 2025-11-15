@@ -4,6 +4,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.common.models import VideoGeneration, VideoStatus
+from app.common.constants import MOCK_USER_ID
 
 
 def update_progress(
@@ -35,6 +36,7 @@ def update_progress(
             # Create new record if it doesn't exist
             video = VideoGeneration(
                 id=video_id,
+                user_id=MOCK_USER_ID,  # TODO: Get from auth token in future
                 title=kwargs.get("title", "Untitled Video"),
                 prompt=kwargs.get("prompt", ""),
                 status=VideoStatus.QUEUED,

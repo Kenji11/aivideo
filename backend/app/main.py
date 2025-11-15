@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import generate, status, video, health
+from app.api import generate, status, video, health, upload
 from app.database import init_db
 from app.common.logging import setup_logging
 
@@ -28,6 +28,7 @@ app.include_router(health.router, tags=["health"])
 app.include_router(generate.router, tags=["generation"])
 app.include_router(status.router, tags=["status"])
 app.include_router(video.router, tags=["video"])
+app.include_router(upload.router, tags=["upload"])
 
 # Startup event
 @app.on_event("startup")

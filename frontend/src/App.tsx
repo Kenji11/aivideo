@@ -3,6 +3,7 @@ import { Sparkles, Video, Film, Download, ArrowLeft, Settings, BarChart3, Zap, L
 import { Header } from './components/Header';
 import { StepIndicator } from './components/StepIndicator';
 import { UploadZone } from './components/UploadZone';
+import { AssetList } from './components/AssetList';
 import { ProjectCard } from './components/ProjectCard';
 import { ProcessingSteps } from './components/ProcessingSteps';
 import { NotificationCenter, Notification } from './components/NotificationCenter';
@@ -35,6 +36,7 @@ function App() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [referenceAssets, setReferenceAssets] = useState<string[]>([]);
   const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
+  const [assetRefreshTrigger, setAssetRefreshTrigger] = useState(0);
 
   const steps = [
     { id: 1, name: 'Create', icon: Sparkles },
@@ -141,7 +143,13 @@ function App() {
       read: false,
     };
     setNotifications((prev) => [notification, ...prev]);
-    setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 5000);
+    
+    // Auto-dismiss success notifications after 2 seconds
+    if (type === 'success') {
+      setTimeout(() => {
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+      }, 2000);
+    }
   };
 
   const handleSelectTemplate = (template: Template) => {
@@ -362,8 +370,29 @@ function App() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Reference Materials
                 </label>
-                {/* TODO: Task 3 - Connect asset upload to collect asset IDs */}
-                <UploadZone disabled={isProcessing} />
+                <div className="space-y-4">
+                  <UploadZone
+                    disabled={isProcessing}
+                    onAssetsUploaded={(assetIds) => {
+                      setReferenceAssets(prev => {
+                        const newIds = [...prev, ...assetIds];
+                        // Remove duplicates
+                        return Array.from(new Set(newIds));
+                      });
+                      // Trigger asset list refresh
+                      setAssetRefreshTrigger(prev => prev + 1);
+                      addNotification('success', 'Files Uploaded', `${assetIds.length} file(s) uploaded successfully.`);
+                    }}
+                  />
+                  <AssetList
+                    selectedAssetIds={referenceAssets}
+                    onSelectionChange={(assetIds) => {
+                      setReferenceAssets(assetIds);
+                    }}
+                    disabled={isProcessing}
+                    refreshTrigger={assetRefreshTrigger}
+                  />
+                </div>
               </div>
 
               <button

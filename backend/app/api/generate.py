@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.common.schemas import GenerateRequest, GenerateResponse
 from app.common.models import VideoGeneration, VideoStatus
+from app.common.constants import MOCK_USER_ID
 from app.database import get_db
 from app.orchestrator.pipeline import run_pipeline
 import uuid
@@ -18,6 +19,7 @@ async def generate_video(request: GenerateRequest, db: Session = Depends(get_db)
     # Create database record
     video_record = VideoGeneration(
         id=video_id,
+        user_id=MOCK_USER_ID,  # TODO: Get from auth token in future
         title=request.title,
         description=request.description,
         prompt=request.prompt,
