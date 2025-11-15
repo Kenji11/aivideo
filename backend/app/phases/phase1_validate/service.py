@@ -90,6 +90,7 @@ Extract the following information from the user's prompt and return as JSON:
 
 {
     "template": "product_showcase|lifestyle_ad|announcement",
+    "duration": null or integer (in seconds, ONLY if user explicitly specifies duration like "30 seconds", "10s", etc.),
     "product": {
         "name": "product name",
         "category": "product category"
@@ -107,7 +108,8 @@ Extract the following information from the user's prompt and return as JSON:
     }
 }
 
-Choose the template that best matches the user's intent. Extract all available information, using reasonable defaults if information is missing."""
+Choose the template that best matches the user's intent. Extract all available information, using reasonable defaults if information is missing.
+IMPORTANT: Only set "duration" if the user explicitly mentions a duration (like "30 seconds", "10s", "1 minute"). Otherwise leave it as null."""
         
         try:
             # Use OpenRouter if available, otherwise OpenAI
@@ -153,22 +155,52 @@ Choose the template that best matches the user's intent. Extract all available i
             template: Template dictionary
             
         Returns:
-            Merged specification
+            Merged specification with chunk_count calculated based on model's actual output duration
         """
         # Start with template as base
         spec = template.copy()
         
-        # Optimize duration for ads - start with shorter videos (5-10s) that can be extended
+        # Check if user explicitly specified duration
+        user_requested_duration = extracted.get('duration')
+        
+        # Optimize duration for ads - ONLY if user didn't specify duration
         prompt_lower = extracted.get('original_prompt', '').lower() if 'original_prompt' in extracted else ''
         is_ad = 'ad' in prompt_lower or 'advertisement' in prompt_lower or 'commercial' in prompt_lower
         
-        if is_ad:
+        print(f"📊 Phase 1: Duration Optimization")
+        print(f"   Template Duration: {spec.get('duration', 30)}s")
+        print(f"   User Requested Duration: {user_requested_duration}s" if user_requested_duration else "   User Requested Duration: None (using template default)")
+        print(f"   Is Ad: {'✅' if is_ad else '❌'}")
+        
+        # If user explicitly requested duration, use that instead of template default
+        if user_requested_duration:
+            print(f"   ✅ Using user-requested duration: {user_requested_duration}s")
+            spec['duration'] = user_requested_duration
+            # Recalculate beat timings for the requested duration
+            original_duration = template.get('duration', 30)
+            if original_duration != user_requested_duration:
+                beats = spec.get('beats', [])
+                if beats:
+                    scale_factor = user_requested_duration / original_duration
+                    for beat in beats:
+                        beat['duration'] = max(1, int(beat.get('duration', 0) * scale_factor))
+                    # Fix rounding: adjust last beat
+                    current_total = sum(beat['duration'] for beat in beats)
+                    if current_total != user_requested_duration:
+                        beats[-1]['duration'] += (user_requested_duration - current_total)
+                    # Recalculate start times
+                    current_start = 0
+                    for beat in beats:
+                        beat['start'] = current_start
+                        current_start += beat.get('duration', 0)
+        elif is_ad:
             # For ads, start with 5-10 seconds (can be extended later)
             # Use 5 seconds for quick ads, 10 seconds for standard ads
             target_duration = 5 if 'quick' in prompt_lower or 'short' in prompt_lower else 10
             original_duration = spec.get('duration', 30)
             
             if original_duration > target_duration:
+                print(f"   ⚠️  Shortening ad from {original_duration}s to {target_duration}s for MVP")
                 spec['duration'] = target_duration
                 # Scale down beat durations proportionally, but keep at least 1 second per beat
                 beats = spec.get('beats', [])
@@ -233,6 +265,28 @@ Choose the template that best matches the user's intent. Extract all available i
                 product_name=product_name,
                 style_aesthetic=style_aesthetic
             )
+        
+        # Calculate chunk_count based on model's actual chunk duration
+        # Import model config to get actual chunk duration
+        from app.phases.phase4_chunks.model_config import get_default_model
+        import math
+        
+        model_config = get_default_model()
+        actual_chunk_duration = model_config['actual_chunk_duration']
+        video_duration = spec['duration']
+        
+        # Calculate how many chunks we need based on actual model output duration
+        chunk_count = math.ceil(video_duration / actual_chunk_duration)
+        
+        print(f"📊 Phase 1: Chunk Calculation")
+        print(f"   Final Duration: {video_duration}s")
+        print(f"   Model: {model_config['name']} (outputs {actual_chunk_duration}s chunks)")
+        print(f"   Chunk Count: {chunk_count} chunks")
+        print(f"   Formula: ceil({video_duration}s / {actual_chunk_duration}s) = {chunk_count}")
+        
+        # Add to spec for Phase 4 to use
+        spec['chunk_count'] = chunk_count
+        spec['chunk_duration'] = actual_chunk_duration  # Store actual duration in spec
         
         return spec
     
