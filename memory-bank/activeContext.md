@@ -1,74 +1,73 @@
 # Active Context
 
 ## Current Status
-**Project Phase**: Initialization  
+**Project Phase**: MVP Complete - Production Testing  
 **PRD Version**: 2.0  
-**Date**: November 14, 2025  
-**Day**: 0 (Pre-Development)  
-**Team Size**: 3 people  
+**Date**: November 15, 2025  
+**Day**: 1 (Active Development)  
+**Team Size**: 1 person (solo development)  
 **Region**: AWS us-east-2 (Ohio)
 
 ## What Just Happened
-1. ✅ Created project repository
-2. ✅ Comprehensive PRD v2.0 documented (1,954 lines)
-3. ✅ Architecture diagrams added (Mermaid):
-   - `architecture-deployment.mermaid` (82 lines) - AWS infrastructure
-   - `architecture-pipeline.mermaid` (118 lines) - Six-phase workflow
-4. ✅ Memory bank initialized with all core files
-5. ✅ Git repository initialized and pushed to GitHub
-6. ✅ Pulled latest changes from remote
-7. 🔄 Updating memory bank with PRD v2.0 changes
+1. ✅ **PR #8 Complete**: Last-frame continuation for temporal coherence
+2. ✅ Fixed duration override bug (user-specified durations now respected)
+3. ✅ Enhanced Phase 1 logging (duration optimization + chunk calculation)
+4. ✅ All 8 PRs completed successfully
+5. ✅ Pipeline running end-to-end with Phase 1 → Phase 3 → Phase 4 flow
+6. ✅ Phase 2 (Animatic) temporarily disabled for MVP
+7. ✅ Phase 5 & 6 working (refinement has S3 path issue, being addressed)
 
 ## Current Focus
-**Setting up project foundation and git repository**
+**Testing 30s video generation with 6 chunks using last-frame continuation**
 
 ### Immediate Tasks
-1. Complete git initialization and push to GitHub
-2. Create project directory structure
-3. Set up Docker Compose environment
-4. Initialize backend skeleton (FastAPI + Celery)
-5. Initialize frontend skeleton (React + Vite)
+1. Test 30s video with user-specified duration (should generate 6 chunks)
+2. Verify last-frame continuation works across all 6 chunks
+3. Check video quality and temporal coherence
+4. Fix Phase 5 S3 path issue (stitched video not found)
+5. Document findings and next optimizations
 
 ## Recent Decisions
 
-### Architectural Decisions (PRD v2.0)
-1. **3-Person Team Structure**: Phase-based vertical slices
-   - Person A: Phase 1 (Validation) + Phase 2 (Animatic) + Generate Form
-   - Person B: Phase 3 (References) + Phase 4 (Chunks) + Progress Indicator
-   - Person C: Phase 5 (Refinement) + Phase 6 (Export) + Video Player
-   - Why: Zero merge conflicts, parallel development, clear ownership
+### Key Implementation Decisions (November 15, 2025)
 
-2. **AWS Region**: us-east-2 (Ohio)
-   - Why: Cost-effective, low latency, good availability
-   
-3. **Hybrid Approach**: Template-driven structure + AI content generation
-   - Why: Reliability (90%+ success rate) + Creativity
-   
-4. **Six-Phase Pipeline**: Progressive refinement pattern
-   - Phase 1: Validation (GPT-4)
-   - Phase 2: Animatic (SDXL, internal reference)
-   - Phase 3: References (SDXL)
-   - Phase 4: Chunks (Zeroscope/AnimateDiff, parallel)
-   - Phase 5: Refinement (FFmpeg + MusicGen)
-   - Phase 6: Export (S3)
+1. **PR #8: Last-Frame Continuation** ✅
+   - Chunk 0: Uses Phase 3 reference image as init_image
+   - Chunks 1+: Use last frame from previous chunk as init_image
+   - Why: Eliminates visual resets, creates temporal coherence
+   - Result: "One continuous take" feel instead of slideshow
 
-5. **AWS Elastic Beanstalk**: Over ECS or Lambda
-   - Why: Simpler deployment, auto-scaling, managed load balancer
-   - Cost: ~$87/month (~$25 for competition week)
-   - Region: us-east-2 for all services
+2. **Phase 2 Disabled for MVP** ✅
+   - Animatic generation temporarily removed
+   - Phase 3 (References) re-enabled instead
+   - Why: Simpler workflow, faster iteration
+   - One reference image per video (not per beat)
 
-6. **Celery + Redis**: For job queue and workers
-   - Why: Proven, scales well, supports parallel tasks
-   - Pattern: Group execution for 15 video chunks
+3. **Model Configuration System** (PR #2) ✅
+   - Centralized model configs with actual_chunk_duration
+   - DEFAULT_MODEL = 'wan' (wan-2.1-480p image-to-video)
+   - Why: Easy model switching, accurate chunk count calculation
 
-7. **Development vs Final Models**:
-   - Dev: Zeroscope ($0.10/chunk) - Fast iteration
-   - Final: AnimateDiff ($0.20/chunk) - High quality
-   - Saves ~$150 during development
+4. **Chunk Count Calculation** (PR #7) ✅
+   - Fixed: Calculate based on actual model output duration
+   - wan: 5s chunks (not 2s) → 30s video = 6 chunks
+   - animatediff: 2s chunks → 30s video = 15 chunks
+   - Why: Models ignore duration params, must use reality
 
-8. **Visual Documentation**: Added Mermaid diagrams
-   - Deployment architecture (CloudFront → ALB → EB → S3/RDS/ElastiCache)
-   - Pipeline workflow (6 phases with inputs/outputs)
+5. **Duration Optimization Logic** (Today) ✅
+   - Respect user-specified durations (extracted by GPT-4)
+   - Only optimize ads when user doesn't specify duration
+   - Why: User intent should override automatic optimization
+
+6. **Sequential Chunk Generation** (PR #8) ✅
+   - Generate chunks one at a time (not in parallel)
+   - Why: Need previous chunk's last frame for next chunk
+   - Trade-off: Slower but better quality (temporal coherence)
+
+7. **Logging Enhancements** (PR #4 + PR #8) ✅
+   - Phase 1: Duration optimization + chunk calculation
+   - Phase 4: Init image selection per chunk
+   - Why: Better debugging and transparency
 
 ### Template Strategy
 Start with 3 templates:
@@ -78,116 +77,79 @@ Start with 3 templates:
 
 ## Next Steps
 
-### Immediate (Today)
-1. ✅ Initialize git repository
-2. ✅ Create memory bank (v1)
-3. ✅ Push to GitHub
-4. ✅ Pull updated PRD v2.0 and diagrams
-5. 🔄 Update memory bank (v2 with team structure)
-6. 🔲 Create directory structure (phase-based folders)
-7. 🔲 Set up Docker Compose
-8. 🔲 Create .env.example file
+### Immediate (Now)
+1. ✅ Test with 30s user-specified duration
+2. 🔄 Verify 6 chunks generated (not 2)
+3. 🔄 Check temporal coherence across all chunks
+4. 🔲 Fix Phase 5 S3 path issue
+5. 🔲 Test full 30s video end-to-end
 
-### Day 1 Morning (All Together - 2 hours)
-**Shared Foundation** - Zero conflicts if done together first
-- ✅ Review PRD v2.0 and architecture
-- 🔲 Write `common/schemas.py` (PhaseInput/Output contracts)
-- 🔲 Write `common/models.py` (VideoGeneration database model)
-- 🔲 Write `orchestrator/pipeline.py` skeleton
-- 🔲 Set up shared `services/` (API client interfaces)
-- 🔲 Agree on Git workflow (feature branches, PR review)
-- 🔲 Set up Docker Compose
-- 🔲 Test: Can everyone run `docker-compose up` successfully?
+### Short Term (Next Session)
+1. Optimize chunk generation speed (currently sequential)
+2. Consider batch generation after chunk 0
+3. Add transition effects at beat boundaries (future enhancement)
+4. Improve error handling and retry logic
+5. Add more comprehensive logging
 
-### Day 1 Afternoon (Parallel - 6 hours)
-**Person A** (Phases 1+2):
-- Phase 1: Prompt validation (OpenAI integration, templates)
-- Phase 2: Animatic generation (SDXL, S3 uploads)
+### Known Issues to Address
+1. **Phase 5 S3 Path**: Stitched video not found (404 error)
+   - Likely bucket name mismatch or path format issue
+   - Need to verify S3 client configuration
 
-**Person B** (Phases 3+4):
-- Phase 3: Reference assets (style guide generation)
-- Phase 4: Chunk generation (parallel execution, stitching)
+2. **Performance**: Sequential generation is slow
+   - 6 chunks × ~45s each = ~4.5 minutes just for generation
+   - Could optimize: Generate chunk 0, then parallelize chunks 1-5
+   - Trade-off: Complexity vs speed
 
-**Person C** (Phases 5+6):
-- Phase 5: Refinement (FFmpeg, MusicGen)
-- Phase 6: Export (S3 upload, cleanup)
-
-### Day 1-2 (MVP - 48 hours)
-**Complete all 6 pipeline phases**
-1. Phase 1: Prompt validation (GPT-4)
-2. Phase 2: Animatic generation (SDXL)
-3. Phase 3: Reference assets (SDXL)
-4. Phase 4: Chunked video generation (Zeroscope)
-5. Phase 5: Refinement (FFmpeg + MusicGen)
-6. Phase 6: S3 upload + download
-
-**End-to-End Testing**
-- Generate first complete video
-- Verify quality, timing, A/V sync
-- Measure cost and generation time
+3. **Duration Override**: Now fixed, needs testing
+   - User-specified "30 seconds" should work
+   - GPT-4 extracts duration from prompt
+   - Phase 1 respects user intent
 
 ## Active Considerations
 
 ### Cost Management
-- Budget: $225-$275 for competition week
-- Track costs per phase in database
-- Use Zeroscope for all development
-- Switch to AnimateDiff only for final 10 showcase videos
+- Budget: ~$1/video for testing (2 chunks @ $0.45 each)
+- wan model: $0.09/second of video output
+- 30s video (6 chunks × 5s) = ~$2.70
+- Phase 3 reference: $0.025 per generation
+- Current: Testing with 10s videos to save costs
 
-### Quality vs Speed Tradeoffs
-- MVP: Prioritize speed (get working pipeline)
-- Polish phase: Prioritize quality (fine-tune prompts, color grading)
-- Decision point: Day 3 (after MVP complete)
+### Quality vs Speed Tradeoffs  
+- **Current**: Sequential generation for temporal coherence
+- **Future**: Hybrid approach - chunk 0 first, then parallel chunks 1-5
+- **Trade-off**: 6× slower but smooth motion continuity
+- Generation time: ~45s per chunk × 6 = ~4.5 minutes
 
-### Risk Areas to Watch
-1. **Temporal Consistency**: Will animatic-as-reference work?
-   - Mitigation: Test early (Day 1)
-   - Fallback: Motion-first pipeline (documented in PRD)
-
-2. **API Rate Limits**: Replicate limits 50 concurrent predictions
-   - Mitigation: Throttle to 15 chunks at a time
-   - Monitor: Check rate limit headers in responses
-
-3. **Generation Time**: Target <10 minutes
-   - Current estimate: 7-8 minutes
-   - If exceeds: Reduce chunk count or chunk duration
-
-## Questions to Resolve
-
-### Before Day 1
-- ❓ AWS account ready? (Need to verify credentials)
-- ❓ Replicate API token obtained?
-- ❓ OpenAI API key obtained?
-
-### During MVP Development
-- ❓ Which template to test first? (Recommend: product_showcase)
-- ❓ What's the optimal chunk overlap? (Start with 0.5s)
-- ❓ Should we generate all 15 chunks or start with 5 for testing?
-
-### Before Final Submission
-- ❓ Which 10 videos to showcase with AnimateDiff?
-- ❓ How to structure demo video?
-- ❓ What documentation needs to be written?
+### Technical Achievements
+1. ✅ **Temporal Coherence**: Last-frame continuation working
+2. ✅ **Model Reality**: Accurate chunk duration calculations
+3. ✅ **User Intent**: Duration override bug fixed
+4. ✅ **Comprehensive Logging**: Easy debugging and monitoring
+5. ✅ **Phase 3 Integration**: Reference image generation working
 
 ## Current Blockers
-**None** - Ready to proceed with development
+1. **Phase 5 S3 Path Issue**: Refinement can't find stitched video
+   - Error: 404 Not Found when downloading from S3
+   - Need to verify bucket name and path format
 
-## Success Indicators (To Track)
-- [ ] Local Docker Compose working
-- [ ] First successful prompt validation (Phase 1)
-- [ ] First animatic generated (Phase 2)
-- [ ] First video chunk generated (Phase 4)
-- [ ] First complete 30s video
-- [ ] Deploy to AWS (Web + Worker tiers)
-- [ ] First video generated in production
-- [ ] Generate 10 showcase videos
-- [ ] Complete documentation
-- [ ] Submit to competition
+## Success Indicators (Tracking Progress)
+- [x] Local Docker Compose working
+- [x] First successful prompt validation (Phase 1)
+- [x] Phase 3 reference image generated
+- [x] First video chunk generated (Phase 4)
+- [x] Last-frame continuation working
+- [x] 2-chunk video generated successfully (10s)
+- [ ] 6-chunk video generated successfully (30s)
+- [ ] Phase 5 refinement working
+- [ ] First complete polished video
+- [ ] Deploy optimizations (parallel after chunk 0)
 
 ## Notes
-- PRD is comprehensive and detailed (1,716 lines)
-- All 6 phases are well-specified
-- Cost breakdown is clear ($1.76-$3.26 per video)
-- Architecture is proven (similar to existing systems)
-- Timeline is aggressive but achievable (MVP in 48 hours)
+- PR #8 (Last-Frame Continuation) successfully implemented and tested
+- Pipeline working end-to-end (Phase 1 → 3 → 4)
+- Phase 2 disabled for MVP, may re-enable later
+- wan model outputs 5s chunks regardless of parameters
+- Sequential generation ensures temporal coherence
+- User-specified durations now respected by Phase 1
 

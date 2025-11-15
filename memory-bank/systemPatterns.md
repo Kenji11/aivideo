@@ -104,27 +104,76 @@ Each video generation flows through 6 sequential phases:
 
 ### 3. Temporal Consistency Pattern
 
-**Animatic-as-Reference**
+**Last-Frame Continuation (PR #8)** ✅ ACTIVE
+- **Chunk 0**: Uses Phase 3 reference image as init_image
+- **Chunks 1+**: Use last frame from previous chunk as init_image
+- Creates temporal coherence and motion continuity
+- Result: "One continuous take" feel, eliminates visual resets
+- Trade-off: Requires sequential generation (slower but better quality)
+
+**Animatic-as-Reference** (DISABLED FOR MVP)
 - Generate cheap, low-detail structural frames
 - Use as ControlNet inputs for video generation
 - Ensures character/object consistency across clips
-- Solves "temporal drift" problem in AI video
+- May re-enable post-MVP for multi-image workflows
 
-### 4. Parallel Processing Pattern
+### 4. Processing Pattern Evolution
 
-**Celery Group Execution**
-- All 15 video chunks generated simultaneously
-- Each chunk is independent task
-- Results aggregated when all complete
-- Reduces total generation time from 15× to ~1×
+**Current: Sequential Generation (PR #8)**
+- Chunks generated one at a time (0, 1, 2, 3, ...)
+- Required for last-frame continuation
+- Each chunk needs previous chunk's last frame
+- Slower but ensures temporal coherence
+- Generation time: ~45s × chunk_count
 
-### 5. Progressive Enhancement Pattern
+**Future: Hybrid Approach (Planned)**
+- Generate chunk 0 first (uses Phase 3 reference)
+- Extract last frame from chunk 0
+- Generate chunks 1+ in parallel (all use chunk 0's last frame)
+- Trade-off: Slightly less coherence but much faster
+- Alternative: Batch sequential (0-1-2 sequential, then 3-4-5 parallel, etc.)
+
+**Original: Parallel Generation (Deprecated)**
+- All chunks generated simultaneously
+- Fast but no temporal continuity between chunks
+- Caused visual resets and inconsistency
+- Replaced by sequential approach
+
+### 5. Model Reality Pattern (PR #7)
+
+**Actual vs Requested Duration**
+- **Critical Discovery**: Models output different durations regardless of parameters
+- **wan**: Outputs ~5s chunks (ignores duration param, trained on 5s clips)
+- **zeroscope**: Outputs ~3s chunks (24 frames @ 8fps)
+- **animatediff**: Outputs ~2s chunks (16 frames @ 8fps)
+- **runway**: Outputs ~5-10s chunks (varies by tier)
+
+**Chunk Count Calculation**
+```python
+# WRONG (old approach):
+chunk_count = video_duration / 2  # Assumed all models output 2s
+
+# RIGHT (PR #7):
+model_config = get_default_model()
+actual_chunk_duration = model_config['actual_chunk_duration']
+chunk_count = math.ceil(video_duration / actual_chunk_duration)
+
+# Example: 30s video with wan (5s chunks) = 6 chunks (not 15!)
+```
+
+**Impact**: Must use actual_chunk_duration for accurate planning
+- Affects chunk count calculation
+- Affects overlap calculations  
+- Affects cost estimation
+- Affects generation time estimation
+
+### 6. Progressive Enhancement Pattern
 
 **Low-to-High Fidelity**
-- Development: Use Zeroscope ($0.10/chunk, fast)
-- Final: Switch to AnimateDiff ($0.20/chunk, quality)
+- Development: Use wan ($0.09/s, fast, 480p)
+- Final: Can switch to higher quality models
 - Allows rapid iteration during development
-- Switch to high-quality only for showcase
+- Model switching via single constant change
 
 ## Data Flow Patterns
 

@@ -14,6 +14,7 @@ COST_WAN = 0.09  # Wan 2.1 (480p) - Default model
 COST_ZEROSCOPE = 0.10  # Zeroscope v2 XL
 COST_ANIMATEDIFF = 0.20  # AnimateDiff
 COST_RUNWAY = 0.25  # Runway Gen-2 (estimated)
+COST_HAILUO = 0.04  # Hailuo 2.3 (fast)
 
 # Legacy constants (kept for backwards compatibility)
 COST_ZEROSCOPE_VIDEO = COST_ZEROSCOPE

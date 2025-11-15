@@ -11,7 +11,8 @@ CRITICAL: Models output different chunk durations regardless of parameters!
 - Use 'duration_controllable' to know if you can change it
 
 Available Models:
-- 'wan': Wan 2.1 (wavespeedai/wan-2.1-i2v-480p) - Default, outputs 5s chunks
+- 'hailuo': Hailuo 2.3 Fast (minimax/hailuo-2.3-fast) - Default, outputs 5s chunks, 720p @ 30fps
+- 'wan': Wan 2.1 (wavespeedai/wan-2.1-i2v-480p) - Outputs 5s chunks
 - 'zeroscope': Zeroscope v2 XL - Outputs 3s chunks
 - 'animatediff': AnimateDiff - Outputs 2s chunks (controllable)
 - 'runway': Runway Gen-2 - Outputs 5-10s chunks (controllable with Gen-3)
@@ -44,42 +45,43 @@ from app.common.constants import (
     COST_ZEROSCOPE,
     COST_ANIMATEDIFF,
     COST_RUNWAY,
+    COST_HAILUO,
 )
 
 # Default model (currently used model)
-DEFAULT_MODEL = 'wan'
+DEFAULT_MODEL = 'hailuo'
 
 # Model configurations dictionary
 MODEL_CONFIGS: Dict[str, Dict] = {
     'wan': {
         'name': 'wan',
         'replicate_model': 'wavespeedai/wan-2.1-i2v-480p',
-        'cost_per_generation': COST_WAN,  # Cost per second of video
+        'cost_per_generation': COST_WAN,
         'params': {
-            'num_frames': 80,  # Maximum frames supported
-            'fps': 24,  # Default FPS
-            'width': 480,  # Output width
-            'height': 480,  # Output height
+            'num_frames': 80,
+            'fps': 24,
+            'width': 480,
+            'height': 480,
         },
-        'actual_chunk_duration': 5.0,  # Reality: model outputs ~5s chunks regardless of params (trained on 5s clips)
-        'duration_controllable': False,  # Cannot reliably control chunk duration
-        'supports_multi_image': False,  # Does not support multiple image inputs
-        'max_reference_assets': 0,  # No reference assets support
-        'supports_text_to_video': True,  # Can generate from text prompt only
-        'supports_image_to_video': True,  # Can generate from image input
+        'actual_chunk_duration': 5.0,
+        'duration_controllable': False,
+        'supports_multi_image': False,
+        'max_reference_assets': 0,
+        'supports_text_to_video': True,
+        'supports_image_to_video': True,
     },
     'zeroscope': {
         'name': 'zeroscope',
         'replicate_model': 'anotherjesse/zeroscope-v2-xl',
-        'cost_per_generation': COST_ZEROSCOPE,  # Cost per second of video
+        'cost_per_generation': COST_ZEROSCOPE,
         'params': {
-            'num_frames': 24,  # Maximum frames supported
-            'fps': 8,  # Default FPS
-            'width': 1024,  # Output width
-            'height': 576,  # Output height
+            'num_frames': 24,
+            'fps': 8,
+            'width': 1024,
+            'height': 576,
         },
-        'actual_chunk_duration': 3.0,  # Reality: 24 frames @ 8fps = 3 seconds
-        'duration_controllable': True,  # Some control via num_frames parameter
+        'actual_chunk_duration': 3.0,
+        'duration_controllable': True,
         'supports_multi_image': False,
         'max_reference_assets': 0,
         'supports_text_to_video': True,
@@ -88,15 +90,15 @@ MODEL_CONFIGS: Dict[str, Dict] = {
     'animatediff': {
         'name': 'animatediff',
         'replicate_model': 'lucataco/animatediff',
-        'cost_per_generation': COST_ANIMATEDIFF,  # Cost per second of video
+        'cost_per_generation': COST_ANIMATEDIFF,
         'params': {
-            'num_frames': 16,  # Maximum frames supported
-            'fps': 8,  # Default FPS
-            'width': 512,  # Output width
-            'height': 512,  # Output height
+            'num_frames': 16,
+            'fps': 8,
+            'width': 512,
+            'height': 512,
         },
-        'actual_chunk_duration': 2.0,  # Reality: 16 frames @ 8fps = 2 seconds (actually works!)
-        'duration_controllable': True,  # Good control via num_frames parameter
+        'actual_chunk_duration': 2.0,
+        'duration_controllable': True,
         'supports_multi_image': False,
         'max_reference_assets': 0,
         'supports_text_to_video': True,
@@ -104,18 +106,41 @@ MODEL_CONFIGS: Dict[str, Dict] = {
     },
     'runway': {
         'name': 'runway',
-        'replicate_model': 'runway-gen2',  # Note: May need actual Replicate model name
-        'cost_per_generation': COST_RUNWAY,  # Cost per second of video
+        'replicate_model': 'runway-gen2',
+        'cost_per_generation': COST_RUNWAY,
         'params': {
-            'num_frames': 4,  # Maximum frames supported
-            'fps': 24,  # Default FPS
-            'width': 1280,  # Output width
-            'height': 768,  # Output height
+            'num_frames': 4,
+            'fps': 24,
+            'width': 1280,
+            'height': 768,
         },
-        'actual_chunk_duration': 5.0,  # Reality: ~5-10s depending on tier (conservative estimate)
-        'duration_controllable': True,  # Gen-3 API allows 5s or 10s selection
+        'actual_chunk_duration': 5.0,
+        'duration_controllable': True,
         'supports_multi_image': False,
         'max_reference_assets': 0,
+        'supports_text_to_video': True,
+        'supports_image_to_video': True,
+    },
+    'hailuo': {
+        'name': 'hailuo',
+        'replicate_model': 'minimax/hailuo-2.3-fast',  # Official, fastest, cheapest high-quality version
+        'cost_per_generation': COST_HAILUO,  # $0.04 per 5s chunk ($0.008/second)
+        'params': {
+            'num_frames': 151,      # 151 frames @ 30fps = ~5.03s (max reliable)
+            'fps': 30,              # Native 30fps, smoother motion
+            'width': 1280,          # Supports up to 1080p, 720p default on fast tier
+            'height': 720,
+        },
+        'param_names': {
+            'image': 'first_frame_image',  # Hailuo uses 'first_frame_image' instead of 'image'
+            'prompt': 'prompt',
+            'num_frames': 'num_frames',
+            'fps': 'fps',
+        },
+        'actual_chunk_duration': 5.0,  # Trained on 5s clips, outputs ~5s consistently
+        'duration_controllable': True,  # Can control via num_frames (30–151 frames)
+        'supports_multi_image': False,  # Single image input only
+        'max_reference_assets': 0,      # No extra assets
         'supports_text_to_video': True,
         'supports_image_to_video': True,
     },
