@@ -1,15 +1,25 @@
-import { Upload, AlertCircle } from 'lucide-react';
+import { Upload, AlertCircle, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { api, UploadedAsset } from '../lib/api';
 
 interface UploadZoneProps {
-  onFilesSelected?: (files: File[]) => void;
+  onAssetsUploaded?: (assetIds: string[]) => void;
   disabled?: boolean;
 }
 
-export function UploadZone({ onFilesSelected, disabled = false }: UploadZoneProps) {
+interface FileUploadState {
+  file: File;
+  status: 'pending' | 'uploading' | 'success' | 'error';
+  progress: number;
+  error?: string;
+  assetId?: string;
+}
+
+export function UploadZone({ onAssetsUploaded, disabled = false }: UploadZoneProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragActive, setIsDragActive] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadStates, setUploadStates] = useState<FileUploadState[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -30,7 +40,7 @@ export function UploadZone({ onFilesSelected, disabled = false }: UploadZoneProp
     handleFiles(files);
   };
 
-  const handleFiles = (files: File[]) => {
+  const handleFiles = async (files: File[]) => {
     const validFiles = files.filter(f => {
       const isValid = ['image/', 'video/', 'application/pdf'].some(type =>
         f.type.startsWith(type.replace('/', '')) || f.type === 'application/pdf'
@@ -38,8 +48,72 @@ export function UploadZone({ onFilesSelected, disabled = false }: UploadZoneProp
       return isValid;
     });
 
-    setSelectedFiles(validFiles);
-    onFilesSelected?.(validFiles);
+    if (validFiles.length === 0) return;
+
+    // Initialize upload states
+    const initialStates: FileUploadState[] = validFiles.map(file => ({
+      file,
+      status: 'pending',
+      progress: 0,
+    }));
+    setUploadStates(initialStates);
+    setIsUploading(true);
+
+    try {
+      // Upload files with progress tracking
+      const response = await api.uploadAssets(validFiles, (progress) => {
+        // Update progress for all files (simplified - could be per-file if needed)
+        setUploadStates(prev => prev.map(state => ({
+          ...state,
+          status: 'uploading' as const,
+          progress,
+        })));
+      });
+
+      // Update states with results
+      const assetIds: string[] = [];
+      setUploadStates(prev => {
+        return prev.map((state, idx) => {
+          const uploadedAsset = response.assets[idx];
+          if (uploadedAsset) {
+            assetIds.push(uploadedAsset.asset_id);
+            return {
+              ...state,
+              status: 'success' as const,
+              progress: 100,
+              assetId: uploadedAsset.asset_id,
+            };
+          } else {
+            return {
+              ...state,
+              status: 'error' as const,
+              error: response.errors?.[idx] || 'Upload failed',
+            };
+          }
+        });
+      });
+
+      // Notify parent of uploaded asset IDs
+      if (assetIds.length > 0) {
+        onAssetsUploaded?.(assetIds);
+      }
+
+      // Show errors if any
+      if (response.errors && response.errors.length > 0) {
+        console.error('Upload errors:', response.errors);
+      }
+    } catch (error) {
+      // Handle upload errors
+      const errorMessage = error instanceof Error ? error.message : 'Failed to upload files';
+      setUploadStates(prev => prev.map(state => ({
+        ...state,
+        status: 'error' as const,
+        error: errorMessage,
+      })));
+      console.error('Upload error:', error);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,9 +138,17 @@ export function UploadZone({ onFilesSelected, disabled = false }: UploadZoneProp
               : 'border-slate-300 dark:border-slate-600 hover:border-blue-400 hover:bg-blue-50'
         }`}
       >
-        <Upload className={`w-12 h-12 mx-auto mb-3 ${isDragActive ? 'text-blue-600' : 'text-slate-400'}`} />
+        {isUploading ? (
+          <Loader2 className="w-12 h-12 mx-auto mb-3 text-blue-600 animate-spin" />
+        ) : (
+          <Upload className={`w-12 h-12 mx-auto mb-3 ${isDragActive ? 'text-blue-600' : 'text-slate-400'}`} />
+        )}
         <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-          {selectedFiles.length > 0 ? 'Files selected' : 'Drag & drop or click to upload'}
+          {isUploading
+            ? 'Uploading files...'
+            : uploadStates.length > 0
+            ? `${uploadStates.filter(s => s.status === 'success').length} file(s) uploaded`
+            : 'Drag & drop or click to upload'}
         </p>
         <p className="text-xs text-slate-500 dark:text-slate-400">
           Images, videos, or PDFs to guide the AI
@@ -82,25 +164,61 @@ export function UploadZone({ onFilesSelected, disabled = false }: UploadZoneProp
         />
       </div>
 
-      {selectedFiles.length > 0 && (
+      {uploadStates.length > 0 && (
         <div className="space-y-2">
-          {selectedFiles.map((file, idx) => (
+          {uploadStates.map((state, idx) => (
             <div
               key={idx}
-              className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200"
+              className={`p-3 rounded-lg border ${
+                state.status === 'success'
+                  ? 'bg-green-50 border-green-200'
+                  : state.status === 'error'
+                  ? 'bg-red-50 border-red-200'
+                  : state.status === 'uploading'
+                  ? 'bg-blue-50 border-blue-200'
+                  : 'bg-slate-50 border-slate-200'
+              }`}
             >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{file.name}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB
-                </p>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center space-x-2 flex-1 min-w-0">
+                  {state.status === 'uploading' && (
+                    <Loader2 className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
+                  )}
+                  {state.status === 'success' && (
+                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  )}
+                  {state.status === 'error' && (
+                    <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                  )}
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                    {state.file.name}
+                  </p>
+                </div>
+                {state.status !== 'uploading' && (
+                  <button
+                    onClick={() => setUploadStates(uploadStates.filter((_, i) => i !== idx))}
+                    className="ml-3 text-slate-400 hover:text-slate-600 dark:text-slate-400 flex-shrink-0"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
-              <button
-                onClick={() => setSelectedFiles(selectedFiles.filter((_, i) => i !== idx))}
-                className="ml-3 text-slate-400 hover:text-slate-600 dark:text-slate-400"
-              >
-                ×
-              </button>
+              {state.status === 'uploading' && (
+                <div className="w-full bg-slate-200 rounded-full h-2 mb-1">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${state.progress}%` }}
+                  />
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {(state.file.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+                {state.status === 'error' && state.error && (
+                  <p className="text-xs text-red-600 truncate ml-2">{state.error}</p>
+                )}
+              </div>
             </div>
           ))}
         </div>

@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Sparkles, Video, Film, Download, ArrowLeft, Settings, BarChart3, Zap, Library, CreditCard, Code2 } from 'lucide-react';
 import { Header } from './components/Header';
 import { StepIndicator } from './components/StepIndicator';
 import { UploadZone } from './components/UploadZone';
+import { AssetList } from './components/AssetList';
 import { ProjectCard } from './components/ProjectCard';
 import { ProcessingSteps } from './components/ProcessingSteps';
 import { NotificationCenter, Notification } from './components/NotificationCenter';
@@ -17,6 +18,7 @@ import { VideoLibrary } from './pages/VideoLibrary';
 import { Billing } from './pages/Billing';
 import { API } from './pages/API';
 import { supabase, Project } from './lib/supabase';
+import { api } from './lib/api';
 
 type AppStep = 'projects' | 'create' | 'processing' | 'preview' | 'download' | 'templates' | 'settings' | 'analytics' | 'dashboard' | 'library' | 'billing' | 'api' | 'export';
 
@@ -32,6 +34,11 @@ function App() {
   const [processingProgress, setProcessingProgress] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [referenceAssets, setReferenceAssets] = useState<string[]>([]);
+  const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
+  const [assetRefreshTrigger, setAssetRefreshTrigger] = useState(0);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
 
   const steps = [
     { id: 1, name: 'Create', icon: Sparkles },
@@ -64,12 +71,126 @@ function App() {
     return () => clearInterval(interval);
   }, [isProcessing, elapsedTime, processingProgress]);
 
+  const addNotification = useCallback((type: Notification['type'], title: string, message: string) => {
+    const id = Math.random().toString();
+    const notification: Notification = {
+      id,
+      type,
+      title,
+      message,
+      timestamp: new Date(),
+      read: false,
+    };
+    setNotifications((prev) => [notification, ...prev]);
+    
+    // Auto-dismiss success notifications after 2 seconds
+    if (type === 'success') {
+      setTimeout(() => {
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+      }, 2000);
+    }
+  }, []);
+
+  const fetchVideos = useCallback(async () => {
+    setIsLoadingProjects(true);
+    setProjectsError(null);
+    
+    try {
+      const response = await api.getVideos();
+      
+      // Map backend video data to Project format
+      const mappedProjects: Project[] = response.videos.map((video) => {
+        // Map backend status to Project status
+        let projectStatus: Project['status'] = 'pending';
+        if (video.status === 'complete' || video.status === 'completed') {
+          projectStatus = 'completed';
+        } else if (video.status === 'failed') {
+          projectStatus = 'failed';
+        } else if (
+          video.status === 'validating' ||
+          video.status === 'generating_animatic' ||
+          video.status === 'generating_references' ||
+          video.status === 'generating_chunks' ||
+          video.status === 'refining' ||
+          video.status === 'exporting' ||
+          video.status === 'queued'
+        ) {
+          projectStatus = video.status === 'queued' || video.status === 'validating' ? 'pending' : 'processing';
+        }
+        
+        return {
+          id: video.video_id,
+          user_id: 'mock-user-id', // Using mock user ID for now
+          title: video.title,
+          description: undefined, // Backend doesn't return description in list
+          prompt: '', // Backend doesn't return prompt in list
+          status: projectStatus,
+          created_at: video.created_at,
+          updated_at: video.completed_at || video.created_at,
+        };
+      });
+      
+      setProjects(mappedProjects);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch videos. Please try again.';
+      setProjectsError(errorMessage);
+      addNotification('error', 'Failed to Load Projects', errorMessage);
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  }, [addNotification]);
+
+  // Fetch videos when "My Projects" page loads
+  useEffect(() => {
+    if (appStep === 'projects') {
+      fetchVideos();
+    }
+  }, [appStep, fetchVideos]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!prompt.trim() || !title.trim()) {
+      addNotification('error', 'Validation Error', 'Please fill in all required fields.');
+      return;
+    }
+
+    // Validate prompt length (backend requires min 10 chars)
+    if (prompt.trim().length < 10) {
+      addNotification('error', 'Validation Error', 'Prompt must be at least 10 characters long.');
+      return;
+    }
+
     setIsProcessing(true);
     setElapsedTime(0);
     setProcessingProgress(0);
-    setAppStep('processing');
+
+    try {
+      // Call API to generate video
+      const response = await api.generateVideo({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        prompt: prompt.trim(),
+        reference_assets: referenceAssets,
+      });
+
+      // Store video ID for tracking
+      setCurrentVideoId(response.video_id);
+      
+      // Show success notification
+      addNotification('success', 'Video Generation Started', response.message || 'Your video is being generated.');
+      
+      // Switch to processing view
+      setAppStep('processing');
+    } catch (error) {
+      // Handle errors
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start video generation. Please try again.';
+      addNotification('error', 'Generation Failed', errorMessage);
+      
+      // Reset processing state
+      setIsProcessing(false);
+    }
   };
 
   const handleProjectSelect = (project: Project) => {
@@ -89,19 +210,6 @@ function App() {
     }
   };
 
-  const addNotification = (type: Notification['type'], title: string, message: string) => {
-    const id = Math.random().toString();
-    const notification: Notification = {
-      id,
-      type,
-      title,
-      message,
-      timestamp: new Date(),
-      read: false,
-    };
-    setNotifications((prev) => [notification, ...prev]);
-    setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 5000);
-  };
 
   const handleSelectTemplate = (template: Template) => {
     setTitle(template.name);
@@ -232,16 +340,42 @@ function App() {
 
         {appStep === 'projects' && (
           <div className="animate-fade-in">
-            <div className="mb-8">
-              <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                My Projects
-              </h2>
-              <p className="text-slate-600 dark:text-slate-400">
-                Create and manage your AI-generated videos
-              </p>
+            <div className="mb-8 flex items-center justify-between">
+              <div>
+                <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                  My Projects
+                </h2>
+                <p className="text-slate-600 dark:text-slate-400">
+                  Create and manage your AI-generated videos
+                </p>
+              </div>
+              <button
+                onClick={fetchVideos}
+                disabled={isLoadingProjects}
+                className="btn-secondary flex items-center space-x-2"
+              >
+                <span>{isLoadingProjects ? 'Loading...' : 'Refresh'}</span>
+              </button>
             </div>
 
-            {projects.length === 0 ? (
+            {isLoadingProjects ? (
+              <div className="card p-16 text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4 animate-pulse">
+                  <Video className="w-6 h-6 text-blue-600" />
+                </div>
+                <p className="text-slate-500 dark:text-slate-400">Loading projects...</p>
+              </div>
+            ) : projectsError ? (
+              <div className="card p-16 text-center">
+                <p className="text-red-600 dark:text-red-400 mb-4">{projectsError}</p>
+                <button
+                  onClick={fetchVideos}
+                  className="btn-primary"
+                >
+                  Try Again
+                </button>
+              </div>
+            ) : projects.length === 0 ? (
               <div className="card p-16 text-center">
                 <Film className="w-16 h-16 mx-auto text-slate-300 mb-4" />
                 <p className="text-slate-500 dark:text-slate-400 mb-6">No projects yet</p>
@@ -321,7 +455,29 @@ function App() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Reference Materials
                 </label>
-                <UploadZone disabled={isProcessing} />
+                <div className="space-y-4">
+                  <UploadZone
+                    disabled={isProcessing}
+                    onAssetsUploaded={(assetIds) => {
+                      setReferenceAssets(prev => {
+                        const newIds = [...prev, ...assetIds];
+                        // Remove duplicates
+                        return Array.from(new Set(newIds));
+                      });
+                      // Trigger asset list refresh
+                      setAssetRefreshTrigger(prev => prev + 1);
+                      addNotification('success', 'Files Uploaded', `${assetIds.length} file(s) uploaded successfully.`);
+                    }}
+                  />
+                  <AssetList
+                    selectedAssetIds={referenceAssets}
+                    onSelectionChange={(assetIds) => {
+                      setReferenceAssets(assetIds);
+                    }}
+                    disabled={isProcessing}
+                    refreshTrigger={assetRefreshTrigger}
+                  />
+                </div>
               </div>
 
               <button

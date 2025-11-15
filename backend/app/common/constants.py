@@ -23,3 +23,6 @@ PHASE3_TIMEOUT = 300
 PHASE4_TIMEOUT = 600
 PHASE5_TIMEOUT = 300
 PHASE6_TIMEOUT = 180
+
+# Mock user ID for development/testing (before auth is implemented)
+MOCK_USER_ID = "mock-user-00000000-0000-0000-0000-000000000000"
