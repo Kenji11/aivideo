@@ -8,12 +8,12 @@ from app.phases.phase2_animatic.prompts import (
     generate_animatic_prompt,
     create_negative_prompt,
 )
-from app.common.constants import COST_SDXL_IMAGE, S3_ANIMATIC_PREFIX
+from app.common.constants import COST_FLUX_SCHNELL_IMAGE, S3_ANIMATIC_PREFIX
 from app.orchestrator.progress import update_progress
 
 
 class AnimaticGenerationService:
-    """Service for generating animatic frames using SDXL"""
+    """Service for generating animatic frames using FLUX Schnell (cost-optimized)"""
     
     def __init__(self):
         """Initialize the service with clients and cost tracking"""
@@ -63,7 +63,7 @@ class AnimaticGenerationService:
             )
             
             frame_urls.append(s3_url)
-            self.total_cost += COST_SDXL_IMAGE
+            self.total_cost += COST_FLUX_SCHNELL_IMAGE
             
             # Update progress after each frame
             current_progress = base_progress + (frame_num + 1) * progress_per_frame
@@ -101,23 +101,29 @@ class AnimaticGenerationService:
             Exception: If frame generation or upload fails
         """
         try:
-            # Generate image using SDXL
-            # Using specific version hash as :latest is not supported
+            # Generate image using FLUX Schnell (cheaper and faster for animatics)
+            # Cost: $0.003/image vs SDXL $0.0055/image (45% savings)
+            # Good for low-fidelity animatic frames
             output = self.replicate.run(
-                "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
+                "black-forest-labs/flux-schnell",
                 input={
                     "prompt": prompt,
-                    "negative_prompt": negative_prompt,
-                    "width": 512,
-                    "height": 512,
-                    "num_inference_steps": 20,
-                    "guidance_scale": 7.0,
-                    "num_outputs": 1,
-                }
+                    "aspect_ratio": "1:1",  # Square for animatics
+                    "output_format": "png",
+                    "output_quality": 80,  # Lower quality for animatics (faster, cheaper)
+                },
+                timeout=60
             )
             
             # Extract image URL from output
-            image_url = output[0]
+            # FLUX Schnell returns a URL or list of URLs
+            if isinstance(output, str):
+                image_url = output
+            elif isinstance(output, list) and len(output) > 0:
+                image_url = output[0]
+            else:
+                # Handle iterator/other formats
+                image_url = list(output)[0] if hasattr(output, '__iter__') else str(output)
             
             # Download image data
             response = requests.get(image_url)
