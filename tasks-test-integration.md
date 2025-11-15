@@ -92,19 +92,23 @@
 
 **File:** `backend/app/phases/phase2_animatic/service.py` or `task.py`
 
-- [ ] Update progress after each frame is generated in Phase 2
-- [ ] Call `update_progress` with:
+- [x] Update progress after each frame is generated in Phase 2
+- [x] Call `update_progress` with:
   - `video_id`
   - `status="generating_animatic"`
   - `progress` calculated based on frames completed
   - `animatic_urls` updated with each new frame URL
-- [ ] Update progress after all frames are complete
-- [ ] Ensure progress is queryable via status endpoint
+- [x] Update progress after all frames are complete
+- [x] Ensure progress is queryable via status endpoint
+- [x] Add logging for Phase 1 completion
+- [x] Add logging for Phase 2 completion
 
 **Details:**
 - Track frame generation progress (e.g., 5 frames = 20% per frame)
 - Update `animatic_urls` array as frames are generated
 - Progress should be visible when checking video status
+- Progress updates from 25% to 50% during Phase 2 (distributed across frames)
+- Phase completion logs include template/beats info, cost, and duration
 
 ---
 

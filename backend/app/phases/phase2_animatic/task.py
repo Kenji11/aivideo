@@ -40,6 +40,12 @@ def generate_animatic(self, video_id: str, spec: Dict) -> Dict:
             error_message=None
         )
         
+        # Log successful phase completion
+        print(f"✅ Phase 2 (Animatic) completed successfully for video {video_id}")
+        print(f"   - Generated {len(frame_urls)} frames")
+        print(f"   - Cost: ${service.total_cost:.4f}")
+        print(f"   - Duration: {duration_seconds:.2f}s")
+        
         return output.dict()
         
     except Exception as e:

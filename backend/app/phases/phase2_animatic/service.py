@@ -8,6 +8,7 @@ from app.phases.phase2_animatic.prompts import (
     create_negative_prompt,
 )
 from app.common.constants import COST_SDXL_IMAGE, S3_ANIMATIC_PREFIX
+from app.orchestrator.progress import update_progress
 
 
 class AnimaticGenerationService:
@@ -38,6 +39,13 @@ class AnimaticGenerationService:
         
         print(f"Starting animatic generation for {total_frames} frames...")
         
+        # Calculate progress increment per frame
+        # Phase 2 starts at 25% and should reach ~50% when complete
+        # So we have 25% progress to distribute across frames
+        phase_progress_range = 25.0  # 25% to 50%
+        progress_per_frame = phase_progress_range / total_frames if total_frames > 0 else 0
+        base_progress = 25.0  # Starting progress for Phase 2
+        
         for frame_num, beat in enumerate(beats):
             print(f"Generating frame {frame_num + 1}/{total_frames} for beat: {beat.get('name', 'unknown')}")
             
@@ -55,6 +63,15 @@ class AnimaticGenerationService:
             
             frame_urls.append(s3_url)
             self.total_cost += COST_SDXL_IMAGE
+            
+            # Update progress after each frame
+            current_progress = base_progress + (frame_num + 1) * progress_per_frame
+            update_progress(
+                video_id=video_id,
+                status="generating_animatic",
+                progress=current_progress,
+                animatic_urls=frame_urls
+            )
         
         print(f"Completed animatic generation: {total_frames} frames, Total cost: ${self.total_cost:.4f}")
         
