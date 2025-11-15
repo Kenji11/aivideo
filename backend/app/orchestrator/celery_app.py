@@ -28,11 +28,13 @@ celery_app.conf.update(
         "app.orchestrator.pipeline",
         "app.phases.phase1_validate.task",
         "app.phases.phase2_animatic.task",
+        "app.phases.phase3_references.task",
     ],
 )
 
-# Import task modules to ensure they're registered
-# This ensures tasks are discovered when the worker starts
+# Import tasks to register them with Celery
+# This ensures tasks are available when worker starts
 from app.orchestrator import pipeline  # noqa: F401
 from app.phases.phase1_validate import task as phase1_task  # noqa: F401
 from app.phases.phase2_animatic import task as phase2_task  # noqa: F401
+from app.phases.phase3_references import task as phase3_task  # noqa: F401

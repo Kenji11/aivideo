@@ -82,6 +82,7 @@ class VideoGeneration(Base):
     stitched_url = Column(String, nullable=True)
     refined_url = Column(String, nullable=True)
     final_video_url = Column(String, nullable=True)
+    phase_outputs = Column(JSON, default=dict)  # Store outputs from each phase
     
     # Metadata
     cost_usd = Column(Float, default=0.0)

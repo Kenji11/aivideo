@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Sparkles, Video, Film, Download, ArrowLeft, Settings, BarChart3, Zap, Library, CreditCard, Code2 } from 'lucide-react';
 import { Header } from './components/Header';
 import { StepIndicator } from './components/StepIndicator';
 import { UploadZone } from './components/UploadZone';
-import { AssetList } from './components/AssetList';
 import { ProjectCard } from './components/ProjectCard';
 import { ProcessingSteps } from './components/ProcessingSteps';
 import { NotificationCenter, Notification } from './components/NotificationCenter';
@@ -18,7 +17,7 @@ import { VideoLibrary } from './pages/VideoLibrary';
 import { Billing } from './pages/Billing';
 import { API } from './pages/API';
 import { supabase, Project } from './lib/supabase';
-import { api } from './lib/api';
+import { generateVideo, getVideoStatus, StatusResponse } from './lib/api';
 
 type AppStep = 'projects' | 'create' | 'processing' | 'preview' | 'download' | 'templates' | 'settings' | 'analytics' | 'dashboard' | 'library' | 'billing' | 'api' | 'export';
 
@@ -34,11 +33,8 @@ function App() {
   const [processingProgress, setProcessingProgress] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [referenceAssets, setReferenceAssets] = useState<string[]>([]);
-  const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
-  const [assetRefreshTrigger, setAssetRefreshTrigger] = useState(0);
-  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
-  const [projectsError, setProjectsError] = useState<string | null>(null);
+  const [videoId, setVideoId] = useState<string | null>(null);
+  const [referenceAssets, setReferenceAssets] = useState<StatusResponse['reference_assets'] | null>(null);
 
   const steps = [
     { id: 1, name: 'Create', icon: Sparkles },
@@ -54,142 +50,77 @@ function App() {
     { name: 'Composing final video', status: processingProgress > 3 ? 'completed' : processingProgress === 3 ? 'processing' : 'pending' },
   ];
 
+  // Poll for video status
+  useEffect(() => {
+    if (!videoId || !isProcessing) return;
+
+    const pollStatus = async () => {
+      try {
+        const status = await getVideoStatus(videoId);
+        
+        // Update progress
+        setProcessingProgress(Math.floor(status.progress / 25)); // 0-4 steps
+        
+        // Check for Phase 3 reference assets
+        if (status.reference_assets) {
+          setReferenceAssets(status.reference_assets);
+          addNotification('success', 'Reference Assets Generated', 'Style guide and product references are ready!');
+        }
+        
+        // Check if complete or failed
+        if (status.status === 'complete') {
+          setIsProcessing(false);
+          setAppStep('preview');
+          addNotification('success', 'Video Complete', 'Your video is ready!');
+        } else if (status.status === 'failed') {
+          setIsProcessing(false);
+          addNotification('error', 'Generation Failed', status.error || 'Unknown error');
+        }
+      } catch (error) {
+        console.error('Failed to poll status:', error);
+      }
+    };
+
+    // Poll every 2 seconds
+    const interval = setInterval(pollStatus, 2000);
+    pollStatus(); // Initial call
+
+    return () => clearInterval(interval);
+  }, [videoId, isProcessing]);
+
+  // Timer for elapsed time
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isProcessing) {
       interval = setInterval(() => {
         setElapsedTime(t => t + 1);
-        if (elapsedTime > 5 && processingProgress < 4) {
-          setProcessingProgress(p => p + 1);
-        }
-        if (elapsedTime > 15) {
-          setIsProcessing(false);
-          setAppStep('preview');
-        }
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isProcessing, elapsedTime, processingProgress]);
-
-  const addNotification = useCallback((type: Notification['type'], title: string, message: string) => {
-    const id = Math.random().toString();
-    const notification: Notification = {
-      id,
-      type,
-      title,
-      message,
-      timestamp: new Date(),
-      read: false,
-    };
-    setNotifications((prev) => [notification, ...prev]);
-    
-    // Auto-dismiss success notifications after 2 seconds
-    if (type === 'success') {
-      setTimeout(() => {
-        setNotifications((prev) => prev.filter((n) => n.id !== id));
-      }, 2000);
-    }
-  }, []);
-
-  const fetchVideos = useCallback(async () => {
-    setIsLoadingProjects(true);
-    setProjectsError(null);
-    
-    try {
-      const response = await api.getVideos();
-      
-      // Map backend video data to Project format
-      const mappedProjects: Project[] = response.videos.map((video) => {
-        // Map backend status to Project status
-        let projectStatus: Project['status'] = 'pending';
-        if (video.status === 'complete' || video.status === 'completed') {
-          projectStatus = 'completed';
-        } else if (video.status === 'failed') {
-          projectStatus = 'failed';
-        } else if (
-          video.status === 'validating' ||
-          video.status === 'generating_animatic' ||
-          video.status === 'generating_references' ||
-          video.status === 'generating_chunks' ||
-          video.status === 'refining' ||
-          video.status === 'exporting' ||
-          video.status === 'queued'
-        ) {
-          projectStatus = video.status === 'queued' || video.status === 'validating' ? 'pending' : 'processing';
-        }
-        
-        return {
-          id: video.video_id,
-          user_id: 'mock-user-id', // Using mock user ID for now
-          title: video.title,
-          description: undefined, // Backend doesn't return description in list
-          prompt: '', // Backend doesn't return prompt in list
-          status: projectStatus,
-          created_at: video.created_at,
-          updated_at: video.completed_at || video.created_at,
-        };
-      });
-      
-      setProjects(mappedProjects);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch videos. Please try again.';
-      setProjectsError(errorMessage);
-      addNotification('error', 'Failed to Load Projects', errorMessage);
-    } finally {
-      setIsLoadingProjects(false);
-    }
-  }, [addNotification]);
-
-  // Fetch videos when "My Projects" page loads
-  useEffect(() => {
-    if (appStep === 'projects') {
-      fetchVideos();
-    }
-  }, [appStep, fetchVideos]);
+  }, [isProcessing]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate required fields
-    if (!prompt.trim() || !title.trim()) {
-      addNotification('error', 'Validation Error', 'Please fill in all required fields.');
-      return;
-    }
-
-    // Validate prompt length (backend requires min 10 chars)
-    if (prompt.trim().length < 10) {
-      addNotification('error', 'Validation Error', 'Prompt must be at least 10 characters long.');
-      return;
-    }
-
-    setIsProcessing(true);
-    setElapsedTime(0);
-    setProcessingProgress(0);
-
     try {
-      // Call API to generate video
-      const response = await api.generateVideo({
-        title: title.trim(),
-        description: description.trim() || undefined,
-        prompt: prompt.trim(),
-        reference_assets: referenceAssets,
-      });
-
-      // Store video ID for tracking
-      setCurrentVideoId(response.video_id);
-      
-      // Show success notification
-      addNotification('success', 'Video Generation Started', response.message || 'Your video is being generated.');
-      
-      // Switch to processing view
+      setIsProcessing(true);
+      setElapsedTime(0);
+      setProcessingProgress(0);
+      setReferenceAssets(null);
       setAppStep('processing');
-    } catch (error) {
-      // Handle errors
-      const errorMessage = error instanceof Error ? error.message : 'Failed to start video generation. Please try again.';
-      addNotification('error', 'Generation Failed', errorMessage);
       
-      // Reset processing state
+      // Call backend API
+      const response = await generateVideo({
+        prompt: prompt,
+        assets: [] // TODO: Get from UploadZone
+      });
+      
+      setVideoId(response.video_id);
+      addNotification('success', 'Generation Started', 'Your video is being created...');
+    } catch (error) {
+      addNotification('error', 'Generation Failed', error instanceof Error ? error.message : 'Unknown error');
       setIsProcessing(false);
+      setAppStep('create');
     }
   };
 
@@ -210,6 +141,19 @@ function App() {
     }
   };
 
+  const addNotification = (type: Notification['type'], title: string, message: string) => {
+    const id = Math.random().toString();
+    const notification: Notification = {
+      id,
+      type,
+      title,
+      message,
+      timestamp: new Date(),
+      read: false,
+    };
+    setNotifications((prev) => [notification, ...prev]);
+    setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 5000);
+  };
 
   const handleSelectTemplate = (template: Template) => {
     setTitle(template.name);
@@ -340,42 +284,16 @@ function App() {
 
         {appStep === 'projects' && (
           <div className="animate-fade-in">
-            <div className="mb-8 flex items-center justify-between">
-              <div>
-                <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                  My Projects
-                </h2>
-                <p className="text-slate-600 dark:text-slate-400">
-                  Create and manage your AI-generated videos
-                </p>
-              </div>
-              <button
-                onClick={fetchVideos}
-                disabled={isLoadingProjects}
-                className="btn-secondary flex items-center space-x-2"
-              >
-                <span>{isLoadingProjects ? 'Loading...' : 'Refresh'}</span>
-              </button>
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                My Projects
+              </h2>
+              <p className="text-slate-600 dark:text-slate-400">
+                Create and manage your AI-generated videos
+              </p>
             </div>
 
-            {isLoadingProjects ? (
-              <div className="card p-16 text-center">
-                <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4 animate-pulse">
-                  <Video className="w-6 h-6 text-blue-600" />
-                </div>
-                <p className="text-slate-500 dark:text-slate-400">Loading projects...</p>
-              </div>
-            ) : projectsError ? (
-              <div className="card p-16 text-center">
-                <p className="text-red-600 dark:text-red-400 mb-4">{projectsError}</p>
-                <button
-                  onClick={fetchVideos}
-                  className="btn-primary"
-                >
-                  Try Again
-                </button>
-              </div>
-            ) : projects.length === 0 ? (
+            {projects.length === 0 ? (
               <div className="card p-16 text-center">
                 <Film className="w-16 h-16 mx-auto text-slate-300 mb-4" />
                 <p className="text-slate-500 dark:text-slate-400 mb-6">No projects yet</p>
@@ -455,29 +373,7 @@ function App() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Reference Materials
                 </label>
-                <div className="space-y-4">
-                  <UploadZone
-                    disabled={isProcessing}
-                    onAssetsUploaded={(assetIds) => {
-                      setReferenceAssets(prev => {
-                        const newIds = [...prev, ...assetIds];
-                        // Remove duplicates
-                        return Array.from(new Set(newIds));
-                      });
-                      // Trigger asset list refresh
-                      setAssetRefreshTrigger(prev => prev + 1);
-                      addNotification('success', 'Files Uploaded', `${assetIds.length} file(s) uploaded successfully.`);
-                    }}
-                  />
-                  <AssetList
-                    selectedAssetIds={referenceAssets}
-                    onSelectionChange={(assetIds) => {
-                      setReferenceAssets(assetIds);
-                    }}
-                    disabled={isProcessing}
-                    refreshTrigger={assetRefreshTrigger}
-                  />
-                </div>
+                <UploadZone disabled={isProcessing} />
               </div>
 
               <button
@@ -494,8 +390,8 @@ function App() {
 
         {appStep === 'processing' && (
           <div className="card p-8 text-center animate-fade-in">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-6 animate-pulse-subtle">
-              <Video className="w-10 h-10 text-blue-600" />
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 dark:bg-blue-900 rounded-full mb-6 animate-pulse-subtle">
+              <Video className="w-10 h-10 text-blue-600 dark:text-blue-400" />
             </div>
             <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
               AI is Creating Your Video
@@ -504,9 +400,67 @@ function App() {
               Sit back and relax while our AI works its magic...
             </p>
 
-            <div className="max-w-md mx-auto text-left">
+            <div className="max-w-md mx-auto text-left mb-8">
               <ProcessingSteps steps={processingSteps} elapsedTime={elapsedTime} />
             </div>
+
+            {/* Phase 3 Reference Assets */}
+            {referenceAssets && (
+              <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                  Reference Assets Generated
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                  {referenceAssets.style_guide_url && (
+                    <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Style Guide</p>
+                      <img 
+                        src={referenceAssets.style_guide_url} 
+                        alt="Style Guide"
+                        className="w-full h-48 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
+                        onError={(e) => {
+                          // If S3 URL, try to get presigned URL or show placeholder
+                          e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Style+Guide';
+                        }}
+                      />
+                    </div>
+                  )}
+                  {referenceAssets.product_reference_url && (
+                    <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Product Reference</p>
+                      <img 
+                        src={referenceAssets.product_reference_url} 
+                        alt="Product Reference"
+                        className="w-full h-48 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Product+Reference';
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+                {referenceAssets.uploaded_assets && referenceAssets.uploaded_assets.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      Uploaded Assets ({referenceAssets.uploaded_assets.length})
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {referenceAssets.uploaded_assets.map((asset, idx) => (
+                        <img
+                          key={idx}
+                          src={asset.s3_url}
+                          alt={`Uploaded asset ${idx + 1}`}
+                          className="w-full h-24 object-cover rounded border border-slate-200 dark:border-slate-700"
+                          onError={(e) => {
+                            e.currentTarget.src = 'https://via.placeholder.com/200x200?text=Asset';
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
