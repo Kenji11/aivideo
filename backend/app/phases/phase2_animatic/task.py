@@ -1,6 +1,7 @@
 from typing import Dict
 import time
 import traceback
+import json
 from app.orchestrator.celery_app import celery_app
 from app.common.schemas import PhaseOutput
 from app.phases.phase2_animatic.service import AnimaticGenerationService
@@ -35,6 +36,12 @@ def generate_animatic(self, video_id: str, spec: Dict) -> Dict:
     print(f"   - Style: {style_aesthetic}")
     if color_palette:
         print(f"   - Color palette: {', '.join(color_palette[:5])}{'...' if len(color_palette) > 5 else ''}")
+    
+    # Log full spec (formatted)
+    print(f"   - Full spec:")
+    spec_json = json.dumps(spec, indent=2)
+    for line in spec_json.split('\n'):
+        print(f"     {line}")
     
     try:
         # Initialize service
