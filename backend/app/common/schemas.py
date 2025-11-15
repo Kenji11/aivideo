@@ -23,7 +23,7 @@ class PhaseOutput(BaseModel):
 
 class GenerateRequest(BaseModel):
     """Request to generate video"""
-    title: str = Field(..., min_length=1, max_length=200)
+    title: Optional[str] = Field(None, max_length=200)  # Optional, will default to "Untitled Video"
     description: Optional[str] = Field(None, max_length=2000)
     prompt: str = Field(..., min_length=10, max_length=1000)
     reference_assets: List[str] = Field(default_factory=list, description="List of asset IDs to use as references")

@@ -1,4 +1,4 @@
-import { X, Mail, Link as LinkIcon, Copy, Check } from 'lucide-react';
+import { X, Mail, Copy, Check } from 'lucide-react';
 import { useState } from 'react';
 
 interface ShareModalProps {
@@ -7,7 +7,7 @@ interface ShareModalProps {
   onClose: () => void;
 }
 
-export function ShareModal({ projectId, projectTitle, onClose }: ShareModalProps) {
+export function ShareModal({ projectId, onClose }: ShareModalProps) {
   const [sharedEmails, setSharedEmails] = useState<string[]>([]);
   const [newEmail, setNewEmail] = useState('');
   const [permission, setPermission] = useState<'view' | 'comment' | 'edit'>('view');
@@ -29,11 +29,11 @@ export function ShareModal({ projectId, projectTitle, onClose }: ShareModalProps
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const permissionLabels = {
-    view: 'Can view',
-    comment: 'Can comment',
-    edit: 'Can edit',
-  };
+  // const permissionLabels = { // Unused for now
+  //   view: 'Can view',
+  //   comment: 'Can comment',
+  //   edit: 'Can edit',
+  // };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

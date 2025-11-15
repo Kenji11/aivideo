@@ -1,6 +1,6 @@
 import { Upload, AlertCircle, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { api, UploadedAsset } from '../lib/api';
+import { api } from '../lib/api';
 
 interface UploadZoneProps {
   onAssetsUploaded?: (assetIds: string[]) => void;

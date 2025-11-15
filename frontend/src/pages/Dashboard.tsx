@@ -12,7 +12,7 @@ const recentActivity = [
 ];
 
 export function Dashboard({ onBack }: DashboardProps) {
-  const [showNewTeam, setShowNewTeam] = useState(false);
+  const [, setShowNewTeam] = useState(false);
 
   return (
     <div className="max-w-6xl mx-auto animate-fade-in">
