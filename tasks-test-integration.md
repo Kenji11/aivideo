@@ -116,14 +116,14 @@
 
 Before considering integration complete:
 
-- [ ] Can submit video generation from frontend
-- [ ] Can upload assets from frontend and receive asset IDs
-- [ ] Asset IDs are included in video generation request
-- [ ] Video generation starts and progresses through Phase 1
-- [ ] Video generation progresses through Phase 2
-- [ ] Progress updates are visible in database during Phase 2
-- [ ] All error cases are handled gracefully
-- [ ] Status endpoint returns accurate progress information
+- [x] Can submit video generation from frontend
+- [x] Can upload assets from frontend and receive asset IDs
+- [x] Asset IDs are included in video generation request
+- [x] Video generation starts and progresses through Phase 1
+- [x] Video generation progresses through Phase 2
+- [x] Progress updates are visible in database during Phase 2
+- [x] All error cases are handled gracefully
+- [x] Status endpoint returns accurate progress information
 
 **Test Commands:**
 ```bash
