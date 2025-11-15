@@ -2,6 +2,7 @@ from typing import List, Dict
 import tempfile
 import os
 import requests
+import traceback
 from app.services import replicate_client, s3_client
 from app.phases.phase2_animatic.prompts import (
     generate_animatic_prompt,
@@ -140,4 +141,12 @@ class AnimaticGenerationService:
             return s3_url
             
         except Exception as e:
-            raise Exception(f"Failed to generate frame {frame_num}: {str(e)}")
+            error_msg = f"Failed to generate frame {frame_num}: {str(e)}"
+            print(f"❌ Frame generation error for video {video_id}, frame {frame_num}")
+            print(f"   Error: {str(e)}")
+            print(f"   Error type: {type(e).__name__}")
+            print(f"   Traceback:")
+            for line in traceback.format_exc().split('\n'):
+                if line.strip():
+                    print(f"   {line}")
+            raise Exception(error_msg)
