@@ -411,16 +411,27 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
                     try:
                         print(f"   Trying model: {model_name} (image-to-video)...")
                         
+                        # Get model-specific parameter names (some models use different names)
+                        param_names = model_config.get('param_names', {
+                            'image': 'image',  # Default parameter names
+                            'prompt': 'prompt',
+                            'num_frames': 'num_frames',
+                            'fps': 'fps',
+                        })
+                        
+                        # Build input dict with model-specific parameter names
+                        input_params = {
+                            param_names['image']: img_file,
+                            param_names['prompt']: prompt,
+                            param_names['num_frames']: num_frames,
+                            param_names['fps']: fps,
+                        }
+                        
                         # Use model config parameters
                         # Timeout: 5 minutes per chunk (should be enough for video generation)
                         output = replicate_client.run(
                             model_name,
-                            input={
-                                "image": img_file,
-                                "prompt": prompt,
-                                "num_frames": num_frames,
-                                "fps": fps,
-                            },
+                            input=input_params,
                             timeout=300  # 5 minutes timeout
                         )
                         

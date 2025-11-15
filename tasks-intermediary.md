@@ -6,7 +6,7 @@ Simplify the video generation pipeline for MVP by temporarily removing Phase 2 (
 
 **CRITICAL ISSUE RESOLVED**: Video generation models output different chunk durations regardless of what parameters we request. wan (our default) outputs ~5s chunks, not 2s. This affected chunk count calculation and caused video length issues.
 
-**STATUS: PR #8 Complete ✅ - Last-Frame Continuation Implemented & Tested**
+**STATUS: PR #9 In Progress - Hailuo Model Testing & Direction Prompts**
 
 ### Task Order
 1. **PR #1** - Comment out Phase 2 & 3 (MVP simplification) ✅
@@ -16,13 +16,15 @@ Simplify the video generation pipeline for MVP by temporarily removing Phase 2 (
 5. **PR #6** - Re-enable Phase 3 (References) ✅
 6. **PR #7** - Add actual_chunk_duration to model configs ✅
 7. **PR #5** - Video length investigation & fix ✅ (Resolved by PR #7)
-8. **PR #8** - Implement last-frame continuation for temporal coherence 🔄
+8. **PR #8** - Implement last-frame continuation for temporal coherence ✅
+9. **PR #9** - Switch to Hailuo model & add direction prompts 🔄
 
 ## Model Configuration Reference
 
-The model config system will include these models:
+The model config system includes these models:
 
-- **wan** (wan-2.1-480p) - Currently used, DEFAULT_MODEL, **actual output: ~5 seconds** (ignores duration param)
+- **hailuo** (minimax/hailuo-2.3-fast) - **DEFAULT_MODEL**, **actual output: ~5 seconds**, 720p @ 30fps, $0.04/chunk
+- **wan** (wan-2.1-480p) - **actual output: ~5 seconds**, 480p @ 24fps, $0.45/chunk (previous default)
 - **zeroscope** (Zeroscope v2 XL) - **actual output: ~3 seconds** (24 frames @ 8fps)
 - **animatediff** (AnimateDiff) - **actual output: ~2 seconds** (16 frames @ 8fps)
 - **runway** (Runway Gen-2) - **actual output: ~5-10 seconds** (depends on tier)
@@ -165,17 +167,42 @@ Each model config includes: name, replicate_model, cost_per_generation, params (
   - [x] 8.17 Test: Verify chunks 1+ use last frame from previous chunk (Verified: chunk 1 used last frame from chunk 0)
   - [x] 8.18 Test: Verify temporal coherence (no visual resets between chunks) (Verified in stitched output)
 
+- [ ] 9.0 Switch to Hailuo Model & Add Direction Prompts (PR #9) **← MODEL TESTING**
+  - [x] 9.1 Switch DEFAULT_MODEL from 'wan' to 'hailuo' in `model_config.py`
+  - [x] 9.2 Verify COST_HAILUO is imported from `constants.py` (already exists: $0.04)
+  - [x] 9.3 Update model documentation to reflect Hailuo as default
+  - [x] 9.4 Add model-specific parameter mapping (`param_names` in model config)
+  - [x] 9.5 Fix Hailuo parameter: use 'first_frame_image' instead of 'image'
+  - [x] 9.6 Update chunk_generator to use model-specific parameter names
+  - [ ] 9.7 Test Hailuo model with basic image-to-video generation
+  - [ ] 9.8 Verify Hailuo accepts image + prompt parameters correctly
+  - [ ] 9.6 Check Hailuo output quality and duration (should be ~5s chunks @ 720p, 30fps)
+  - [ ] 9.7 Add `direction_prompt` field to ChunkSpec schema in `schemas.py`
+  - [ ] 9.8 Build direction prompt from beat specifications (camera movement, action, shot type)
+  - [ ] 9.9 Combine base prompt with direction prompt for image-to-video generation
+  - [ ] 9.10 Format: "{base_prompt}. {direction_prompt}" or separate fields if model supports it
+  - [ ] 9.11 For chunk 0: Include direction from beat in prompt
+  - [ ] 9.12 For chunks 1+: Include direction from corresponding beat in prompt
+  - [ ] 9.13 Add logging: "Using direction prompt: {direction_prompt}" for each chunk
+  - [ ] 9.14 Test: Verify direction prompts improve video motion and camera work
+  - [ ] 9.15 Test: Verify Hailuo respects direction prompts better than wan
+  - [ ] 9.16 Compare output quality: Hailuo (720p @ 30fps) vs wan (480p @ 24fps)
+  - [ ] 9.17 Verify cost tracking: Hailuo should be cheaper ($0.04 vs $0.45 per chunk)
+
 ## Notes
 
 - **Phase 2 Removal**: Phase 2 (Animatic) remains disabled for MVP. Phase 3 (References) is being re-enabled.
 - **Phase 3 Scope**: Generate ONE reference image (product_ref) per video. Style guide is OUT OF SCOPE for MVP.
-- **Model Strategy**: wan-2.1-480p (image-to-video) is default. Text-to-video support is limited, so we prioritize image-to-video workflow.
+- **Model Strategy**: **Hailuo 2.3 Fast (minimax/hailuo-2.3-fast)** is now default. 720p @ 30fps, outputs 5s chunks, $0.04/chunk (cheaper than wan).
+- **Previous Model**: wan-2.1-480p was default (480p @ 24fps, $0.45/chunk)
 - **Model Switching**: To switch models, simply change `DEFAULT_MODEL` in `model_config.py`. No code changes needed elsewhere.
-- **Reference Image Usage**: Phase 3 generates reference image → Phase 4 uses it as first frame for **CHUNK 0 ONLY** via wan model.
+- **Direction Prompts**: Adding camera movement and action direction to prompts for better video control with reference images.
+- **Reference Image Usage**: Phase 3 generates reference image → Phase 4 uses it as first frame for **CHUNK 0 ONLY** via Hailuo model (previously wan).
 - **Last-Frame Continuation (PR #8)**: Chunks 1+ use last frame from previous chunk for temporal coherence and motion continuity.
 - **Text-to-Video Fallback**: Kept as fallback if reference generation fails, but primary path is image-to-video.
 - **Logging Strategy**: Two-level logging (summary + details) provides quick overview and deep debugging capability.
 - **⚠️ CRITICAL DISCOVERY**: Models output different chunk durations regardless of params:
+  - **hailuo**: Outputs ~5s chunks (151 frames @ 30fps = ~5.03s, controllable via num_frames)
   - **wan**: Outputs ~5s chunks (ignores duration param, trained on 5s clips)
   - **zeroscope**: Outputs ~3s chunks (24 frames @ 8fps = 3s)
   - **animatediff**: Outputs ~2s chunks (16 frames @ 8fps = 2s)
