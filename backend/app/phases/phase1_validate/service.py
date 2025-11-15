@@ -171,15 +171,36 @@ Choose the template that best matches the user's intent. Extract all available i
             if original_duration > target_duration:
                 spec['duration'] = target_duration
                 # Scale down beat durations proportionally, but keep at least 1 second per beat
-                total_beat_duration = sum(beat.get('duration', 0) for beat in spec.get('beats', []))
-                if total_beat_duration > 0:
+                beats = spec.get('beats', [])
+                total_beat_duration = sum(beat.get('duration', 0) for beat in beats)
+                
+                if total_beat_duration > 0 and beats:
                     scale_factor = target_duration / original_duration
-                    for beat in spec.get('beats', []):
+                    
+                    # Scale durations
+                    for beat in beats:
                         new_duration = max(1, int(beat.get('duration', 0) * scale_factor))
                         beat['duration'] = new_duration
+                    
+                    # Fix rounding errors: adjust last beat to match target duration exactly
+                    current_total = sum(beat['duration'] for beat in beats)
+                    difference = target_duration - current_total
+                    
+                    if difference != 0:
+                        # Adjust last beat (or distribute if needed)
+                        beats[-1]['duration'] += difference
+                        # Ensure last beat is at least 1 second
+                        if beats[-1]['duration'] < 1:
+                            beats[-1]['duration'] = 1
+                            # If last beat can't accommodate, distribute across all beats
+                            current_total = sum(beat['duration'] for beat in beats)
+                            if current_total != target_duration:
+                                difference = target_duration - current_total
+                                beats[0]['duration'] += difference
+                    
                     # Recalculate start times
                     current_start = 0
-                    for beat in spec.get('beats', []):
+                    for beat in beats:
                         beat['start'] = current_start
                         current_start += beat.get('duration', 0)
                 

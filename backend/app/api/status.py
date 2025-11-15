@@ -53,20 +53,27 @@ async def get_status(video_id: str, db: Session = Depends(get_db)) -> StatusResp
             
             # Convert S3 URLs to presigned URLs for frontend access
             from app.services.s3 import s3_client
-            if reference_assets.get('style_guide_url', '').startswith('s3://'):
+            
+            # Convert style_guide_url if it exists and is an S3 URL
+            style_guide_url = reference_assets.get('style_guide_url')
+            if style_guide_url and style_guide_url.startswith('s3://'):
                 # Extract key from s3://bucket/key
-                s3_path = reference_assets['style_guide_url'].replace(f's3://{s3_client.bucket}/', '')
+                s3_path = style_guide_url.replace(f's3://{s3_client.bucket}/', '')
                 reference_assets['style_guide_url'] = s3_client.generate_presigned_url(s3_path, expiration=3600)
             
-            if reference_assets.get('product_reference_url', '').startswith('s3://'):
-                s3_path = reference_assets['product_reference_url'].replace(f's3://{s3_client.bucket}/', '')
+            # Convert product_reference_url if it exists and is an S3 URL
+            product_reference_url = reference_assets.get('product_reference_url')
+            if product_reference_url and product_reference_url.startswith('s3://'):
+                s3_path = product_reference_url.replace(f's3://{s3_client.bucket}/', '')
                 reference_assets['product_reference_url'] = s3_client.generate_presigned_url(s3_path, expiration=3600)
             
             # Convert uploaded assets S3 URLs
-            if reference_assets.get('uploaded_assets'):
-                for asset in reference_assets['uploaded_assets']:
-                    if asset.get('s3_url', '').startswith('s3://'):
-                        s3_path = asset['s3_url'].replace(f's3://{s3_client.bucket}/', '')
+            uploaded_assets = reference_assets.get('uploaded_assets')
+            if uploaded_assets:
+                for asset in uploaded_assets:
+                    s3_url = asset.get('s3_url')
+                    if s3_url and s3_url.startswith('s3://'):
+                        s3_path = s3_url.replace(f's3://{s3_client.bucket}/', '')
                         asset['s3_url'] = s3_client.generate_presigned_url(s3_path, expiration=3600)
         
         # Look for Phase 4 output (stitched video)

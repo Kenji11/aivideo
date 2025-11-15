@@ -15,8 +15,8 @@ from app.common.models import VideoGeneration, VideoStatus
 def run_pipeline(video_id: str, prompt: str, assets: list = None):
     """
     Main orchestration task - chains phases sequentially.
-    Currently implements Phase 1 (Validate) -> Phase 4 (Chunks).
-    Phase 2 (Animatic) and Phase 3 (References) are temporarily disabled for MVP.
+    Currently implements Phase 1 (Validate) -> Phase 3 (References) -> Phase 4 (Chunks).
+    Phase 2 (Animatic) is disabled for MVP. Phase 3 generates reference image used by Phase 4.
     
     Args:
         video_id: Unique video generation ID
@@ -66,14 +66,14 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         )
         
         # ============================================================================
-        # Phase 2 & 3 temporarily disabled for MVP
-        # Phase 2 (Animatic) and Phase 3 (References) are commented out to simplify
-        # the pipeline for MVP. Phase 1 output goes directly to Phase 4 (Chunks).
-        # To re-enable: uncomment Phase 2 & 3 sections below and update Phase 4 call.
+        # Phase 2 disabled for MVP - using Phase 3 references only
+        # Phase 2 (Animatic) is commented out to simplify the pipeline for MVP.
+        # Phase 3 (References) generates a single reference image used by Phase 4.
+        # To re-enable Phase 2: uncomment Phase 2 section below and update Phase 4 call.
         # ============================================================================
         
         # ============ PHASE 2: GENERATE ANIMATIC ============
-        # Phase 2 & 3 temporarily disabled for MVP
+        # Phase 2 disabled for MVP - using Phase 3 references only
         # update_progress(video_id, "generating_animatic", 25, current_phase="phase2_animatic")
         # 
         # # Run Phase 2 task synchronously
@@ -112,59 +112,59 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         animatic_urls = []
         
         # ============ PHASE 3: GENERATE REFERENCE ASSETS ============
-        # Phase 2 & 3 temporarily disabled for MVP
-        # update_progress(video_id, "generating_references", 30, current_phase="phase3_references")
-        # 
-        # # Run Phase 3 task synchronously (using apply instead of delay().get())
-        # result3_obj = generate_references.apply(args=[video_id, spec])
-        # result3 = result3_obj.result  # Get actual result from EagerResult
-        # 
-        # # Check Phase 3 success
-        # if result3['status'] != "success":
-        #     raise Exception(f"Phase 3 failed: {result3.get('error_message', 'Unknown error')}")
-        # 
-        # # Update cost tracking
-        # total_cost += result3['cost_usd']
-        # update_cost(video_id, "phase3", result3['cost_usd'])
-        # print(f"💰 Phase 3 Cost: ${result3['cost_usd']:.4f} | Total: ${total_cost:.4f}")
-        # 
-        # # Extract reference URLs from Phase 3
-        # reference_urls = result3['output_data']
-        # 
-        # # Store Phase 3 output in database
-        # db = SessionLocal()
-        # try:
-        #     video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
-        #     if video:
-        #         if video.phase_outputs is None:
-        #             video.phase_outputs = {}
-        #         video.phase_outputs['phase3_references'] = result3
-        #         # Mark JSON column as modified so SQLAlchemy detects the change
-        #         from sqlalchemy.orm.attributes import flag_modified
-        #         flag_modified(video, 'phase_outputs')
-        #         db.commit()
-        # finally:
-        #     db.close()
-        # 
-        # # Update progress
-        # update_progress(
-        #     video_id,
-        #     "generating_references",
-        #     40,
-        #     current_phase="phase3_references",
-        #     total_cost=total_cost
-        # )
+        update_progress(video_id, "generating_references", 30, current_phase="phase3_references")
         
-        # Set empty reference_urls for Phase 4 (since Phase 3 is disabled)
-        reference_urls = {}
+        # Run Phase 3 task synchronously (using apply instead of delay().get())
+        result3_obj = generate_references.apply(args=[video_id, spec])
+        result3 = result3_obj.result  # Get actual result from EagerResult
+        
+        # Check Phase 3 success
+        if result3['status'] != "success":
+            raise Exception(f"Phase 3 failed: {result3.get('error_message', 'Unknown error')}")
+        
+        # Update cost tracking
+        total_cost += result3['cost_usd']
+        update_cost(video_id, "phase3", result3['cost_usd'])
+        print(f"💰 Phase 3 Cost: ${result3['cost_usd']:.4f} | Total: ${total_cost:.4f}")
+        
+        # Extract reference URLs from Phase 3
+        reference_urls = result3['output_data']
+        
+        # Log reference image usage
+        if reference_urls and reference_urls.get('product_reference_url'):
+            print(f"📸 Using reference image from Phase 3: {reference_urls['product_reference_url'][:80]}...")
+        
+        # Store Phase 3 output in database
+        db = SessionLocal()
+        try:
+            video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+            if video:
+                if video.phase_outputs is None:
+                    video.phase_outputs = {}
+                video.phase_outputs['phase3_references'] = result3
+                # Mark JSON column as modified so SQLAlchemy detects the change
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(video, 'phase_outputs')
+                db.commit()
+        finally:
+            db.close()
+        
+        # Update progress
+        update_progress(
+            video_id,
+            "generating_references",
+            40,
+            current_phase="phase3_references",
+            total_cost=total_cost
+        )
         
         # ============ PHASE 4: GENERATE VIDEO CHUNKS ============
-        # Progress adjusted: Phase 1 ends at 20%, Phase 4 starts at 30% (skipping Phase 2 & 3)
-        update_progress(video_id, "generating_chunks", 30, current_phase="phase4_chunks")
+        # Progress: Phase 1 (20%) → Phase 3 (40%) → Phase 4 (40-70%)
+        update_progress(video_id, "generating_chunks", 45, current_phase="phase4_chunks")
         
         # Run Phase 4 task synchronously
-        # Phase 2 & 3 temporarily disabled for MVP - passing empty lists
-        result4_obj = generate_chunks.apply(args=[video_id, spec, [], {}])
+        # Pass empty animatic_urls (Phase 2 disabled) and reference_urls from Phase 3
+        result4_obj = generate_chunks.apply(args=[video_id, spec, [], reference_urls])
         result4 = result4_obj.result
         
         # Check Phase 4 success
@@ -282,7 +282,8 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         print("="*70)
         print(f"💰 TOTAL COST: ${total_cost:.4f} USD")
         print(f"   - Phase 1 (Validate): ${result1['cost_usd']:.4f}")
-        # Phase 2 & 3 temporarily disabled for MVP
+        # Phase 2 disabled for MVP
+        print(f"   - Phase 3 (References): ${result3['cost_usd']:.4f}")
         print(f"   - Phase 4 (Chunks): ${result4['cost_usd']:.4f}")
         print(f"⏱️  Generation Time: {generation_time:.1f} seconds ({generation_time/60:.1f} minutes)")
         print(f"📹 Video URL: {stitched_video_url}")
