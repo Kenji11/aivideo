@@ -8,5 +8,5 @@ new DaveVictorVincentAIVideoGenerationStack(app, 'DaveVictorVincentAIVideoGenera
     account: process.env.CDK_DEFAULT_ACCOUNT || process.env.AWS_ACCOUNT_ID,
     region: 'us-east-1',
   },
-  hostedZoneId: 'Z00669322LNYAWLYNIHGN',
+  hostedZoneId: 'Z02772533IJIPQUFR1DYJ',
 });

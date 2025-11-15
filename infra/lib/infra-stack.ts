@@ -431,30 +431,30 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       exportName: 'CertificateArn',
     });
 
-    // // Stage 6: Route53 & HTTPS
-    // // Add HTTPS listener
-    // const httpsListener = alb.addListener('HTTPSListener', {
-    //   port: 443,
-    //   protocol: elbv2.ApplicationProtocol.HTTPS,
-    //   certificates: [certificate],
-    //   defaultTargetGroups: [targetGroup],
-    // });
+    // Stage 6: Route53 & HTTPS
+    // Add HTTPS listener
+    const httpsListener = alb.addListener('HTTPSListener', {
+      port: 443,
+      protocol: elbv2.ApplicationProtocol.HTTPS,
+      certificates: [certificate],
+      defaultTargetGroups: [targetGroup],
+    });
 
-    // // Note: The HTTP listener added in Stage 4 will remain
-    // // In production, you may want to remove it and only use HTTPS
-    // // For now, both HTTP and HTTPS will work
+    // Note: The HTTP listener added in Stage 4 will remain
+    // In production, you may want to remove it and only use HTTPS
+    // For now, both HTTP and HTTPS will work
 
-    // new route53.ARecord(this, 'APIRecord', {
-    //   zone: hostedZone,
-    //   recordName: 'aivideo-api',
-    //   target: route53.RecordTarget.fromAlias(
-    //     new route53targets.LoadBalancerTarget(alb)
-    //   ),
-    // });
+    new route53.ARecord(this, 'APIRecord', {
+      zone: hostedZone,
+      recordName: 'aivideo-api',
+      target: route53.RecordTarget.fromAlias(
+        new route53targets.LoadBalancerTarget(alb)
+      ),
+    });
 
-    // new cdk.CfnOutput(this, 'APIURL', {
-    //   value: `https://aivideo-api.gauntlet3.com`,
-    //   description: 'API endpoint URL',
-    // });
+    new cdk.CfnOutput(this, 'APIURL', {
+      value: `https://aivideo-api.gauntlet3.com`,
+      description: 'API endpoint URL',
+    });
   }
 }
