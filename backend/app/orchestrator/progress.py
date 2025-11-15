@@ -116,6 +116,9 @@ def update_cost(video_id: str, phase: str, cost: float) -> None:
             video.cost_usd = sum(video.cost_breakdown.values())
             
             db.commit()
+            
+            # Log cost update to terminal
+            print(f"   💰 {phase.upper()} cost updated: ${cost:.4f} | Running total: ${video.cost_usd:.4f}")
     
     finally:
         db.close()

@@ -42,7 +42,9 @@ class StatusResponse(BaseModel):
     current_phase: Optional[str]
     estimated_time_remaining: Optional[int]
     error: Optional[str]
+    animatic_urls: Optional[List[str]] = None  # Phase 2 animatic frames
     reference_assets: Optional[Dict] = None  # Phase 3 reference assets
+    stitched_video_url: Optional[str] = None  # Phase 4 stitched video
 
 class VideoResponse(BaseModel):
     """Response from video endpoint"""
