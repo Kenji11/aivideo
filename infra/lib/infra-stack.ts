@@ -350,69 +350,69 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       exportName: 'APIServiceName',
     });
 
-    // // Stage 4: Application Load Balancer
-    // // Security group for ALB
-    // const albSecurityGroup = new ec2.SecurityGroup(this, 'ALBSecurityGroup', {
-    //   vpc,
-    //   description: 'Security group for Application Load Balancer',
-    //   allowAllOutbound: true,
-    // });
+    // Stage 4: Application Load Balancer
+    // Security group for ALB
+    const albSecurityGroup = new ec2.SecurityGroup(this, 'ALBSecurityGroup', {
+      vpc,
+      description: 'Security group for Application Load Balancer',
+      allowAllOutbound: true,
+    });
 
-    // albSecurityGroup.addIngressRule(
-    //   ec2.Peer.anyIpv4(),
-    //   ec2.Port.tcp(80),
-    //   'Allow HTTP from internet'
-    // );
+    albSecurityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(),
+      ec2.Port.tcp(80),
+      'Allow HTTP from internet'
+    );
 
-    // albSecurityGroup.addIngressRule(
-    //   ec2.Peer.anyIpv4(),
-    //   ec2.Port.tcp(443),
-    //   'Allow HTTPS from internet'
-    // );
+    albSecurityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(),
+      ec2.Port.tcp(443),
+      'Allow HTTPS from internet'
+    );
 
-    // // Allow ALB to connect to ECS
-    // ecsSecurityGroup.addIngressRule(
-    //   albSecurityGroup,
-    //   ec2.Port.tcp(8000),
-    //   'Allow ALB to connect to API service'
-    // );
+    // Allow ALB to connect to ECS
+    ecsSecurityGroup.addIngressRule(
+      albSecurityGroup,
+      ec2.Port.tcp(8000),
+      'Allow ALB to connect to API service'
+    );
 
-    // // Create ALB
-    // const alb = new elbv2.ApplicationLoadBalancer(this, 'ALB', {
-    //   vpc,
-    //   internetFacing: true,
-    //   securityGroup: albSecurityGroup,
-    // });
+    // Create ALB
+    const alb = new elbv2.ApplicationLoadBalancer(this, 'ALB', {
+      vpc,
+      internetFacing: true,
+      securityGroup: albSecurityGroup,
+    });
 
-    // // Target group for API service
-    // const targetGroup = new elbv2.ApplicationTargetGroup(this, 'APITargetGroup', {
-    //   port: 8000,
-    //   protocol: elbv2.ApplicationProtocol.HTTP,
-    //   vpc,
-    //   targetType: elbv2.TargetType.IP,
-    //   healthCheck: {
-    //     path: '/health',
-    //     interval: cdk.Duration.seconds(30),
-    //     timeout: cdk.Duration.seconds(5),
-    //     healthyThresholdCount: 2,
-    //     unhealthyThresholdCount: 3,
-    //   },
-    // });
+    // Target group for API service
+    const targetGroup = new elbv2.ApplicationTargetGroup(this, 'APITargetGroup', {
+      port: 8000,
+      protocol: elbv2.ApplicationProtocol.HTTP,
+      vpc,
+      targetType: elbv2.TargetType.IP,
+      healthCheck: {
+        path: '/health',
+        interval: cdk.Duration.seconds(30),
+        timeout: cdk.Duration.seconds(5),
+        healthyThresholdCount: 2,
+        unhealthyThresholdCount: 3,
+      },
+    });
 
-    // // Attach API service to target group
-    // apiService.attachToApplicationTargetGroup(targetGroup);
+    // Attach API service to target group
+    apiService.attachToApplicationTargetGroup(targetGroup);
 
-    // // HTTP listener (temporary, HTTPS will be added in Stage 6)
-    // alb.addListener('HTTPListener', {
-    //   port: 80,
-    //   protocol: elbv2.ApplicationProtocol.HTTP,
-    //   defaultTargetGroups: [targetGroup],
-    // });
+    // HTTP listener (temporary, HTTPS will be added in Stage 6)
+    alb.addListener('HTTPListener', {
+      port: 80,
+      protocol: elbv2.ApplicationProtocol.HTTP,
+      defaultTargetGroups: [targetGroup],
+    });
 
-    // new cdk.CfnOutput(this, 'ALBDNSName', {
-    //   value: alb.loadBalancerDnsName,
-    //   exportName: 'ALBDNSName',
-    // });
+    new cdk.CfnOutput(this, 'ALBDNSName', {
+      value: alb.loadBalancerDnsName,
+      exportName: 'ALBDNSName',
+    });
 
     // // Stage 5: ACM Certificate
     // // Create hosted zone reference (reused in Stage 6)
