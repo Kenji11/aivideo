@@ -1,6 +1,8 @@
 # Main orchestration task
 import time
 from app.orchestrator.celery_app import celery_app
+from app.phases.phase1_validate.task import validate_prompt
+from app.phases.phase3_references.task import generate_references
 from app.orchestrator.progress import update_progress, update_cost
 from app.phases.phase1_validate.task import validate_prompt
 from app.phases.phase2_animatic.task import generate_animatic
@@ -57,22 +59,36 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
             total_cost=total_cost
         )
         
-        # ============ PHASE 2: GENERATE ANIMATIC ============
-        update_progress(video_id, "generating_animatic", 25, current_phase="phase2_animatic")
+        # TODO: Phase 2 - Generate Animatic (needs to be implemented)
+        # For now, we'll skip Phase 2 and go directly to Phase 3
         
-        # Run Phase 2 task directly (we're already in a Celery worker, so no need for .delay())
-        result2 = generate_animatic(video_id, spec)
+        # ============ PHASE 3: GENERATE REFERENCE ASSETS ============
+        update_progress(video_id, "generating_references", 30, current_phase="phase3_references")
         
-        # Check Phase 2 success
-        if result2['status'] != "success":
-            raise Exception(f"Phase 2 failed: {result2.get('error_message', 'Unknown error')}")
+        # Run Phase 3 task
+        result3 = generate_references.delay(video_id, spec).get(timeout=300)
+        
+        # Check Phase 3 success
+        if result3['status'] != "success":
+            raise Exception(f"Phase 3 failed: {result3.get('error_message', 'Unknown error')}")
         
         # Update cost tracking
-        total_cost += result2['cost_usd']
-        update_cost(video_id, "phase2", result2['cost_usd'])
+        total_cost += result3['cost_usd']
+        update_cost(video_id, "phase3", result3['cost_usd'])
         
-        # TODO: Phase 3 - Generate Reference Assets
-        # TODO: Phase 4 - Generate Video Chunks
+        # Extract reference URLs from Phase 3
+        reference_urls = result3['output_data']
+        
+        # Update progress
+        update_progress(
+            video_id,
+            "generating_references",
+            40,
+            current_phase="phase3_references",
+            total_cost=total_cost
+        )
+        
+        # TODO: Phase 4 - Generate Video Chunks (needs animatic_urls from Phase 2)
         # TODO: Phase 5 - Refine & Enhance
         # TODO: Phase 6 - Export & Deliver
         
