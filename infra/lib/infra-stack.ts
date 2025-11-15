@@ -75,46 +75,50 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     const dbSecret = new secretsmanager.Secret(this, 'DatabaseSecret', {
       description: 'Aurora Postgres database credentials',
       generateSecretString: {
-        secretStringTemplate: JSON.stringify({ username: 'admin' }),
+        secretStringTemplate: JSON.stringify({ username: 'aivideo' }),
         generateStringKey: 'password',
         excludeCharacters: '"@/\\',
       },
     });
 
-    // // Create Aurora Serverless v2 cluster
-    // const auroraCluster = new rds.DatabaseCluster(this, 'AuroraCluster', {
-    //   engine: rds.DatabaseClusterEngine.auroraPostgres({
-    //     version: rds.AuroraPostgresEngineVersion.VER_15_4,
-    //   }),
-    //   credentials: rds.Credentials.fromSecret(dbSecret),
-    //   serverlessV2MinCapacity: 0.5,
-    //   serverlessV2MaxCapacity: 1,
-    //   defaultDatabaseName: 'videogen',
-    //   vpc,
-    //   securityGroups: [auroraSecurityGroup],
-    //   removalPolicy: cdk.RemovalPolicy.RETAIN,
-    // });
+    // Create Aurora Serverless v2 cluster
+    const auroraCluster = new rds.DatabaseCluster(this, 'AuroraCluster', {
+      engine: rds.DatabaseClusterEngine.auroraPostgres({
+        version: rds.AuroraPostgresEngineVersion.VER_17_5,
+      }),
+      credentials: rds.Credentials.fromSecret(dbSecret),
+      serverlessV2MinCapacity: 0.5,
+      serverlessV2MaxCapacity: 1,
+      defaultDatabaseName: 'videogen',
+      vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PUBLIC,
+      },
+      securityGroups: [auroraSecurityGroup],
+      writer: rds.ClusterInstance.serverlessV2('writer'),
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
 
-    // // Export values for use in other stages
-    // new cdk.CfnOutput(this, 'VpcId', {
-    //   value: vpc.vpcId,
-    //   exportName: 'VpcId',
-    // });
+    // Export values for use in other stages
+    new cdk.CfnOutput(this, 'VpcId', {
+      value: vpc.vpcId,
+      exportName: 'VpcId',
+    });
 
-    // new cdk.CfnOutput(this, 'ECSSecurityGroupId', {
-    //   value: ecsSecurityGroup.securityGroupId,
-    //   exportName: 'ECSSecurityGroupId',
-    // });
+    new cdk.CfnOutput(this, 'ECSSecurityGroupId', {
+      value: ecsSecurityGroup.securityGroupId,
+      exportName: 'ECSSecurityGroupId',
+    });
 
-    // new cdk.CfnOutput(this, 'DatabaseSecretArn', {
-    //   value: dbSecret.secretArn,
-    //   exportName: 'DatabaseSecretArn',
-    // });
+    new cdk.CfnOutput(this, 'DatabaseSecretArn', {
+      value: dbSecret.secretArn,
+      exportName: 'DatabaseSecretArn',
+    });
 
-    // new cdk.CfnOutput(this, 'AuroraClusterEndpoint', {
-    //   value: auroraCluster.clusterEndpoint.hostname,
-    //   exportName: 'AuroraClusterEndpoint',
-    // });
+    new cdk.CfnOutput(this, 'AuroraClusterEndpoint', {
+      value: auroraCluster.clusterEndpoint.hostname,
+      exportName: 'AuroraClusterEndpoint',
+    });
 
     // // Stage 3: ECS Cluster & Services
     // // Create ECS Fargate cluster
