@@ -414,22 +414,22 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       exportName: 'ALBDNSName',
     });
 
-    // // Stage 5: ACM Certificate
-    // // Create hosted zone reference (reused in Stage 6)
-    // const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
-    //   hostedZoneId: props.hostedZoneId,
-    //   zoneName: 'vincentchan.cloud',
-    // });
+    // Stage 5: ACM Certificate
+    // Create hosted zone reference (reused in Stage 6)
+    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
+      hostedZoneId: props.hostedZoneId,
+      zoneName: 'gauntlet3.com',
+    });
 
-    // const certificate = new acm.Certificate(this, 'Certificate', {
-    //   domainName: 'aivideo-api.vincentchan.cloud',
-    //   validation: acm.CertificateValidation.fromDns(hostedZone),
-    // });
+    const certificate = new acm.Certificate(this, 'Certificate', {
+      domainName: 'aivideo-api.gauntlet3.com',
+      validation: acm.CertificateValidation.fromDns(hostedZone),
+    });
 
-    // new cdk.CfnOutput(this, 'CertificateArn', {
-    //   value: certificate.certificateArn,
-    //   exportName: 'CertificateArn',
-    // });
+    new cdk.CfnOutput(this, 'CertificateArn', {
+      value: certificate.certificateArn,
+      exportName: 'CertificateArn',
+    });
 
     // // Stage 6: Route53 & HTTPS
     // // Add HTTPS listener
@@ -453,7 +453,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     // });
 
     // new cdk.CfnOutput(this, 'APIURL', {
-    //   value: `https://aivideo-api.vincentchan.cloud`,
+    //   value: `https://aivideo-api.gauntlet3.com`,
     //   description: 'API endpoint URL',
     // });
   }
