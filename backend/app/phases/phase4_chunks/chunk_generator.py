@@ -193,18 +193,32 @@ def build_chunk_specs(
     
     chunk_count = int((duration + chunk_overlap) / (chunk_duration - chunk_overlap))
     
-    # Check if we have animatic URLs - if not, use text-to-video fallback
-    use_text_to_video = len(animatic_urls) == 0
+    # Determine if we should use text-to-video or image-to-video mode
+    # Priority: 1) product_reference from Phase 3, 2) animatic from Phase 2, 3) text-to-video fallback
+    product_reference_url = reference_urls.get('product_reference_url') if reference_urls else None
+    has_reference_image = product_reference_url is not None
+    has_animatic = len(animatic_urls) > 0
     
-    # Only validate animatic frames if we're using image-to-video mode
-    if not use_text_to_video:
+    # Use image-to-video if we have either product reference or animatic
+    use_text_to_video = not (has_reference_image or has_animatic)
+    
+    # Log mode selection
+    if has_reference_image:
+        print(f"✅ Using image-to-video mode with product reference from Phase 3")
+        print(f"   Reference URL: {product_reference_url[:80]}...")
+    elif has_animatic:
+        print(f"✅ Using image-to-video mode with animatic frames from Phase 2")
+    else:
+        print(f"⚠️  No reference images available - using text-to-video fallback")
+    
+    # Only validate animatic frames if we're using them (Phase 2 enabled)
+    if has_animatic and not has_reference_image:
         # Ensure we have enough animatic frames (only check if animatic_urls is provided)
         if len(animatic_urls) < len(beats):
             raise PhaseException(f"Not enough animatic frames: {len(animatic_urls)} < {len(beats)}")
     
     chunk_specs = []
     style_guide_url = reference_urls.get('style_guide_url') if reference_urls else None
-    product_reference_url = reference_urls.get('product_reference_url') if reference_urls else None
     
     for chunk_num in range(chunk_count):
         # Calculate chunk timing
@@ -227,9 +241,14 @@ def build_chunk_specs(
         
         beat = beats[beat_index]
         
-        # Get animatic frame for this chunk (map to beat) - only if available
+        # Determine reference image to use for this chunk
+        # Priority: 1) product_reference (used for ALL chunks), 2) animatic (per-beat)
         animatic_frame_url = None
-        if not use_text_to_video and animatic_urls:
+        if has_reference_image:
+            # Use product reference for ALL chunks (same reference image throughout)
+            animatic_frame_url = product_reference_url
+        elif has_animatic:
+            # Use animatic frames (different frame per beat)
             animatic_frame_url = animatic_urls[beat_index] if beat_index < len(animatic_urls) else animatic_urls[-1]
         
         # Build prompt from beat (keep concise, ~50-100 words)
@@ -252,13 +271,13 @@ def build_chunk_specs(
             start_time=start_time,
             duration=duration_actual,
             beat=beat,
-            animatic_frame_url=animatic_frame_url,  # None if using text-to-video
-            style_guide_url=style_guide_url if chunk_num == 0 else None,
+            animatic_frame_url=animatic_frame_url,  # product_reference, animatic, or None
+            style_guide_url=style_guide_url if chunk_num == 0 else None,  # Style guide disabled for MVP
             product_reference_url=product_reference_url,
             previous_chunk_last_frame=None,  # Will be set after previous chunk generates
             prompt=prompt,
             fps=spec.get('fps', 24),
-            use_text_to_video=use_text_to_video  # Set based on whether animatic_urls is empty
+            use_text_to_video=use_text_to_video  # False if we have any reference image
         )
         
         chunk_specs.append(chunk_spec)
@@ -321,39 +340,55 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
         
         # Try image-to-video first if images are available, otherwise use text-to-video
         if not use_text_to_video and chunk_spec_obj.animatic_frame_url:
-            # ============ IMAGE-TO-VIDEO MODE (Existing Code) ============
+            # ============ IMAGE-TO-VIDEO MODE ============
             try:
                 print(f"Generating chunk {chunk_num} with image-to-video...")
                 
-                # Download animatic frame from S3
-                animatic_key = chunk_spec_obj.animatic_frame_url.replace(f's3://{s3_client.bucket}/', '')
-                animatic_path = s3_client.download_temp(animatic_key)
-                temp_files.append(animatic_path)
+                # Download reference image from S3
+                # This could be: product_reference (Phase 3) or animatic_frame (Phase 2)
+                reference_key = chunk_spec_obj.animatic_frame_url.replace(f's3://{s3_client.bucket}/', '')
+                reference_path = s3_client.download_temp(reference_key)
+                temp_files.append(reference_path)
                 
-                # Download style guide if chunk 0
-                style_guide_path = None
-                if chunk_num == 0 and chunk_spec_obj.style_guide_url:
-                    style_guide_key = chunk_spec_obj.style_guide_url.replace(f's3://{s3_client.bucket}/', '')
-                    style_guide_path = s3_client.download_temp(style_guide_key)
-                    temp_files.append(style_guide_path)
+                # Check if this is a product reference (used for all chunks) or animatic (per-beat)
+                is_product_reference = (chunk_spec_obj.product_reference_url and 
+                                       chunk_spec_obj.animatic_frame_url == chunk_spec_obj.product_reference_url)
                 
-                # Download previous chunk's last frame if chunk > 0
-                previous_frame_path = None
-                if chunk_num > 0 and chunk_spec_obj.previous_chunk_last_frame:
-                    prev_frame_key = chunk_spec_obj.previous_chunk_last_frame.replace(f's3://{s3_client.bucket}/', '')
-                    previous_frame_path = s3_client.download_temp(prev_frame_key)
-                    temp_files.append(previous_frame_path)
-                
-                # Create composite image
-                composite_path = create_reference_composite(
-                    animatic_path=animatic_path,
-                    style_guide_path=style_guide_path,
-                    previous_frame_path=previous_frame_path,
-                    animatic_weight=0.7 if chunk_num == 0 else 0.3,
-                    style_weight=0.3 if chunk_num == 0 else 0.0,
-                    temporal_weight=0.7 if chunk_num > 0 else 0.0
-                )
-                temp_files.append(composite_path)
+                if is_product_reference:
+                    # ============ PRODUCT REFERENCE MODE (MVP) ============
+                    # Use product reference directly as first frame for ALL chunks
+                    # No compositing needed - simpler and faster
+                    print(f"   Using product reference as first frame (no compositing)")
+                    composite_path = reference_path  # Use reference directly
+                else:
+                    # ============ ANIMATIC MODE (Phase 2 enabled) ============
+                    # Use animatic with optional style guide and temporal consistency
+                    print(f"   Using animatic frame with compositing")
+                    
+                    # Download style guide if chunk 0
+                    style_guide_path = None
+                    if chunk_num == 0 and chunk_spec_obj.style_guide_url:
+                        style_guide_key = chunk_spec_obj.style_guide_url.replace(f's3://{s3_client.bucket}/', '')
+                        style_guide_path = s3_client.download_temp(style_guide_key)
+                        temp_files.append(style_guide_path)
+                    
+                    # Download previous chunk's last frame if chunk > 0
+                    previous_frame_path = None
+                    if chunk_num > 0 and chunk_spec_obj.previous_chunk_last_frame:
+                        prev_frame_key = chunk_spec_obj.previous_chunk_last_frame.replace(f's3://{s3_client.bucket}/', '')
+                        previous_frame_path = s3_client.download_temp(prev_frame_key)
+                        temp_files.append(previous_frame_path)
+                    
+                    # Create composite image
+                    composite_path = create_reference_composite(
+                        animatic_path=reference_path,
+                        style_guide_path=style_guide_path,
+                        previous_frame_path=previous_frame_path,
+                        animatic_weight=0.7 if chunk_num == 0 else 0.3,
+                        style_weight=0.3 if chunk_num == 0 else 0.0,
+                        temporal_weight=0.7 if chunk_num > 0 else 0.0
+                    )
+                    temp_files.append(composite_path)
                 
                 # Image-to-video using model config
                 # Replicate accepts file paths or file objects

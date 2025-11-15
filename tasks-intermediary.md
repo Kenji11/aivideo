@@ -2,36 +2,42 @@
 
 ## Overview
 
-Simplify the video generation pipeline for MVP by temporarily removing Phase 2 (Animatic) and Phase 3 (References), making Phase 1 output directly to Phase 4. Additionally, improve Phase 4 with model configuration management, text-to-video fallback, comprehensive logging, and video length debugging.
+Simplify the video generation pipeline for MVP by temporarily removing Phase 2 (Animatic) but re-enabling Phase 3 (References) to generate reference images for video chunks. Use wan model (image-to-video) as default since text-to-video support is limited.
 
-**PRIORITY: Complete PR #1 and PR #3 first**
+**PRIORITY: Complete PR #6 next (Re-enable Phase 3)**
 
 ### Task Order
-1. **PR #1** - Comment out Phase 2 & 3 (MVP simplification)
-2. **PR #3** - Add text-to-video fallback
-3. PR #2 - Model configuration system
-4. PR #4 - Comprehensive logging
-5. PR #5 - Video length investigation & fix
+1. **PR #1** - Comment out Phase 2 & 3 (MVP simplification) ✅
+2. **PR #3** - Add text-to-video fallback ✅
+3. PR #2 - Model configuration system ✅
+4. PR #4 - Comprehensive logging ✅
+5. **PR #6** - Re-enable Phase 3 (References) ✅
+6. **PR #7** - Add actual_chunk_duration to model configs **← DO THIS NEXT**
+7. PR #5 - Video length investigation & fix
 
 ## Model Configuration Reference
 
 The model config system will include these models:
 
-- **wan** (wan-2.1-480p) - Currently used, will be DEFAULT_MODEL
-- **zeroscope** (Zeroscope v2 XL)
-- **animatediff** (AnimateDiff)
-- **runway** (Runway Gen-2)
+- **wan** (wan-2.1-480p) - Currently used, DEFAULT_MODEL, **actual output: ~5 seconds** (ignores duration param)
+- **zeroscope** (Zeroscope v2 XL) - **actual output: ~3 seconds** (24 frames @ 8fps)
+- **animatediff** (AnimateDiff) - **actual output: ~2 seconds** (16 frames @ 8fps)
+- **runway** (Runway Gen-2) - **actual output: ~5-10 seconds** (depends on tier)
 
-Each model config includes: name, replicate_model, cost_per_generation, params (num_frames, fps, width, height), supports_multi_image, max_reference_assets.
+Each model config includes: name, replicate_model, cost_per_generation, params (num_frames, fps, width, height), supports_multi_image, max_reference_assets, **actual_chunk_duration** (reality of what model outputs).
 
 ## Relevant Files
 
-- `backend/app/orchestrator/pipeline.py` - Main pipeline orchestration (comment out Phase 2 & 3)
-- `backend/app/phases/phase4_chunks/chunk_generator.py` - Chunk generation logic (add text-to-video fallback, logging)
-- `backend/app/phases/phase4_chunks/service.py` - Chunk service orchestration (add logging)
-- `backend/app/phases/phase4_chunks/schemas.py` - ChunkSpec schema (may need updates for text-to-video)
-- `backend/app/phases/phase4_chunks/model_config.py` - NEW: Model configuration management
-- `backend/app/common/constants.py` - Add model cost constants
+- `backend/app/orchestrator/pipeline.py` - Main pipeline orchestration (re-enable Phase 3, keep Phase 2 disabled)
+- `backend/app/phases/phase3_references/task.py` - Phase 3 Celery task (generate reference images)
+- `backend/app/phases/phase3_references/service.py` - Phase 3 service layer (orchestrate reference generation)
+- `backend/app/phases/phase3_references/image_generator.py` - Generate reference images via Replicate
+- `backend/app/phases/phase3_references/schemas.py` - Phase 3 schemas (ReferenceSpec, ReferenceResult)
+- `backend/app/phases/phase4_chunks/chunk_generator.py` - Chunk generation logic (use reference images, logging)
+- `backend/app/phases/phase4_chunks/service.py` - Chunk service orchestration (receive reference URLs)
+- `backend/app/phases/phase4_chunks/schemas.py` - ChunkSpec schema (use reference images from Phase 3)
+- `backend/app/phases/phase4_chunks/model_config.py` - Model configuration management
+- `backend/app/common/constants.py` - Model cost constants
 - `backend/app/phases/phase4_chunks/stitcher.py` - Video stitching logic (investigate length issues)
 
 ## Tasks
@@ -86,6 +92,40 @@ Each model config includes: name, replicate_model, cost_per_generation, params (
   - [x] 4.11 Use consistent log format: emoji prefix + timestamp + structured data
   - [ ] 4.12 Test logging appears correctly in console during generation
 
+- [x] 6.0 Re-enable Phase 3 (Reference Generation) (PR #6) **← COMPLETED**
+  - [x] 6.1 In `pipeline.py`, uncomment Phase 3 section (lines ~102-143)
+  - [x] 6.2 Keep Phase 2 (Animatic) commented out with note: "# Phase 2 disabled for MVP - using Phase 3 references only"
+  - [x] 6.3 Update Phase 4 call to pass reference_urls from Phase 3: `generate_chunks.apply(args=[video_id, spec, [], reference_urls])`
+  - [x] 6.4 Verify Phase 3 generates ONE reference image per video (not per beat)
+  - [x] 6.5 Update Phase 3 to skip style_guide generation (mark as OUT OF SCOPE for MVP)
+  - [x] 6.6 In `phase3_references/service.py`, ensure only product_ref is generated (no style_guide)
+  - [x] 6.7 Update `build_chunk_specs()` in Phase 4 to use reference_urls['product_ref'] for image-to-video
+  - [x] 6.8 Set `use_text_to_video=False` in ChunkSpec when reference image is available
+  - [x] 6.9 Update `generate_single_chunk()` to use reference image as first frame input for wan model
+  - [x] 6.10 Update progress tracking to include Phase 3 milestone (20% → 40%)
+  - [x] 6.11 Update cost summary to include Phase 3 reference generation cost
+  - [x] 6.12 Add logging: "Using reference image from Phase 3: {reference_url}"
+  - [ ] 6.13 Test pipeline runs Phase 1 → Phase 3 → Phase 4 successfully
+  - [ ] 6.14 Verify chunks are generated using reference image (image-to-video mode)
+  - [ ] 6.15 Confirm wan model works with reference image input
+
+- [ ] 7.0 Add Actual Chunk Duration to Model Configs (PR #7) **← NEW**
+  - [ ] 7.1 Add `actual_chunk_duration` field to each model in `model_config.py`
+  - [ ] 7.2 Set wan actual_chunk_duration to 5.0 seconds (model ignores duration param, outputs ~5s)
+  - [ ] 7.3 Set zeroscope actual_chunk_duration to 3.0 seconds (24 frames @ 8fps)
+  - [ ] 7.4 Set animatediff actual_chunk_duration to 2.0 seconds (16 frames @ 8fps)
+  - [ ] 7.5 Set runway actual_chunk_duration to 5.0 seconds (conservative estimate)
+  - [ ] 7.6 Add `duration_controllable` boolean flag (False for wan, True for others)
+  - [ ] 7.7 Add docstring explaining: "actual_chunk_duration = reality of what model outputs regardless of params"
+  - [ ] 7.8 Update `build_chunk_specs()` to use `actual_chunk_duration` for chunk count calculation
+  - [ ] 7.9 Calculate chunk_count = ceil(video_duration / actual_chunk_duration) instead of fixed 2s assumption
+  - [ ] 7.10 Log: "Model outputs {actual_chunk_duration}s chunks, need {chunk_count} chunks for {duration}s video"
+  - [ ] 7.11 Update chunk overlap logic to use actual_chunk_duration (overlap = actual_chunk_duration * 0.25)
+  - [ ] 7.12 Remove hardcoded chunk_duration calculations (lines 184-194 in chunk_generator.py)
+  - [ ] 7.13 Test with wan model: 30s video should generate ~6 chunks (not 15 chunks assuming 2s)
+  - [ ] 7.14 Test with animatediff: 30s video should generate ~15 chunks (2s chunks)
+  - [ ] 7.15 Verify stitched video duration matches spec.duration after using actual chunk durations
+
 - [ ] 5.0 Investigate & Fix Video Length Issues (PR #5)
   - [ ] 5.1 Add logging to `build_chunk_specs()`: log calculated chunk_duration, chunk_overlap, chunk_count
   - [ ] 5.2 Log each ChunkSpec: chunk_num, start_time, duration
@@ -101,25 +141,36 @@ Each model config includes: name, replicate_model, cost_per_generation, params (
 
 ## Notes
 
-- **Phase 2 & 3 Removal**: Temporarily commented out for MVP. Will be re-enabled after Phase 4 is stable.
+- **Phase 2 Removal**: Phase 2 (Animatic) remains disabled for MVP. Phase 3 (References) is being re-enabled.
+- **Phase 3 Scope**: Generate ONE reference image (product_ref) per video. Style guide is OUT OF SCOPE for MVP.
+- **Model Strategy**: wan-2.1-480p (image-to-video) is default. Text-to-video support is limited, so we prioritize image-to-video workflow.
 - **Model Switching**: To switch models, simply change `DEFAULT_MODEL` in `model_config.py`. No code changes needed elsewhere.
-- **Current Model**: wan-2.1-480p (wavespeedai/wan-2.1-i2v-480p) is currently used. Will be set as DEFAULT_MODEL.
-- **Text-to-Video Fallback**: Gracefully handles missing image inputs by falling back to text-only generation.
+- **Reference Image Usage**: Phase 3 generates reference image → Phase 4 uses it as first frame for all chunks via wan model.
+- **Text-to-Video Fallback**: Kept as fallback if reference generation fails, but primary path is image-to-video.
 - **Logging Strategy**: Two-level logging (summary + details) provides quick overview and deep debugging capability.
 - **Video Length Investigation**: Root cause needs to be identified before implementing fix. Could be chunk duration, overlap, or stitching logic.
+
+## Bug Fixes Applied
+
+1. **Status API None Handling**: Fixed `AttributeError: 'NoneType' object has no attribute 'startswith'` in `status.py` when checking S3 URLs. Added null checks before calling `.startswith()`.
+
+2. **Phase 1 Duration Validation**: Fixed "Beat durations don't match video duration" error caused by rounding when scaling beats for ads. Now adjusts last beat to ensure exact duration match.
 
 ## Testing Strategy
 
 After each PR:
-1. Run integration test with Phase 1 → Phase 4 flow
+1. Run integration test with Phase 1 → Phase 3 → Phase 4 flow
 2. Verify logs appear correctly
 3. Check generated video duration
 4. Validate cost tracking accuracy
+5. Verify reference image is generated and used in chunks
 
 ## Success Criteria
 
-- [ ] Pipeline runs Phase 1 → Phase 4 (skipping 2 & 3)
-- [ ] Phase 4 generates chunks successfully with or without image inputs
+- [ ] Pipeline runs Phase 1 → Phase 3 → Phase 4 (skipping Phase 2 only)
+- [ ] Phase 3 generates reference image successfully
+- [ ] Phase 4 uses reference image for image-to-video generation (wan model)
+- [ ] Text-to-video fallback works if reference generation fails
 - [ ] Models can be switched by changing single constant
 - [ ] Comprehensive logs show all inputs and outputs
 - [ ] Video length matches expected duration (±0.5s tolerance)

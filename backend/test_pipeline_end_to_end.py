@@ -51,7 +51,7 @@ def test_pipeline():
     poll_count = 0
     
     phases_seen = set()
-    animatic_seen = False
+    validate_seen = False
     references_seen = False
     video_seen = False
     
@@ -71,25 +71,25 @@ def test_pipeline():
             if poll_count % 10 == 0 or status.get('current_phase') != status.get('current_phase'):
                 print(f"   Poll {poll_count}: Status={status['status']}, Progress={status['progress']:.1f}%, Phase={status.get('current_phase', 'N/A')}")
             
-            # Check for Phase 2 (animatic)
-            if status.get('animatic_urls') and len(status['animatic_urls']) > 0 and not animatic_seen:
-                animatic_seen = True
-                print(f"   ✅ Phase 2 Complete: {len(status['animatic_urls'])} animatic frames")
+            # Check for Phase 1 (validate)
+            if status.get('current_phase') == 'phase1_validate' and not validate_seen:
+                validate_seen = True
+                print(f"   ✅ Phase 1 Complete: Prompt validated and spec generated")
             
-            # Check for Phase 3 (references)
+            # Check for Phase 3 (references) - Phase 2 is disabled for MVP
             if status.get('reference_assets') and not references_seen:
                 references_seen = True
                 refs = status['reference_assets']
-                print(f"   ✅ Phase 3 Complete: Style guide + Product reference")
-                if refs.get('style_guide_url'):
-                    print(f"      Style guide: {refs['style_guide_url'][:60]}...")
+                print(f"   ✅ Phase 3 Complete: Product reference generated")
                 if refs.get('product_reference_url'):
                     print(f"      Product ref: {refs['product_reference_url'][:60]}...")
+                if refs.get('style_guide_url'):
+                    print(f"      Style guide: {refs['style_guide_url'][:60]}... (OUT OF SCOPE for MVP)")
             
             # Check for Phase 4 (stitched video)
             if status.get('stitched_video_url') and not video_seen:
                 video_seen = True
-                print(f"   ✅ Phase 4 Complete: Stitched video ready!")
+                print(f"   ✅ Phase 4 Complete: Video chunks generated and stitched!")
                 print(f"      Video URL: {status['stitched_video_url'][:60]}...")
             
             # Check completion
@@ -102,11 +102,12 @@ def test_pipeline():
                 # Verify all phases completed
                 print(f"\n   📊 Phase Summary:")
                 print(f"      Phases seen: {sorted(phases_seen)}")
-                print(f"      Phase 2 (Animatic): {'✅' if animatic_seen else '❌'}")
+                print(f"      Phase 1 (Validate): {'✅' if validate_seen else '❌'}")
+                print(f"      Phase 2 (Animatic): ⏭️  SKIPPED (disabled for MVP)")
                 print(f"      Phase 3 (References): {'✅' if references_seen else '❌'}")
                 print(f"      Phase 4 (Video): {'✅' if video_seen else '❌'}")
                 
-                if animatic_seen and references_seen and video_seen:
+                if references_seen and video_seen:
                     print(f"\n   🎉 ALL PHASES COMPLETED SUCCESSFULLY!")
                 else:
                     print(f"\n   ⚠️  Some phases missing!")

@@ -23,6 +23,8 @@ class ReferenceAssetService:
         """
         Generate all reference assets for a video.
         
+        MVP Scope: Only generates product reference image (style_guide is OUT OF SCOPE).
+        
         Args:
             video_id: Unique video generation ID
             spec: Video specification from Phase 1
@@ -31,18 +33,23 @@ class ReferenceAssetService:
             Dictionary with reference URLs and metadata
         """
         try:
-            # Extract style information
-            style = spec.get('style', {})
+            # Extract product information
             product = spec.get('product')
             uploaded_assets = spec.get('uploaded_assets', [])
             
-            # Generate style guide
-            style_guide_url = self._generate_style_guide(video_id, style)
+            # ============ MVP: Style guide generation disabled ============
+            # Style guide is out of scope for MVP
+            style_guide_url = None
+            print("ℹ️  Style guide generation disabled (OUT OF SCOPE for MVP)")
             
             # Generate product reference if product exists
             product_reference_url = None
             if product:
+                print(f"📸 Generating product reference for: {product.get('name', 'product')}...")
                 product_reference_url = self._generate_product_reference(video_id, product)
+                print(f"✅ Product reference generated: {product_reference_url[:80]}...")
+            else:
+                print("⚠️  No product information found - skipping product reference generation")
             
             # Process uploaded assets
             processed_assets = []
@@ -54,7 +61,7 @@ class ReferenceAssetService:
             
             # Build output
             output = {
-                'style_guide_url': style_guide_url,
+                'style_guide_url': style_guide_url,  # None for MVP
                 'product_reference_url': product_reference_url,
                 'uploaded_assets': processed_assets,
                 'total_cost': self.total_cost
