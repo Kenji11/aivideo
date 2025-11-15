@@ -60,6 +60,7 @@ class VideoListItem(BaseModel):
     title: str
     status: str
     progress: float
+    current_phase: Optional[str] = None
     final_video_url: Optional[str]
     cost_usd: float
     created_at: datetime

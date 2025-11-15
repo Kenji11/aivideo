@@ -78,10 +78,12 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         
         # Calculate generation time
         generation_time = time.time() - start_time
+        # Phase 2 complete = 50% progress (2 out of 6 phases, but only 2 implemented so far)
+        # Don't set to 100% until all phases are complete
         update_progress(
             video_id,
-            "complete",
-            100,
+            "generating_animatic",  # Keep status as generating_animatic, not "complete"
+            50,  # Phase 2 complete = 50% (not 100% since we only have 2 phases implemented)
             current_phase="phase2_animatic",
             animatic_urls=result2['output_data']['animatic_urls'],
             total_cost=total_cost,
@@ -90,7 +92,7 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         
         return {
             "video_id": video_id,
-            "status": "complete",
+            "status": "generating_animatic",  # Not "complete" - only 2 of 6 phases implemented
             "spec": spec,
             "animatic_urls": result2['output_data']['animatic_urls'],
             "cost_usd": total_cost,
