@@ -29,6 +29,8 @@ celery_app.conf.update(
         "app.phases.phase1_validate.task",
         "app.phases.phase2_animatic.task",
         "app.phases.phase3_references.task",
+        "app.phases.phase4_chunks.task",
+        "app.phases.phase5_refine.task",
     ],
 )
 
@@ -38,3 +40,5 @@ from app.orchestrator import pipeline  # noqa: F401
 from app.phases.phase1_validate import task as phase1_task  # noqa: F401
 from app.phases.phase2_animatic import task as phase2_task  # noqa: F401
 from app.phases.phase3_references import task as phase3_task  # noqa: F401
+from app.phases.phase4_chunks import task as phase4_task  # noqa: F401
+from app.phases.phase5_refine import task as phase5_task  # noqa: F401

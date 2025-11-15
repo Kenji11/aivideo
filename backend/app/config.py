@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     # External APIs
     replicate_api_token: str
     openai_api_key: str
+    openrouter_api_key: str = ""  # Optional: OpenRouter for LLM access (alternative to OpenAI)
     
     # AWS
     aws_access_key_id: str

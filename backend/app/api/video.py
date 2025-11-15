@@ -15,20 +15,38 @@ async def list_videos(
     # Order by most recent first
     videos = db.query(VideoGeneration).order_by(VideoGeneration.created_at.desc()).all()
     
-    video_items = [
-        VideoListItem(
-            video_id=video.id,
-            title=video.title,
-            status=video.status.value,
-            progress=video.progress,
-            current_phase=video.current_phase,
-            final_video_url=video.final_video_url,
-            cost_usd=video.cost_usd,
-            created_at=video.created_at,
-            completed_at=video.completed_at
+    video_items = []
+    for video in videos:
+        # Get stitched_video_url from phase_outputs if available (Phase 4 output)
+        stitched_url = video.stitched_url
+        if not stitched_url and video.phase_outputs:
+            phase4_output = video.phase_outputs.get('phase4_chunks')
+            if phase4_output and phase4_output.get('status') == 'success':
+                phase4_data = phase4_output.get('output_data', {})
+                stitched_url = phase4_data.get('stitched_video_url')
+        
+        # Use stitched_url as final_video_url if final_video_url is not set
+        final_url = video.final_video_url or stitched_url
+        
+        # Convert S3 URL to presigned URL if needed
+        if final_url and final_url.startswith('s3://'):
+            from app.services.s3 import s3_client
+            s3_path = final_url.replace(f's3://{s3_client.bucket}/', '')
+            final_url = s3_client.generate_presigned_url(s3_path, expiration=3600 * 24 * 7)  # 7 days
+        
+        video_items.append(
+            VideoListItem(
+                video_id=video.id,
+                title=video.title,
+                status=video.status.value,
+                progress=video.progress,
+                current_phase=video.current_phase,
+                final_video_url=final_url,
+                cost_usd=video.cost_usd,
+                created_at=video.created_at,
+                completed_at=video.completed_at
+            )
         )
-        for video in videos
-    ]
     
     return VideoListResponse(
         videos=video_items,

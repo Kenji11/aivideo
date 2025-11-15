@@ -12,6 +12,16 @@ class PromptValidationService:
     def __init__(self):
         """Initialize the validation service"""
         self.openai = openai_client
+        # Try to use OpenRouter if available, fallback to OpenAI
+        try:
+            from app.services.openrouter import openrouter_client
+            if openrouter_client.api_key:
+                self.use_openrouter = True
+                self.openrouter = openrouter_client
+            else:
+                self.use_openrouter = False
+        except Exception:
+            self.use_openrouter = False
     
     def validate_and_extract(self, prompt: str, assets: List[Dict] = None) -> Dict:
         """
@@ -32,6 +42,8 @@ class PromptValidationService:
         
         # Step 1: Extract intent from prompt using GPT-4
         extracted = self._extract_intent(prompt)
+        # Store original prompt for duration optimization
+        extracted['original_prompt'] = prompt
         
         # Step 2: Get template name with fallback
         template_name = extracted.get('template', 'product_showcase')
@@ -98,17 +110,35 @@ Extract the following information from the user's prompt and return as JSON:
 Choose the template that best matches the user's intent. Extract all available information, using reasonable defaults if information is missing."""
         
         try:
-            response = self.openai.chat.completions.create(
-                model="gpt-4-turbo-preview",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.3
-            )
+            # Use OpenRouter if available, otherwise OpenAI
+            if self.use_openrouter:
+                # OpenRouter API call (OpenAI-compatible format)
+                response_data = self.openrouter.chat_completion(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt}
+                    ],
+                    model="openai/gpt-4-turbo",  # Can use any model: "anthropic/claude-3-opus", "google/gemini-pro", etc.
+                    temperature=0.3,
+                    max_tokens=1000,
+                    response_format={"type": "json_object"}  # Ensure JSON response
+                )
+                # Extract content from OpenRouter response (same format as OpenAI)
+                content = response_data['choices'][0]['message']['content']
+            else:
+                # OpenAI API call
+                response = self.openai.chat.completions.create(
+                    model="gpt-4-turbo-preview",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.3
+                )
+                content = response.choices[0].message.content
             
-            extracted = json.loads(response.choices[0].message.content)
+            extracted = json.loads(content)
             return extracted
             
         except Exception as e:
@@ -127,6 +157,35 @@ Choose the template that best matches the user's intent. Extract all available i
         """
         # Start with template as base
         spec = template.copy()
+        
+        # Optimize duration for ads - start with shorter videos (5-10s) that can be extended
+        prompt_lower = extracted.get('original_prompt', '').lower() if 'original_prompt' in extracted else ''
+        is_ad = 'ad' in prompt_lower or 'advertisement' in prompt_lower or 'commercial' in prompt_lower
+        
+        if is_ad:
+            # For ads, start with 5-10 seconds (can be extended later)
+            # Use 5 seconds for quick ads, 10 seconds for standard ads
+            target_duration = 5 if 'quick' in prompt_lower or 'short' in prompt_lower else 10
+            original_duration = spec.get('duration', 30)
+            
+            if original_duration > target_duration:
+                spec['duration'] = target_duration
+                # Scale down beat durations proportionally, but keep at least 1 second per beat
+                total_beat_duration = sum(beat.get('duration', 0) for beat in spec.get('beats', []))
+                if total_beat_duration > 0:
+                    scale_factor = target_duration / original_duration
+                    for beat in spec.get('beats', []):
+                        new_duration = max(1, int(beat.get('duration', 0) * scale_factor))
+                        beat['duration'] = new_duration
+                    # Recalculate start times
+                    current_start = 0
+                    for beat in spec.get('beats', []):
+                        beat['start'] = current_start
+                        current_start += beat.get('duration', 0)
+                
+                # Mark as ad for potential extension
+                spec['is_ad'] = True
+                spec['original_duration'] = original_duration
         
         # Update template field
         spec['template'] = extracted.get('template', template.get('name', 'product_showcase'))
