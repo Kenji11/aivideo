@@ -35,7 +35,7 @@ export function Settings({ onBack }: SettingsProps) {
     setTheme(newTheme);
   };
 
-  const toggleSwitch = (value: boolean) => value;
+  // const toggleSwitch = (value: boolean) => value; // Unused helper
 
   return (
     <div className="max-w-3xl mx-auto animate-fade-in">

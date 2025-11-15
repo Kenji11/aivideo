@@ -6,7 +6,8 @@ import { UploadZone } from './components/UploadZone';
 import { ProjectCard } from './components/ProjectCard';
 import { ProcessingSteps } from './components/ProcessingSteps';
 import { NotificationCenter, Notification } from './components/NotificationCenter';
-import { TemplateGallery, Template } from './components/TemplateGallery';
+// import { TemplateGallery } from './components/TemplateGallery'; // Unused for now
+import type { Template } from './components/TemplateGallery';
 import { ExportPanel } from './components/ExportPanel';
 import { Auth } from './pages/Auth';
 import { Settings as SettingsPage } from './pages/Settings';
@@ -16,7 +17,7 @@ import { Dashboard } from './pages/Dashboard';
 import { VideoLibrary } from './pages/VideoLibrary';
 import { Billing } from './pages/Billing';
 import { API } from './pages/API';
-import { supabase, Project } from './lib/supabase';
+// import { supabase, Project } from './lib/supabase'; // Unused for now
 import { generateVideo, getVideoStatus, StatusResponse, listVideos, VideoListItem } from './lib/api';
 
 type AppStep = 'projects' | 'create' | 'processing' | 'preview' | 'download' | 'templates' | 'settings' | 'analytics' | 'dashboard' | 'library' | 'billing' | 'api' | 'export';
@@ -29,7 +30,7 @@ function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [projects, setProjects] = useState<VideoListItem[]>([]);
-  const [selectedProject, setSelectedProject] = useState<VideoListItem | null>(null);
+  const [, setSelectedProject] = useState<VideoListItem | null>(null);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -38,6 +39,7 @@ function App() {
   const [animaticUrls, setAnimaticUrls] = useState<string[] | null>(null);
   const [referenceAssets, setReferenceAssets] = useState<StatusResponse['reference_assets'] | null>(null);
   const [stitchedVideoUrl, setStitchedVideoUrl] = useState<string | null>(null);
+  const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]); // Store uploaded asset IDs
 
   const steps = [
     { id: 1, name: 'Create', icon: Sparkles },
@@ -158,12 +160,12 @@ function App() {
         setStitchedVideoUrl(null);
         setAppStep('processing');
       
-      // Call backend API
+      // Call backend API with uploaded asset IDs
       const response = await generateVideo({
         title: title || 'Untitled Video',
         description: description || undefined,
         prompt: prompt,
-        reference_assets: [] // TODO: Get from UploadZone and convert to asset IDs
+        reference_assets: uploadedAssetIds // Use uploaded asset IDs from UploadZone
       });
       
       setVideoId(response.video_id);
@@ -446,7 +448,13 @@ function App() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Reference Materials
                 </label>
-                <UploadZone disabled={isProcessing} />
+                <UploadZone 
+                  disabled={isProcessing} 
+                  onAssetsUploaded={(assetIds) => {
+                    setUploadedAssetIds(assetIds);
+                    addNotification('success', 'Files Uploaded', `${assetIds.length} file(s) uploaded successfully!`);
+                  }}
+                />
               </div>
 
               <button

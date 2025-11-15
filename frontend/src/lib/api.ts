@@ -79,6 +79,8 @@ export interface StatusResponse {
   estimated_time_remaining?: number;
   error?: string;
   reference_assets?: ReferenceAssets;
+  animatic_urls?: string[];
+  stitched_video_url?: string;
 }
 
 export interface VideoResponse {

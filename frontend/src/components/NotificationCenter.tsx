@@ -1,5 +1,4 @@
 import { X, Check, AlertCircle, Info, Bell } from 'lucide-react';
-import { useState, useEffect } from 'react';
 
 export interface Notification {
   id: string;
@@ -16,7 +15,7 @@ interface NotificationCenterProps {
 }
 
 export function NotificationCenter({ notifications, onDismiss }: NotificationCenterProps) {
-  const unreadCount = notifications.filter(n => !n.read).length;
+  // const unreadCount = notifications.filter(n => !n.read).length; // Unused for now
 
   const getIcon = (type: Notification['type']) => {
     switch (type) {

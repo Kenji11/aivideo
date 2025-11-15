@@ -1,4 +1,4 @@
-import { Play, Trash2, FileText, Calendar, Video as VideoIcon, Loader2 } from 'lucide-react';
+import { Play, Trash2, Calendar, Video as VideoIcon, Loader2 } from 'lucide-react';
 import { VideoListItem } from '../lib/api';
 import { formatDistanceToNow } from 'date-fns';
 

@@ -1,4 +1,4 @@
-import { Download, Share2, Monitor } from 'lucide-react';
+import { Download, Monitor } from 'lucide-react';
 import { useState } from 'react';
 
 interface ExportSettings {

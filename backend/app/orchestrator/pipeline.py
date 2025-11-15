@@ -16,7 +16,7 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
     """
     Main orchestration task - chains phases sequentially.
     Currently implements Phase 1 (Validate) -> Phase 3 (References) -> Phase 4 (Chunks).
-    Phase 2 (Animatic) is disabled for MVP. Phase 3 generates reference image used by Phase 4.
+    Phase 2 (Animatic) is skipped for cost/time optimization - Phase 4 uses text-to-video mode.
     
     Args:
         video_id: Unique video generation ID
@@ -66,14 +66,14 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         )
         
         # ============================================================================
-        # Phase 2 disabled for MVP - using Phase 3 references only
-        # Phase 2 (Animatic) is commented out to simplify the pipeline for MVP.
-        # Phase 3 (References) generates a single reference image used by Phase 4.
-        # To re-enable Phase 2: uncomment Phase 2 section below and update Phase 4 call.
+        # Phase 2 & 3 temporarily disabled for MVP
+        # Phase 2 (Animatic) and Phase 3 (References) are commented out to simplify
+        # the pipeline for MVP. Phase 1 output goes directly to Phase 4 (Chunks).
+        # To re-enable: uncomment Phase 2 & 3 sections below and update Phase 4 call.
         # ============================================================================
         
         # ============ PHASE 2: GENERATE ANIMATIC ============
-        # Phase 2 disabled for MVP - using Phase 3 references only
+        # Phase 2 & 3 temporarily disabled for MVP
         # update_progress(video_id, "generating_animatic", 25, current_phase="phase2_animatic")
         # 
         # # Run Phase 2 task synchronously
@@ -112,6 +112,7 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         animatic_urls = []
         
         # ============ PHASE 3: GENERATE REFERENCE ASSETS ============
+        # Phase 2 is skipped, but Phase 3 is enabled for reference assets (style guide, product refs)
         update_progress(video_id, "generating_references", 30, current_phase="phase3_references")
         
         # Run Phase 3 task synchronously (using apply instead of delay().get())
@@ -129,10 +130,6 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         
         # Extract reference URLs from Phase 3
         reference_urls = result3['output_data']
-        
-        # Log reference image usage
-        if reference_urls and reference_urls.get('product_reference_url'):
-            print(f"📸 Using reference image from Phase 3: {reference_urls['product_reference_url'][:80]}...")
         
         # Store Phase 3 output in database
         db = SessionLocal()
@@ -159,12 +156,12 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         )
         
         # ============ PHASE 4: GENERATE VIDEO CHUNKS ============
-        # Progress: Phase 1 (20%) → Phase 3 (40%) → Phase 4 (40-70%)
-        update_progress(video_id, "generating_chunks", 45, current_phase="phase4_chunks")
+        # Progress: Phase 1 ends at 20%, Phase 3 ends at 40%, Phase 4 starts at 50% (skipping Phase 2)
+        update_progress(video_id, "generating_chunks", 50, current_phase="phase4_chunks")
         
         # Run Phase 4 task synchronously
-        # Pass empty animatic_urls (Phase 2 disabled) and reference_urls from Phase 3
-        result4_obj = generate_chunks.apply(args=[video_id, spec, [], reference_urls])
+        # Phase 2 is skipped (empty animatic_urls), but Phase 3 reference_urls are passed
+        result4_obj = generate_chunks.apply(args=[video_id, spec, animatic_urls, reference_urls])
         result4 = result4_obj.result
         
         # Check Phase 4 success
@@ -282,9 +279,10 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         print("="*70)
         print(f"💰 TOTAL COST: ${total_cost:.4f} USD")
         print(f"   - Phase 1 (Validate): ${result1['cost_usd']:.4f}")
-        # Phase 2 disabled for MVP
         print(f"   - Phase 3 (References): ${result3['cost_usd']:.4f}")
         print(f"   - Phase 4 (Chunks): ${result4['cost_usd']:.4f}")
+        if 'cost_usd' in result5 and result5.get('status') == 'success':
+            print(f"   - Phase 5 (Refine): ${result5['cost_usd']:.4f}")
         print(f"⏱️  Generation Time: {generation_time:.1f} seconds ({generation_time/60:.1f} minutes)")
         print(f"📹 Video URL: {stitched_video_url}")
         print("="*70)
