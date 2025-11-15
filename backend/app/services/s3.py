@@ -1,4 +1,6 @@
 import boto3
+import tempfile
+import os
 from app.config import get_settings
 
 settings = get_settings()
@@ -25,5 +27,19 @@ class S3Client:
             Params={'Bucket': self.bucket, 'Key': key},
             ExpiresIn=expiration
         )
+    
+    def download_file(self, key: str, local_path: str = None) -> str:
+        """Download file from S3 to local path"""
+        if local_path is None:
+            # Create temp file
+            suffix = os.path.splitext(key)[1] or '.tmp'
+            local_path = tempfile.mktemp(suffix=suffix)
+        
+        self.client.download_file(self.bucket, key, local_path)
+        return local_path
+    
+    def download_temp(self, key: str) -> str:
+        """Download file from S3 to temporary file"""
+        return self.download_file(key)
 
 s3_client = S3Client()
