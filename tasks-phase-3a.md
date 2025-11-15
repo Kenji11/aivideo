@@ -37,10 +37,10 @@ class ReferenceAssetsOutput(BaseModel):
     total_cost: float
 ```
 
-- [ ] Import BaseModel from pydantic
-- [ ] Create StyleGuideSpec model (prompt, aesthetic, color_palette, mood, lighting)
-- [ ] Create ProductReferenceSpec model (product_name, product_category, prompt)
-- [ ] Create ReferenceAssetsOutput model with all URLs and cost
+- [x] Import BaseModel from pydantic
+- [x] Create StyleGuideSpec model (prompt, aesthetic, color_palette, mood, lighting)
+- [x] Create ProductReferenceSpec model (product_name, product_category, prompt)
+- [x] Create ReferenceAssetsOutput model with all URLs and cost
 
 ---
 
@@ -72,14 +72,14 @@ class AssetHandler:
         """Validate image format and dimensions"""
 ```
 
-- [ ] Import s3_client
-- [ ] Create AssetHandler class
-- [ ] Implement `process_uploaded_assets()` method
-- [ ] Add validation for image formats (JPEG, PNG)
-- [ ] Add validation for image dimensions (max 2048x2048)
-- [ ] Implement `download_asset()` method
-- [ ] Implement `validate_image()` method
-- [ ] Add error handling for invalid assets
+- [x] Import s3_client
+- [x] Create AssetHandler class
+- [x] Implement `process_uploaded_assets()` method
+- [x] Add validation for image formats (JPEG, PNG)
+- [x] Add validation for image dimensions (max 2048x2048)
+- [x] Implement `download_asset()` method
+- [x] Implement `validate_image()` method
+- [x] Add error handling for invalid assets
 
 ---
 
@@ -89,71 +89,71 @@ class AssetHandler:
 
 **File:** `backend/app/phases/phase3_references/service.py`
 
-- [ ] Import necessary dependencies (replicate_client, s3_client, schemas, asset_handler)
-- [ ] Create ReferenceAssetService class
-- [ ] Add `__init__` method to initialize services
-- [ ] Add `total_cost` attribute for cost tracking
+- [x] Import necessary dependencies (replicate_client, s3_client, schemas, asset_handler)
+- [x] Create ReferenceAssetService class
+- [x] Add `__init__` method to initialize services
+- [x] Add `total_cost` attribute for cost tracking
 
 ### Task 12.2: Implement generate_all_references Method
 
-- [ ] Create `generate_all_references(video_id, spec)` method signature
-- [ ] Add docstring explaining method purpose
-- [ ] Extract style information from spec
-- [ ] Call `_generate_style_guide(video_id, spec)`
-- [ ] Call `_generate_product_reference(video_id, spec)` if product exists
-- [ ] Process uploaded assets using AssetHandler
-- [ ] Upload all references to S3
-- [ ] Calculate total cost
-- [ ] Return reference URLs dictionary
+- [x] Create `generate_all_references(video_id, spec)` method signature
+- [x] Add docstring explaining method purpose
+- [x] Extract style information from spec
+- [x] Call `_generate_style_guide(video_id, spec)`
+- [x] Call `_generate_product_reference(video_id, spec)` if product exists
+- [x] Process uploaded assets using AssetHandler
+- [x] Upload all references to S3
+- [x] Calculate total cost
+- [x] Return reference URLs dictionary
 
 ### Task 12.3: Implement _generate_style_guide Method
 
-- [ ] Create `_generate_style_guide(video_id, spec)` private method
-- [ ] Build prompt from spec style information
-- [ ] Format prompt: "{aesthetic} style, {color_palette} colors, {mood} mood, {lighting} lighting"
-- [ ] Call Replicate SDXL model
-- [ ] Use model: "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b"
-- [ ] Set width=1024, height=1024
-- [ ] Set num_outputs=1
-- [ ] Download generated image
-- [ ] Upload to S3 at `references/{video_id}/style_guide.png`
-- [ ] Track cost (COST_SDXL_IMAGE)
-- [ ] Return S3 URL
+- [x] Create `_generate_style_guide(video_id, spec)` private method
+- [x] Build prompt from spec style information
+- [x] Format prompt: "{aesthetic} style, {color_palette} colors, {mood} mood, {lighting} lighting"
+- [x] Call Replicate SDXL model
+- [x] Use model: "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b"
+- [x] Set width=1024, height=1024
+- [x] Set num_outputs=1
+- [x] Download generated image
+- [x] Upload to S3 at `references/{video_id}/style_guide.png`
+- [x] Track cost (COST_SDXL_IMAGE)
+- [x] Return S3 URL
 
 ### Task 12.4: Implement _generate_product_reference Method
 
-- [ ] Create `_generate_product_reference(video_id, spec)` private method
-- [ ] Extract product information from spec
-- [ ] Build prompt: "Professional product photography of {product_name}, {category}, studio lighting, high quality"
-- [ ] Call Replicate SDXL model
-- [ ] Set width=1024, height=1024
-- [ ] Download generated image
-- [ ] Upload to S3 at `references/{video_id}/product_reference.png`
-- [ ] Track cost (COST_SDXL_IMAGE)
-- [ ] Return S3 URL (or None if no product)
+- [x] Create `_generate_product_reference(video_id, spec)` private method
+- [x] Extract product information from spec
+- [x] Build prompt: "Professional product photography of {product_name}, {category}, studio lighting, high quality"
+- [x] Call Replicate SDXL model
+- [x] Set width=1024, height=1024
+- [x] Download generated image
+- [x] Upload to S3 at `references/{video_id}/product_reference.png`
+- [x] Track cost (COST_SDXL_IMAGE)
+- [x] Return S3 URL (or None if no product)
 
 ### Task 12.5: Implement Uploaded Asset Processing
 
-- [ ] Check if spec has uploaded_assets
-- [ ] Use AssetHandler to process each asset
-- [ ] Validate image format and dimensions
-- [ ] Resize if needed (max 2048x2048)
-- [ ] Upload processed assets to S3
-- [ ] Store asset metadata (type, dimensions, S3 URL)
-- [ ] Return list of processed asset URLs
+- [x] Check if spec has uploaded_assets
+- [x] Use AssetHandler to process each asset
+- [x] Validate image format and dimensions
+- [x] Resize if needed (max 2048x2048)
+- [x] Upload processed assets to S3
+- [x] Store asset metadata (type, dimensions, S3 URL)
+- [x] Return list of processed asset URLs
 
 ---
 
 ## ✅ PR #10, #11, #12 Checklist
 
 Before merging:
-- [ ] All Phase 3 schemas defined
-- [ ] AssetHandler implemented and tested
-- [ ] ReferenceAssetService generates style guide
-- [ ] ReferenceAssetService generates product reference (if applicable)
-- [ ] Uploaded assets processed correctly
-- [ ] All images uploaded to S3
-- [ ] Cost tracking works
+- [x] All Phase 3 schemas defined
+- [x] AssetHandler implemented and tested
+- [x] ReferenceAssetService generates style guide
+- [x] ReferenceAssetService generates product reference (if applicable)
+- [x] Uploaded assets processed correctly
+- [x] All images uploaded to S3
+- [x] Cost tracking works
 
 **Test Commands:**
 ```python
