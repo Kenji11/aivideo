@@ -1,9 +1,10 @@
 # Phase 4: Parallel Chunk Generation Service
 import time
+import json
+from datetime import datetime
 from typing import List, Dict
 from celery import group
 from app.phases.phase4_chunks.chunk_generator import generate_single_chunk, build_chunk_specs
-from app.common.constants import COST_WAN_480P_VIDEO
 from app.common.exceptions import PhaseException
 
 
@@ -40,8 +41,36 @@ class ChunkGenerationService:
             PhaseException: If chunk generation fails
         """
         try:
+            # ============ INPUT LOGGING ============
+            start_time = time.time()
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Log summary
+            num_beats = len(spec.get('beats', []))
+            num_animatic_urls = len(animatic_urls) if animatic_urls else 0
+            has_style_guide = bool(reference_urls and reference_urls.get('style_guide_url'))
+            has_product_ref = bool(reference_urls and reference_urls.get('product_reference_url'))
+            
+            print("="*70)
+            print(f"📋 [{timestamp}] Phase 4 Input Summary")
+            print("="*70)
+            print(f"   Video ID: {video_id}")
+            print(f"   Duration: {spec.get('duration', 0)}s")
+            print(f"   Beats: {num_beats}")
+            print(f"   Animatic URLs: {num_animatic_urls}")
+            print(f"   Style Guide: {'✅' if has_style_guide else '❌'}")
+            print(f"   Product Reference: {'✅' if has_product_ref else '❌'}")
+            print("="*70)
+            
+            # Log full details
+            print(f"📄 [{timestamp}] Full Input Details")
+            print(f"   Spec: {json.dumps(spec, indent=2, default=str)}")
+            print(f"   Animatic URLs: {json.dumps(animatic_urls, indent=2) if animatic_urls else '[]'}")
+            print(f"   Reference URLs: {json.dumps(reference_urls, indent=2) if reference_urls else '{}'}")
+            print("="*70)
+            
             # Build chunk specifications
-            print(f"Building chunk specifications for {video_id}...")
+            print(f"🔨 Building chunk specifications for {video_id}...")
             chunk_specs = build_chunk_specs(video_id, spec, animatic_urls, reference_urls)
             num_chunks = len(chunk_specs)
             
@@ -80,10 +109,8 @@ class ChunkGenerationService:
                     if isinstance(chunk_result, dict) and 'chunk_url' in chunk_result:
                         chunk_urls.append(chunk_result['chunk_url'])
                         last_frame_urls.append(chunk_result.get('last_frame_url'))
-                        # Calculate cost: wan-2.1-480p is $0.09 per second of video
-                        chunk_duration = chunk_spec.duration if hasattr(chunk_spec, 'duration') else 2.0
-                        chunk_cost = chunk_duration * COST_WAN_480P_VIDEO
-                        self.total_cost += chunk_result.get('cost', chunk_cost)
+                        # Use cost from result (calculated using model config in chunk_generator)
+                        self.total_cost += chunk_result.get('cost', 0.0)
                         print(f"   ✅ Chunk {i+1}/{num_chunks} generated successfully ({len(chunk_urls)}/{num_chunks} complete)")
                     else:
                         failed_chunks.append((i, chunk_spec))
@@ -102,15 +129,26 @@ class ChunkGenerationService:
                     if isinstance(retry_result, dict) and 'chunk_url' in retry_result:
                         chunk_urls.insert(i, retry_result['chunk_url'])
                         last_frame_urls.insert(i, retry_result.get('last_frame_url'))
-                        # Calculate cost for retry
-                        retry_chunk_duration = failed_chunk_spec.duration if hasattr(failed_chunk_spec, 'duration') else 2.0
-                        retry_chunk_cost = retry_chunk_duration * COST_WAN_480P_VIDEO
-                        self.total_cost += retry_result.get('cost', retry_chunk_cost)
+                        # Use cost from result (calculated using model config in chunk_generator)
+                        self.total_cost += retry_result.get('cost', 0.0)
                     else:
                         raise PhaseException(f"Chunk {i} failed after retry: {retry_result}")
             
             # Ensure chunks are in correct order (they are already in order from sequential execution)
-            print(f"✅ Generated {len(chunk_urls)} chunks successfully. Total cost: ${self.total_cost:.4f}")
+            total_time = time.time() - start_time
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # ============ SUCCESS LOGGING ============
+            print("="*70)
+            print(f"✅ [{timestamp}] Phase 4 Complete")
+            print("="*70)
+            print(f"   Total Chunks Generated: {len(chunk_urls)}/{num_chunks}")
+            print(f"   Total Cost: ${self.total_cost:.4f}")
+            print(f"   Total Time: {total_time:.1f}s ({total_time/60:.1f} minutes)")
+            print(f"   Chunk URLs:")
+            for i, url in enumerate(chunk_urls):
+                print(f"      [{i+1}] {url[:80]}...")
+            print("="*70)
             
             return {
                 'chunk_urls': chunk_urls,

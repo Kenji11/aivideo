@@ -3,6 +3,8 @@ import os
 import tempfile
 import subprocess
 import requests
+import time
+from datetime import datetime
 from typing import Optional, List, Dict
 from PIL import Image
 
@@ -10,7 +12,8 @@ from app.orchestrator.celery_app import celery_app
 from app.services.replicate import replicate_client
 from app.services.s3 import s3_client
 from app.phases.phase4_chunks.schemas import ChunkSpec
-from app.common.constants import COST_WAN_480P_VIDEO, S3_CHUNKS_PREFIX
+from app.phases.phase4_chunks.model_config import get_default_model
+from app.common.constants import S3_CHUNKS_PREFIX
 from app.common.exceptions import PhaseException
 
 
@@ -190,13 +193,18 @@ def build_chunk_specs(
     
     chunk_count = int((duration + chunk_overlap) / (chunk_duration - chunk_overlap))
     
-    # Ensure we have enough animatic frames
-    if len(animatic_urls) < len(beats):
-        raise PhaseException(f"Not enough animatic frames: {len(animatic_urls)} < {len(beats)}")
+    # Check if we have animatic URLs - if not, use text-to-video fallback
+    use_text_to_video = len(animatic_urls) == 0
+    
+    # Only validate animatic frames if we're using image-to-video mode
+    if not use_text_to_video:
+        # Ensure we have enough animatic frames (only check if animatic_urls is provided)
+        if len(animatic_urls) < len(beats):
+            raise PhaseException(f"Not enough animatic frames: {len(animatic_urls)} < {len(beats)}")
     
     chunk_specs = []
-    style_guide_url = reference_urls.get('style_guide_url')
-    product_reference_url = reference_urls.get('product_reference_url')
+    style_guide_url = reference_urls.get('style_guide_url') if reference_urls else None
+    product_reference_url = reference_urls.get('product_reference_url') if reference_urls else None
     
     for chunk_num in range(chunk_count):
         # Calculate chunk timing
@@ -219,8 +227,10 @@ def build_chunk_specs(
         
         beat = beats[beat_index]
         
-        # Get animatic frame for this chunk (map to beat)
-        animatic_frame_url = animatic_urls[beat_index] if beat_index < len(animatic_urls) else animatic_urls[-1]
+        # Get animatic frame for this chunk (map to beat) - only if available
+        animatic_frame_url = None
+        if not use_text_to_video and animatic_urls:
+            animatic_frame_url = animatic_urls[beat_index] if beat_index < len(animatic_urls) else animatic_urls[-1]
         
         # Build prompt from beat (keep concise, ~50-100 words)
         prompt_template = beat.get('prompt_template', '')
@@ -242,12 +252,13 @@ def build_chunk_specs(
             start_time=start_time,
             duration=duration_actual,
             beat=beat,
-            animatic_frame_url=animatic_frame_url,
+            animatic_frame_url=animatic_frame_url,  # None if using text-to-video
             style_guide_url=style_guide_url if chunk_num == 0 else None,
             product_reference_url=product_reference_url,
             previous_chunk_last_frame=None,  # Will be set after previous chunk generates
             prompt=prompt,
-            fps=spec.get('fps', 24)
+            fps=spec.get('fps', 24),
+            use_text_to_video=use_text_to_video  # Set based on whether animatic_urls is empty
         )
         
         chunk_specs.append(chunk_spec)
@@ -270,104 +281,152 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
     chunk_spec_obj = ChunkSpec(**chunk_spec)
     video_id = chunk_spec_obj.video_id
     chunk_num = chunk_spec_obj.chunk_num
+    use_text_to_video = chunk_spec_obj.use_text_to_video
+    
+    # ============ INPUT LOGGING ============
+    chunk_start_time = time.time()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Get model configuration (default model)
+    model_config = get_default_model()
+    model_name = model_config['replicate_model']
+    model_params = model_config['params']
+    cost_per_second = model_config['cost_per_generation']
+    
+    # Build prompt (already formatted in build_chunk_specs from beat prompt_template)
+    prompt = chunk_spec_obj.prompt
+    prompt_preview = prompt[:100] + "..." if len(prompt) > 100 else prompt
+    
+    print(f"🎬 [{timestamp}] Chunk {chunk_num} Input")
+    print(f"   Start Time: {chunk_spec_obj.start_time:.2f}s")
+    print(f"   Duration: {chunk_spec_obj.duration:.2f}s")
+    print(f"   Prompt: {prompt_preview}")
+    print(f"   Text-to-Video Mode: {'✅' if use_text_to_video else '❌'}")
+    print(f"   Model: {model_config['name']} ({model_name})")
     
     temp_files = []  # Track temp files for cleanup
     
     try:
-        # Download animatic frame from S3
-        animatic_key = chunk_spec_obj.animatic_frame_url.replace(f's3://{s3_client.bucket}/', '')
-        animatic_path = s3_client.download_temp(animatic_key)
-        temp_files.append(animatic_path)
         
-        # Download style guide if chunk 0
-        style_guide_path = None
-        if chunk_num == 0 and chunk_spec_obj.style_guide_url:
-            style_guide_key = chunk_spec_obj.style_guide_url.replace(f's3://{s3_client.bucket}/', '')
-            style_guide_path = s3_client.download_temp(style_guide_key)
-            temp_files.append(style_guide_path)
+        # Calculate frames based on chunk duration and fps from chunk spec
+        fps = chunk_spec_obj.fps
+        chunk_duration = chunk_spec_obj.duration
+        # Use model's max frames limit
+        max_frames = model_params.get('num_frames', 80)
+        num_frames = min(int(chunk_duration * fps), max_frames)
         
-        # Download previous chunk's last frame if chunk > 0
-        previous_frame_path = None
-        if chunk_num > 0 and chunk_spec_obj.previous_chunk_last_frame:
-            prev_frame_key = chunk_spec_obj.previous_chunk_last_frame.replace(f's3://{s3_client.bucket}/', '')
-            previous_frame_path = s3_client.download_temp(prev_frame_key)
-            temp_files.append(previous_frame_path)
+        output = None
+        last_error = None
+        image_to_video_failed = False
         
-        # Create composite image
-        composite_path = create_reference_composite(
-            animatic_path=animatic_path,
-            style_guide_path=style_guide_path,
-            previous_frame_path=previous_frame_path,
-            animatic_weight=0.7 if chunk_num == 0 else 0.3,
-            style_weight=0.3 if chunk_num == 0 else 0.0,
-            temporal_weight=0.7 if chunk_num > 0 else 0.0
-        )
-        temp_files.append(composite_path)
+        # Try image-to-video first if images are available, otherwise use text-to-video
+        if not use_text_to_video and chunk_spec_obj.animatic_frame_url:
+            # ============ IMAGE-TO-VIDEO MODE (Existing Code) ============
+            try:
+                print(f"Generating chunk {chunk_num} with image-to-video...")
+                
+                # Download animatic frame from S3
+                animatic_key = chunk_spec_obj.animatic_frame_url.replace(f's3://{s3_client.bucket}/', '')
+                animatic_path = s3_client.download_temp(animatic_key)
+                temp_files.append(animatic_path)
+                
+                # Download style guide if chunk 0
+                style_guide_path = None
+                if chunk_num == 0 and chunk_spec_obj.style_guide_url:
+                    style_guide_key = chunk_spec_obj.style_guide_url.replace(f's3://{s3_client.bucket}/', '')
+                    style_guide_path = s3_client.download_temp(style_guide_key)
+                    temp_files.append(style_guide_path)
+                
+                # Download previous chunk's last frame if chunk > 0
+                previous_frame_path = None
+                if chunk_num > 0 and chunk_spec_obj.previous_chunk_last_frame:
+                    prev_frame_key = chunk_spec_obj.previous_chunk_last_frame.replace(f's3://{s3_client.bucket}/', '')
+                    previous_frame_path = s3_client.download_temp(prev_frame_key)
+                    temp_files.append(previous_frame_path)
+                
+                # Create composite image
+                composite_path = create_reference_composite(
+                    animatic_path=animatic_path,
+                    style_guide_path=style_guide_path,
+                    previous_frame_path=previous_frame_path,
+                    animatic_weight=0.7 if chunk_num == 0 else 0.3,
+                    style_weight=0.3 if chunk_num == 0 else 0.0,
+                    temporal_weight=0.7 if chunk_num > 0 else 0.0
+                )
+                temp_files.append(composite_path)
+                
+                # Image-to-video using model config
+                # Replicate accepts file paths or file objects
+                # Open file in binary mode for Replicate
+                with open(composite_path, 'rb') as img_file:
+                    try:
+                        print(f"   Trying model: {model_name} (image-to-video)...")
+                        
+                        # Use model config parameters
+                        # Timeout: 5 minutes per chunk (should be enough for video generation)
+                        output = replicate_client.run(
+                            model_name,
+                            input={
+                                "image": img_file,
+                                "prompt": prompt,
+                                "num_frames": num_frames,
+                                "fps": fps,
+                            },
+                            timeout=300  # 5 minutes timeout
+                        )
+                        
+                        print(f"   ✅ Success with {model_name}")
+                    except Exception as e:
+                        last_error = e
+                        error_msg = str(e).lower()
+                        error_type = type(e).__name__
+                        # Image-to-video failed, fallback to text-to-video
+                        print(f"   ⚠️  Image-to-video failed ({error_type}): {str(e)[:80]}...), falling back to text-to-video...")
+                        image_to_video_failed = True
+                
+                if output is None and not image_to_video_failed:
+                    image_to_video_failed = True
+                    print(f"   ⚠️  Image-to-video failed, falling back to text-to-video...")
+                    
+            except Exception as e:
+                # Image-to-video processing failed, fallback to text-to-video
+                image_to_video_failed = True
+                last_error = e
+                print(f"   ⚠️  Image-to-video processing failed: {str(e)[:80]}..., falling back to text-to-video...")
         
-        # Build prompt (already formatted in build_chunk_specs)
-        prompt = chunk_spec_obj.prompt
-        
-        # Call Replicate Zeroscope model
-        print(f"Generating chunk {chunk_num} with Zeroscope...")
-        
-        # Replicate accepts file paths or file objects
-        # Open file in binary mode for Replicate
-        with open(composite_path, 'rb') as img_file:
-              # Calculate frames based on chunk duration and fps from chunk spec
-              fps = chunk_spec_obj.fps
-              chunk_duration = chunk_spec_obj.duration
-              num_frames = int(chunk_duration * fps)
-              
-              # Image-to-video models for ad generation
-              # PRD recommends: Zeroscope (dev) or AnimateDiff (final)
-              # Try models in order of preference (cost, quality, availability)
-              # Note: stability-ai/stable-video-diffusion returns 404, using wan-2.1 as primary
-              model_variants = [
-                  "wavespeedai/wan-2.1-i2v-480p",  # Primary: Wan 2.1 (verified working, open source)
-              ]
-              
-              output = None
-              last_error = None
-              
-              for model_name in model_variants:
-                  try:
-                      print(f"   Trying model: {model_name}...")
-                      
-                      # Wan 2.1 Image-to-Video parameters (only working model)
-                      # Timeout: 5 minutes per chunk (should be enough for video generation)
-                      output = replicate_client.run(
-                          model_name,
-                          input={
-                              "image": img_file,
-                              "prompt": prompt,
-                              "num_frames": min(num_frames, 80),  # Wan supports up to 80 frames
-                              "fps": fps,
-                          },
-                          timeout=300  # 5 minutes timeout
-                      )
-                      
-                      print(f"   ✅ Success with {model_name}")
-                      break
-                  except Exception as e:
-                      last_error = e
-                      error_msg = str(e).lower()
-                      error_type = type(e).__name__
-                      # Check for 404, not found, or any HTTP/API error - catch all and try next
-                      if any(keyword in error_msg for keyword in ["404", "not found", "422", "requested resource", "does not exist", "permission"]):
-                          print(f"   ⚠️  {model_name} failed ({error_type}: {str(e)[:80]}...), trying next model...")
-                          continue
-                      # For any other error on first model, try next; on last model, raise
-                      elif model_name == model_variants[-1]:
-                          # Last model failed, raise the error
-                          print(f"   ❌ All models failed. Last error ({error_type}): {str(e)}")
-                          raise
-                      else:
-                          # Not last model, try next
-                          print(f"   ⚠️  {model_name} error ({error_type}): {str(e)[:80]}..., trying next...")
-                          continue
-              
-              if output is None:
-                  raise PhaseException(f"All video generation models failed. Last error: {str(last_error)}")
+        # ============ TEXT-TO-VIDEO MODE (Fallback or Primary) ============
+        if use_text_to_video or image_to_video_failed:
+            print(f"Generating chunk {chunk_num} with text-to-video (no image input)...")
+            
+            # Check if model supports text-to-video
+            if not model_config.get('supports_text_to_video', False):
+                raise PhaseException(f"Model {model_config['name']} does not support text-to-video generation")
+            
+            try:
+                print(f"   Trying text-to-video model: {model_name}...")
+                
+                # Text-to-video: prompt only, no image input
+                # Use model config parameters
+                output = replicate_client.run(
+                    model_name,
+                    input={
+                        "prompt": prompt,
+                        "num_frames": num_frames,
+                        "fps": fps,
+                        # No "image" parameter for text-to-video
+                    },
+                    timeout=300  # 5 minutes timeout
+                )
+                
+                print(f"   ✅ Success with text-to-video ({model_name})")
+            except Exception as e:
+                last_error = e
+                error_type = type(e).__name__
+                print(f"   ❌ Text-to-video failed ({error_type}): {str(e)}")
+                raise PhaseException(f"Text-to-video generation failed: {str(e)}")
+            
+            if output is None:
+                raise PhaseException(f"Text-to-video generation failed. Last error: {str(last_error)}")
         
         # Download generated video
         # Replicate returns either a string URL or a list/iterator
@@ -408,9 +467,18 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
                 except Exception:
                     pass  # Ignore cleanup errors
         
-        # Calculate actual cost: wan-2.1-480p is $0.09 per second of video
+        # Calculate actual cost using model config
         chunk_duration = chunk_spec_obj.duration
-        chunk_cost = chunk_duration * COST_WAN_480P_VIDEO
+        chunk_cost = chunk_duration * cost_per_second
+        generation_time = time.time() - chunk_start_time
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # ============ SUCCESS LOGGING ============
+        print(f"✅ [{timestamp}] Chunk {chunk_num} Complete")
+        print(f"   Chunk URL: {chunk_s3_url[:80]}...")
+        print(f"   Last Frame URL: {last_frame_s3_url[:80] if last_frame_s3_url else 'N/A'}...")
+        print(f"   Cost: ${chunk_cost:.4f}")
+        print(f"   Generation Time: {generation_time:.1f}s")
         
         return {
             'chunk_url': chunk_s3_url,

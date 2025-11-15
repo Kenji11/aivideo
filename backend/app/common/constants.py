@@ -9,10 +9,17 @@ COST_SDXL_IMAGE = 0.0055  # Legacy, not used anymore
 COST_FLUX_SCHNELL_IMAGE = 0.003  # Phase 2: Animatic frames (cheapest)
 COST_FLUX_DEV_IMAGE = 0.025  # Phase 3: Reference assets (better quality)
 COST_FLUX_PRO_IMAGE = 0.04  # Phase 3: Reference assets (best quality, for final)
-COST_ZEROSCOPE_VIDEO = 0.10  # Legacy, not used
-COST_WAN_480P_VIDEO = 0.09  # Phase 4: Video chunks per second (current)
+# Phase 4: Video generation model costs (per second of video)
+COST_WAN = 0.09  # Wan 2.1 (480p) - Default model
+COST_ZEROSCOPE = 0.10  # Zeroscope v2 XL
+COST_ANIMATEDIFF = 0.20  # AnimateDiff
+COST_RUNWAY = 0.25  # Runway Gen-2 (estimated)
+
+# Legacy constants (kept for backwards compatibility)
+COST_ZEROSCOPE_VIDEO = COST_ZEROSCOPE
+COST_WAN_480P_VIDEO = COST_WAN  # Phase 4: Video chunks per second (current)
 COST_WAN_720P_VIDEO = 0.25  # Phase 4: Video chunks per second (higher quality)
-COST_ANIMATEDIFF_VIDEO = 0.20
+COST_ANIMATEDIFF_VIDEO = COST_ANIMATEDIFF
 COST_MUSICGEN = 0.15
 
 # S3 paths
