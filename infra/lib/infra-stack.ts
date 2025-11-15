@@ -271,79 +271,84 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       assignPublicIp: true,
       enableExecuteCommand: true,
     });
-    
+
     // Ensure Redis is ready before starting API
     apiService.node.addDependency(redisService);
 
-    // // Worker Service
-    // const workerTaskDefinition = new ecs.FargateTaskDefinition(this, 'WorkerTaskDefinition', {
-    //   memoryLimitMiB: 512,
-    //   cpu: 256,
-    //   executionRole: taskExecutionRole,
-    // });
+    // Worker Service
+    const workerTaskDefinition = new ecs.FargateTaskDefinition(this, 'WorkerTaskDefinition', {
+      memoryLimitMiB: 512,
+      cpu: 256,
+      executionRole: taskExecutionRole,
+    });
 
-    // const workerContainer = workerTaskDefinition.addContainer('WorkerContainer', {
-    //   image: ecs.ContainerImage.fromRegistry(imageUri),
-    //   memoryLimitMiB: 512,
-    //   logging: ecs.LogDrivers.awsLogs({
-    //     streamPrefix: 'worker',
-    //     logGroup,
-    //   }),
-    //   command: [
-    //     'celery',
-    //     '-A',
-    //     'app.orchestrator.celery_app',
-    //     'worker',
-    //     '--loglevel=info',
-    //     '--concurrency=4',
-    //   ],
-    //   environment: {
-    //     REDIS_URL: 'redis://redis.aivideo.local:6379/0',
-    //     S3_BUCKET: videoBucket.bucketName,
-    //     AWS_REGION: this.region,
-    //     AURORA_ENDPOINT: auroraCluster.clusterEndpoint.hostname,
-    //     AURORA_PORT: auroraCluster.clusterEndpoint.port.toString(),
-    //     AURORA_DB_NAME: 'videogen',
-    //   },
-    //   environment: {
-    //     ...existing environment vars...,
-    //     DATABASE_USERNAME: dbUsername,
-    //     DATABASE_PASSWORD: dbPassword,
-    //   },
-    //   healthCheck: {
-    //     command: ['CMD-SHELL', 'celery -A app.orchestrator.celery_app inspect ping || exit 1'],
-    //     interval: cdk.Duration.seconds(30),
-    //     timeout: cdk.Duration.seconds(10),
-    //     retries: 3,
-    //     startPeriod: cdk.Duration.seconds(120),
-    //   },
-    // });
+    const workerContainer = workerTaskDefinition.addContainer('WorkerContainer', {
+      image: ecs.ContainerImage.fromRegistry(imageUri),
+      memoryLimitMiB: 512,
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: 'worker',
+        logGroup,
+      }),
 
-    // const workerService = new ecs.FargateService(this, 'WorkerService', {
-    //   cluster,
-    //   taskDefinition: workerTaskDefinition,
-    //   desiredCount: 1,
-    //   securityGroups: [ecsSecurityGroup],
-    //   vpcSubnets: {
-    //     subnetType: ec2.SubnetType.PUBLIC,
-    //   },
-    //   assignPublicIp: true,
-    //   enableExecuteCommand: true,
-    // });
-    
-    // // Ensure Redis is ready before starting Worker
-    // workerService.node.addDependency(redisService);
+      command: [
+        'celery',
+        '-A',
+        'app.orchestrator.celery_app',
+        'worker',
+        '--loglevel=info',
+        '--concurrency=4',
+      ],
 
-    // // Export cluster name
-    // new cdk.CfnOutput(this, 'ClusterName', {
-    //   value: cluster.clusterName,
-    //   exportName: 'ClusterName',
-    // });
+      // MERGED environment block (only one allowed)
+      environment: {
+        REDIS_URL: 'redis://redis.aivideo.local:6379/0',
+        S3_BUCKET: videoBucket.bucketName,
+        AWS_REGION: this.region,
+        AURORA_ENDPOINT: auroraCluster.clusterEndpoint.hostname,
+        AURORA_PORT: auroraCluster.clusterEndpoint.port.toString(),
+        AURORA_DB_NAME: 'videogen',
 
-    // new cdk.CfnOutput(this, 'APIServiceName', {
-    //   value: apiService.serviceName,
-    //   exportName: 'APIServiceName',
-    // });
+        DATABASE_USERNAME: dbUsername,
+        DATABASE_PASSWORD: dbPassword,
+      },
+
+      healthCheck: {
+        command: [
+          'CMD-SHELL',
+          'celery -A app.orchestrator.celery_app inspect ping || exit 1'
+        ],
+        interval: cdk.Duration.seconds(30),
+        timeout: cdk.Duration.seconds(10),
+        retries: 3,
+        startPeriod: cdk.Duration.seconds(120),
+      },
+    });
+
+    const workerService = new ecs.FargateService(this, 'WorkerService', {
+      cluster,
+      taskDefinition: workerTaskDefinition,
+      desiredCount: 1,
+      securityGroups: [ecsSecurityGroup],
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PUBLIC,
+      },
+      assignPublicIp: true,
+      enableExecuteCommand: true,
+    });
+
+    // Ensure Redis is ready before starting Worker
+    workerService.node.addDependency(redisService);
+
+    // Outputs
+    new cdk.CfnOutput(this, 'ClusterName', {
+      value: cluster.clusterName,
+      exportName: 'ClusterName',
+    });
+
+    new cdk.CfnOutput(this, 'APIServiceName', {
+      value: apiService.serviceName,
+      exportName: 'APIServiceName',
+    });
 
     // // Stage 4: Application Load Balancer
     // // Security group for ALB
