@@ -4,7 +4,6 @@ from app.orchestrator.celery_app import celery_app
 from app.orchestrator.progress import update_progress, update_cost
 from app.phases.phase1_validate.task import validate_prompt
 from app.phases.phase2_animatic.task import generate_animatic
-from app.common.constants import PHASE1_TIMEOUT, PHASE2_TIMEOUT
 
 
 @celery_app.task
@@ -34,8 +33,8 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         # ============ PHASE 1: VALIDATE & EXTRACT ============
         update_progress(video_id, "validating", 10, current_phase="phase1_validate")
         
-        # Run Phase 1 task
-        result1 = validate_prompt.delay(video_id, prompt, assets).get(timeout=PHASE1_TIMEOUT)
+        # Run Phase 1 task directly (we're already in a Celery worker, so no need for .delay())
+        result1 = validate_prompt(video_id, prompt, assets)
         
         # Check Phase 1 success
         if result1['status'] != "success":
@@ -61,8 +60,8 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         # ============ PHASE 2: GENERATE ANIMATIC ============
         update_progress(video_id, "generating_animatic", 25, current_phase="phase2_animatic")
         
-        # Run Phase 2 task
-        result2 = generate_animatic.delay(video_id, spec).get(timeout=PHASE2_TIMEOUT)
+        # Run Phase 2 task directly (we're already in a Celery worker, so no need for .delay())
+        result2 = generate_animatic(video_id, spec)
         
         # Check Phase 2 success
         if result2['status'] != "success":

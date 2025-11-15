@@ -102,8 +102,9 @@ class AnimaticGenerationService:
         """
         try:
             # Generate image using SDXL
+            # Using specific version hash as :latest is not supported
             output = self.replicate.run(
-                "stability-ai/sdxl:latest",
+                "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
                 input={
                     "prompt": prompt,
                     "negative_prompt": negative_prompt,
