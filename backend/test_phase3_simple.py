@@ -20,7 +20,7 @@ if not replicate_token:
     print("   Or add to backend/.env file")
     sys.exit(1)
 
-# Set dummy AWS vars if not present (for config loading)
+# Set dummy vars if not present (for config loading)
 if not os.getenv("AWS_ACCESS_KEY_ID"):
     os.environ["AWS_ACCESS_KEY_ID"] = "dummy"
     os.environ["AWS_SECRET_ACCESS_KEY"] = "dummy"
@@ -29,7 +29,20 @@ if not os.getenv("AWS_ACCESS_KEY_ID"):
     print("⚠️  AWS credentials not found - using dummy values (S3 uploads will fail)")
     print("   This test only validates Replicate API calls\n")
 
-from app.services.replicate import replicate_client
+# Set dummy database/redis if not present (for config loading)
+if not os.getenv("DATABASE_URL"):
+    os.environ["DATABASE_URL"] = "postgresql://dummy:dummy@localhost/dummy"
+if not os.getenv("REDIS_URL"):
+    os.environ["REDIS_URL"] = "redis://localhost:6379/0"
+if not os.getenv("OPENAI_API_KEY"):
+    os.environ["OPENAI_API_KEY"] = "dummy"
+
+# Import directly to avoid initializing other services
+import replicate
+from app.config import get_settings
+
+settings = get_settings()
+replicate_client_obj = replicate.Client(api_token=settings.replicate_api_token)
 
 
 def test_sdxl_generation():
@@ -53,7 +66,7 @@ def test_sdxl_generation():
         print(f"Prompt: {style_prompt}")
         print("Calling Replicate SDXL...")
         
-        output = replicate_client.run(
+        output = replicate_client_obj.run(
             "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
             input={
                 "prompt": style_prompt,
@@ -88,7 +101,7 @@ def test_sdxl_generation():
         print(f"Prompt: {product_prompt}")
         print("Calling Replicate SDXL...")
         
-        output = replicate_client.run(
+        output = replicate_client_obj.run(
             "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
             input={
                 "prompt": product_prompt,
