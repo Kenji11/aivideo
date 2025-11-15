@@ -120,199 +120,199 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       exportName: 'AuroraClusterEndpoint',
     });
 
-    // // Stage 3: ECS Cluster & Services
-    // // Create ECS Fargate cluster
-    // const cluster = new ecs.Cluster(this, 'AIVideoCluster', {
-    //   vpc,
-    //   clusterName: 'aivideo-cluster',
-    // });
+    // Stage 3: ECS Cluster & Services
+    // Create ECS Fargate cluster
+    const cluster = new ecs.Cluster(this, 'AIVideoCluster', {
+      vpc,
+      clusterName: 'aivideo-cluster',
+    });
 
-    // // Create CloudWatch log group
-    // const logGroup = new logs.LogGroup(this, 'ECSLogGroup', {
-    //   logGroupName: '/ecs/aivideo',
-    //   retention: logs.RetentionDays.ONE_WEEK,
-    //   removalPolicy: cdk.RemovalPolicy.DESTROY,
-    // });
+    // Create CloudWatch log group
+    const logGroup = new logs.LogGroup(this, 'ECSLogGroup', {
+      logGroupName: '/ecs/aivideo',
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
 
-    // // Task execution role with required permissions
-    // const taskExecutionRole = new iam.Role(this, 'TaskExecutionRole', {
-    //   assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
-    //   managedPolicies: [
-    //     iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonECSTaskExecutionRolePolicy'),
-    //   ],
-    // });
+    // Task execution role with required permissions
+    const taskExecutionRole = new iam.Role(this, 'TaskExecutionRole', {
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonECSTaskExecutionRolePolicy'),
+      ],
+    });
 
-    // // Grant permissions for ECR, Secrets Manager, and S3
-    // taskExecutionRole.addToPolicy(
-    //   new iam.PolicyStatement({
-    //     effect: iam.Effect.ALLOW,
-    //     actions: [
-    //       'ecr:GetAuthorizationToken',
-    //       'ecr:BatchCheckLayerAvailability',
-    //       'ecr:GetDownloadUrlForLayer',
-    //       'ecr:BatchGetImage',
-    //     ],
-    //     resources: ['*'],
-    //   })
-    // );
+    // Grant permissions for ECR, Secrets Manager, and S3
+    taskExecutionRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'ecr:GetAuthorizationToken',
+          'ecr:BatchCheckLayerAvailability',
+          'ecr:GetDownloadUrlForLayer',
+          'ecr:BatchGetImage',
+        ],
+        resources: ['*'],
+      })
+    );
 
-    // dbSecret.grantRead(taskExecutionRole);
-    // videoBucket.grantReadWrite(taskExecutionRole);
+    dbSecret.grantRead(taskExecutionRole);
+    videoBucket.grantReadWrite(taskExecutionRole);
 
-    // // Security group for Redis
-    // const redisSecurityGroup = new ec2.SecurityGroup(this, 'RedisSecurityGroup', {
-    //   vpc,
-    //   description: 'Security group for Redis',
-    //   allowAllOutbound: true,
-    // });
+    // Security group for Redis
+    const redisSecurityGroup = new ec2.SecurityGroup(this, 'RedisSecurityGroup', {
+      vpc,
+      description: 'Security group for Redis',
+      allowAllOutbound: true,
+    });
 
-    // // Allow ECS to connect to Redis on port 6379
-    // redisSecurityGroup.addIngressRule(
-    //   ecsSecurityGroup,
-    //   ec2.Port.tcp(6379),
-    //   'Allow Redis access from ECS'
-    // );
+    // Allow ECS to connect to Redis on port 6379
+    redisSecurityGroup.addIngressRule(
+      ecsSecurityGroup,
+      ec2.Port.tcp(6379),
+      'Allow Redis access from ECS'
+    );
 
-    // // Service discovery namespace
-    // const namespace = cluster.addDefaultCloudMapNamespace({
-    //   name: 'aivideo.local',
-    // });
+    // Service discovery namespace
+    const namespace = cluster.addDefaultCloudMapNamespace({
+      name: 'aivideo.local',
+    });
 
-    // // Redis Service
-    // const redisTaskDefinition = new ecs.FargateTaskDefinition(this, 'RedisTaskDefinition', {
-    //   memoryLimitMiB: 512,
-    //   cpu: 256,
-    //   executionRole: taskExecutionRole,
-    // });
+    // Redis Service
+    const redisTaskDefinition = new ecs.FargateTaskDefinition(this, 'RedisTaskDefinition', {
+      memoryLimitMiB: 512,
+      cpu: 256,
+      executionRole: taskExecutionRole,
+    });
 
-    // redisTaskDefinition.addContainer('RedisContainer', {
-    //   image: ecs.ContainerImage.fromRegistry('redis:7-alpine'),
-    //   memoryLimitMiB: 512,
-    //   logging: ecs.LogDrivers.awsLogs({
-    //     streamPrefix: 'redis',
-    //     logGroup,
-    //   }),
-    //   portMappings: [
-    //     {
-    //       containerPort: 6379,
-    //       protocol: ecs.Protocol.TCP,
-    //     },
-    //   ],
-    // });
+    redisTaskDefinition.addContainer('RedisContainer', {
+      image: ecs.ContainerImage.fromRegistry('redis:7-alpine'),
+      memoryLimitMiB: 512,
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: 'redis',
+        logGroup,
+      }),
+      portMappings: [
+        {
+          containerPort: 6379,
+          protocol: ecs.Protocol.TCP,
+        },
+      ],
+    });
 
-    // const redisService = new ecs.FargateService(this, 'RedisService', {
-    //   cluster,
-    //   taskDefinition: redisTaskDefinition,
-    //   desiredCount: 1,
-    //   securityGroups: [redisSecurityGroup],
-    //   cloudMapOptions: {
-    //     name: 'redis',
-    //     cloudMapNamespace: namespace,
-    //   },
-    // });
+    const redisService = new ecs.FargateService(this, 'RedisService', {
+      cluster,
+      taskDefinition: redisTaskDefinition,
+      desiredCount: 1,
+      securityGroups: [redisSecurityGroup],
+      cloudMapOptions: {
+        name: 'redis',
+        cloudMapNamespace: namespace,
+      },
+    });
 
-    // // API Service
-    // // Get image URI from environment variable (set by GitHub Actions)
-    // const imageUri = process.env.IMAGE_URI || `971422717446.dkr.ecr.us-east-1.amazonaws.com/aivideo/backend:latest`;
+    // API Service
+    // Get image URI from environment variable (set by GitHub Actions)
+    const imageUri = process.env.IMAGE_URI || `971422717446.dkr.ecr.us-east-1.amazonaws.com/aivideo/backend:latest`;
 
-    // const apiTaskDefinition = new ecs.FargateTaskDefinition(this, 'APITaskDefinition', {
-    //   memoryLimitMiB: 512,
-    //   cpu: 256,
-    //   executionRole: taskExecutionRole,
-    // });
+    const apiTaskDefinition = new ecs.FargateTaskDefinition(this, 'APITaskDefinition', {
+      memoryLimitMiB: 512,
+      cpu: 256,
+      executionRole: taskExecutionRole,
+    });
 
-    // const apiContainer = apiTaskDefinition.addContainer('APIContainer', {
-    //   image: ecs.ContainerImage.fromRegistry(imageUri),
-    //   memoryLimitMiB: 512,
-    //   logging: ecs.LogDrivers.awsLogs({
-    //     streamPrefix: 'api',
-    //     logGroup,
-    //   }),
-    //   environment: {
-    //     REDIS_URL: 'redis://redis.aivideo.local:6379/0',
-    //     S3_BUCKET: videoBucket.bucketName,
-    //     AWS_REGION: this.region,
-    //     AURORA_ENDPOINT: auroraCluster.clusterEndpoint.hostname,
-    //     AURORA_PORT: auroraCluster.clusterEndpoint.port.toString(),
-    //     AURORA_DB_NAME: 'videogen',
-    //   },
-    //   secrets: {
-    //     DATABASE_SECRET: ecs.Secret.fromSecretsManager(dbSecret),
-    //   },
-    //   portMappings: [
-    //     {
-    //       containerPort: 8000,
-    //       protocol: ecs.Protocol.TCP,
-    //     },
-    //   ],
-    //   healthCheck: {
-    //     command: ['CMD-SHELL', 'curl -f http://localhost:8000/health || exit 1'],
-    //     interval: cdk.Duration.seconds(30),
-    //     timeout: cdk.Duration.seconds(5),
-    //     retries: 3,
-    //     startPeriod: cdk.Duration.seconds(60),
-    //   },
-    // });
+    const apiContainer = apiTaskDefinition.addContainer('APIContainer', {
+      image: ecs.ContainerImage.fromRegistry(imageUri),
+      memoryLimitMiB: 512,
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: 'api',
+        logGroup,
+      }),
+      environment: {
+        REDIS_URL: 'redis://redis.aivideo.local:6379/0',
+        S3_BUCKET: videoBucket.bucketName,
+        AWS_REGION: this.region,
+        AURORA_ENDPOINT: auroraCluster.clusterEndpoint.hostname,
+        AURORA_PORT: auroraCluster.clusterEndpoint.port.toString(),
+        AURORA_DB_NAME: 'videogen',
+      },
+      secrets: {
+        DATABASE_SECRET: ecs.Secret.fromSecretsManager(dbSecret),
+      },
+      portMappings: [
+        {
+          containerPort: 8000,
+          protocol: ecs.Protocol.TCP,
+        },
+      ],
+      healthCheck: {
+        command: ['CMD-SHELL', 'curl -f http://localhost:8000/health || exit 1'],
+        interval: cdk.Duration.seconds(30),
+        timeout: cdk.Duration.seconds(5),
+        retries: 3,
+        startPeriod: cdk.Duration.seconds(60),
+      },
+    });
 
-    // const apiService = new ecs.FargateService(this, 'APIService', {
-    //   cluster,
-    //   taskDefinition: apiTaskDefinition,
-    //   desiredCount: 1,
-    //   securityGroups: [ecsSecurityGroup],
-    // });
+    const apiService = new ecs.FargateService(this, 'APIService', {
+      cluster,
+      taskDefinition: apiTaskDefinition,
+      desiredCount: 1,
+      securityGroups: [ecsSecurityGroup],
+    });
 
-    // // Worker Service
-    // const workerTaskDefinition = new ecs.FargateTaskDefinition(this, 'WorkerTaskDefinition', {
-    //   memoryLimitMiB: 512,
-    //   cpu: 256,
-    //   executionRole: taskExecutionRole,
-    // });
+    // Worker Service
+    const workerTaskDefinition = new ecs.FargateTaskDefinition(this, 'WorkerTaskDefinition', {
+      memoryLimitMiB: 512,
+      cpu: 256,
+      executionRole: taskExecutionRole,
+    });
 
-    // const workerContainer = workerTaskDefinition.addContainer('WorkerContainer', {
-    //   image: ecs.ContainerImage.fromRegistry(imageUri),
-    //   memoryLimitMiB: 512,
-    //   logging: ecs.LogDrivers.awsLogs({
-    //     streamPrefix: 'worker',
-    //     logGroup,
-    //   }),
-    //   command: [
-    //     'celery',
-    //     '-A',
-    //     'app.orchestrator.celery_app',
-    //     'worker',
-    //     '--loglevel=info',
-    //     '--concurrency=4',
-    //   ],
-    //   environment: {
-    //     REDIS_URL: 'redis://redis.aivideo.local:6379/0',
-    //     S3_BUCKET: videoBucket.bucketName,
-    //     AWS_REGION: this.region,
-    //     AURORA_ENDPOINT: auroraCluster.clusterEndpoint.hostname,
-    //     AURORA_PORT: auroraCluster.clusterEndpoint.port.toString(),
-    //     AURORA_DB_NAME: 'videogen',
-    //   },
-    //   secrets: {
-    //     DATABASE_SECRET: ecs.Secret.fromSecretsManager(dbSecret),
-    //   },
-    // });
+    const workerContainer = workerTaskDefinition.addContainer('WorkerContainer', {
+      image: ecs.ContainerImage.fromRegistry(imageUri),
+      memoryLimitMiB: 512,
+      logging: ecs.LogDrivers.awsLogs({
+        streamPrefix: 'worker',
+        logGroup,
+      }),
+      command: [
+        'celery',
+        '-A',
+        'app.orchestrator.celery_app',
+        'worker',
+        '--loglevel=info',
+        '--concurrency=4',
+      ],
+      environment: {
+        REDIS_URL: 'redis://redis.aivideo.local:6379/0',
+        S3_BUCKET: videoBucket.bucketName,
+        AWS_REGION: this.region,
+        AURORA_ENDPOINT: auroraCluster.clusterEndpoint.hostname,
+        AURORA_PORT: auroraCluster.clusterEndpoint.port.toString(),
+        AURORA_DB_NAME: 'videogen',
+      },
+      secrets: {
+        DATABASE_SECRET: ecs.Secret.fromSecretsManager(dbSecret),
+      },
+    });
 
-    // const workerService = new ecs.FargateService(this, 'WorkerService', {
-    //   cluster,
-    //   taskDefinition: workerTaskDefinition,
-    //   desiredCount: 1,
-    //   securityGroups: [ecsSecurityGroup],
-    // });
+    const workerService = new ecs.FargateService(this, 'WorkerService', {
+      cluster,
+      taskDefinition: workerTaskDefinition,
+      desiredCount: 1,
+      securityGroups: [ecsSecurityGroup],
+    });
 
-    // // Export cluster name
-    // new cdk.CfnOutput(this, 'ClusterName', {
-    //   value: cluster.clusterName,
-    //   exportName: 'ClusterName',
-    // });
+    // Export cluster name
+    new cdk.CfnOutput(this, 'ClusterName', {
+      value: cluster.clusterName,
+      exportName: 'ClusterName',
+    });
 
-    // new cdk.CfnOutput(this, 'APIServiceName', {
-    //   value: apiService.serviceName,
-    //   exportName: 'APIServiceName',
-    // });
+    new cdk.CfnOutput(this, 'APIServiceName', {
+      value: apiService.serviceName,
+      exportName: 'APIServiceName',
+    });
 
     // // Stage 4: Application Load Balancer
     // // Security group for ALB
