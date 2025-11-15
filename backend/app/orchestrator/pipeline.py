@@ -1,15 +1,18 @@
+# Main orchestration task
 import time
 from app.orchestrator.celery_app import celery_app
 from app.phases.phase1_validate.task import validate_prompt
 from app.phases.phase3_references.task import generate_references
 from app.orchestrator.progress import update_progress, update_cost
+from app.phases.phase1_validate.task import validate_prompt
+from app.phases.phase2_animatic.task import generate_animatic
 
 
 @celery_app.task
 def run_pipeline(video_id: str, prompt: str, assets: list = None):
     """
     Main orchestration task - chains all 6 phases sequentially.
-    Currently implements Phase 1 only.
+    Currently implements Phase 1 (Validate) -> Phase 2 (Animatic).
     
     Args:
         video_id: Unique video generation ID
@@ -32,8 +35,8 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         # ============ PHASE 1: VALIDATE & EXTRACT ============
         update_progress(video_id, "validating", 10, current_phase="phase1_validate")
         
-        # Run Phase 1 task
-        result1 = validate_prompt.delay(video_id, prompt, assets).get(timeout=60)
+        # Run Phase 1 task directly (we're already in a Celery worker, so no need for .delay())
+        result1 = validate_prompt(video_id, prompt, assets)
         
         # Check Phase 1 success
         if result1['status'] != "success":
@@ -89,21 +92,25 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         # TODO: Phase 5 - Refine & Enhance
         # TODO: Phase 6 - Export & Deliver
         
-        # Mark as complete (for now, only Phase 1 is done)
+        # Calculate generation time
         generation_time = time.time() - start_time
+        # Phase 2 complete = 50% progress (2 out of 6 phases, but only 2 implemented so far)
+        # Don't set to 100% until all phases are complete
         update_progress(
             video_id,
-            "complete",
-            100,
-            current_phase="phase1_validate",
+            "generating_animatic",  # Keep status as generating_animatic, not "complete"
+            50,  # Phase 2 complete = 50% (not 100% since we only have 2 phases implemented)
+            current_phase="phase2_animatic",
+            animatic_urls=result2['output_data']['animatic_urls'],
             total_cost=total_cost,
             generation_time=generation_time
         )
         
         return {
             "video_id": video_id,
-            "status": "success",
+            "status": "generating_animatic",  # Not "complete" - only 2 of 6 phases implemented
             "spec": spec,
+            "animatic_urls": result2['output_data']['animatic_urls'],
             "cost_usd": total_cost,
             "generation_time_seconds": generation_time
         }

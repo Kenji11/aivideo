@@ -97,7 +97,7 @@
 ### Day 2 Morning: Integration (3 hours - All Together)
 - [ ] Wire up orchestrator with real phase tasks
 - [ ] Deploy to AWS us-east-2:
-  - [ ] Create S3 bucket (videogen-outputs-prod)
+  - [x] Create S3 buckets (ai-video-assets-dev and ai-video-assets-prod) - Created via temporary script, script deleted after use
   - [ ] Create RDS PostgreSQL (db.t4g.micro)
   - [ ] Create ElastiCache Redis (t4g.micro)
   - [ ] Deploy Web tier (Elastic Beanstalk, t3.small)
