@@ -42,6 +42,7 @@ class StatusResponse(BaseModel):
     current_phase: Optional[str]
     estimated_time_remaining: Optional[int]
     error: Optional[str]
+    reference_assets: Optional[Dict] = None  # Phase 3 reference assets
 
 class VideoResponse(BaseModel):
     """Response from video endpoint"""
