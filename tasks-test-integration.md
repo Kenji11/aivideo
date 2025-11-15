@@ -112,48 +112,6 @@
 
 ---
 
-### Task 5: Display Phase 1 Output (Spec)
-
-**File:** `frontend/src/pages/Dashboard.tsx` or new component
-
-- [ ] Create UI component to display Phase 1 spec output
-- [ ] Fetch video details including `spec` field from `/api/video/{video_id}`
-- [ ] Display spec structure showing:
-  - Template selected
-  - Beats/scenes planned
-  - Style specifications
-  - Audio configuration
-  - Color grading settings
-- [ ] Show spec in a readable format (JSON viewer or structured display)
-- [ ] Add section in video detail view to show "Video Specification"
-- [ ] Update video status page to show spec when available
-
-**Details:**
-- Spec is stored in `video.spec` field (JSON)
-- Should be visible after Phase 1 completes
-- Helps verify prompt was correctly interpreted
-
----
-
-### Task 6: Display Phase 2 Output (Animatic Frames)
-
-**File:** `frontend/src/pages/Dashboard.tsx` or new component
-
-- [ ] Create UI component to display Phase 2 animatic frames
-- [ ] Fetch video details including `animatic_urls` field from `/api/video/{video_id}`
-- [ ] Display animatic frames in a gallery/grid view
-- [ ] Show frame thumbnails with ability to view full size
-- [ ] Display frame metadata if available (beat name, shot type, etc.)
-- [ ] Add section in video detail view to show "Animatic Preview"
-- [ ] Update video status page to show animatic when available
-
-**Details:**
-- Animatic URLs are stored in `video.animatic_urls` field (JSON array)
-- Should be visible after Phase 2 completes
-- Each URL should be displayable as an image
-
----
-
 ## ✅ Integration Testing Checklist
 
 Before considering integration complete:
@@ -162,10 +120,8 @@ Before considering integration complete:
 - [ ] Can upload assets from frontend and receive asset IDs
 - [ ] Asset IDs are included in video generation request
 - [ ] Video generation starts and progresses through Phase 1
-- [ ] Phase 1 spec is visible in frontend after completion
 - [ ] Video generation progresses through Phase 2
 - [ ] Progress updates are visible in database during Phase 2
-- [ ] Phase 2 animatic frames are visible in frontend after completion
 - [ ] All error cases are handled gracefully
 - [ ] Status endpoint returns accurate progress information
 
@@ -198,18 +154,21 @@ curl http://localhost:8000/api/video/{video_id}
 
 **File:** `frontend/src/App.tsx`
 
-- [ ] Add API function to fetch all videos in `frontend/src/lib/api.ts`
-- [ ] Fetch videos from `/api/videos` endpoint when "My Projects" page loads
-- [ ] Map backend video data to Project format (or update Project type)
-- [ ] Display videos in the projects grid using ProjectCard component
-- [ ] Show loading state while fetching videos
-- [ ] Handle error state if fetch fails
-- [ ] Update projects state with fetched videos
-- [ ] Refresh projects list when returning to "My Projects" page
+- [x] Add API function to fetch all videos in `frontend/src/lib/api.ts`
+- [x] Fetch videos from `/api/videos` endpoint when "My Projects" page loads
+- [x] Map backend video data to Project format (or update Project type)
+- [x] Display videos in the projects grid using ProjectCard component
+- [x] Show loading state while fetching videos
+- [x] Handle error state if fetch fails
+- [x] Update projects state with fetched videos
+- [x] Refresh projects list when returning to "My Projects" page
 
 **Details:**
 - Endpoint: `GET /api/videos` (already exists)
 - Returns list of videos with: video_id, title, status, progress, final_video_url, cost_usd, created_at, completed_at
 - Should filter by user_id (using MOCK_USER_ID for now)
 - Replace or supplement existing Supabase projects data
+- Status mapping: backend statuses are mapped to Project status enum (pending/processing/completed/failed)
+- Added refresh button to manually reload projects
+- Videos are automatically fetched when navigating to "My Projects" page
 
