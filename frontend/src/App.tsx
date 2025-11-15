@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Sparkles, Video, Film, Download, ArrowLeft, Settings, BarChart3, Zap, Library, CreditCard, Code2 } from 'lucide-react';
 import { Header } from './components/Header';
 import { StepIndicator } from './components/StepIndicator';
@@ -37,6 +37,8 @@ function App() {
   const [referenceAssets, setReferenceAssets] = useState<string[]>([]);
   const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
   const [assetRefreshTrigger, setAssetRefreshTrigger] = useState(0);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
 
   const steps = [
     { id: 1, name: 'Create', icon: Sparkles },
@@ -68,6 +70,82 @@ function App() {
     }
     return () => clearInterval(interval);
   }, [isProcessing, elapsedTime, processingProgress]);
+
+  const addNotification = useCallback((type: Notification['type'], title: string, message: string) => {
+    const id = Math.random().toString();
+    const notification: Notification = {
+      id,
+      type,
+      title,
+      message,
+      timestamp: new Date(),
+      read: false,
+    };
+    setNotifications((prev) => [notification, ...prev]);
+    
+    // Auto-dismiss success notifications after 2 seconds
+    if (type === 'success') {
+      setTimeout(() => {
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+      }, 2000);
+    }
+  }, []);
+
+  const fetchVideos = useCallback(async () => {
+    setIsLoadingProjects(true);
+    setProjectsError(null);
+    
+    try {
+      const response = await api.getVideos();
+      
+      // Map backend video data to Project format
+      const mappedProjects: Project[] = response.videos.map((video) => {
+        // Map backend status to Project status
+        let projectStatus: Project['status'] = 'pending';
+        if (video.status === 'complete' || video.status === 'completed') {
+          projectStatus = 'completed';
+        } else if (video.status === 'failed') {
+          projectStatus = 'failed';
+        } else if (
+          video.status === 'validating' ||
+          video.status === 'generating_animatic' ||
+          video.status === 'generating_references' ||
+          video.status === 'generating_chunks' ||
+          video.status === 'refining' ||
+          video.status === 'exporting' ||
+          video.status === 'queued'
+        ) {
+          projectStatus = video.status === 'queued' || video.status === 'validating' ? 'pending' : 'processing';
+        }
+        
+        return {
+          id: video.video_id,
+          user_id: 'mock-user-id', // Using mock user ID for now
+          title: video.title,
+          description: undefined, // Backend doesn't return description in list
+          prompt: '', // Backend doesn't return prompt in list
+          status: projectStatus,
+          created_at: video.created_at,
+          updated_at: video.completed_at || video.created_at,
+        };
+      });
+      
+      setProjects(mappedProjects);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch videos. Please try again.';
+      setProjectsError(errorMessage);
+      addNotification('error', 'Failed to Load Projects', errorMessage);
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  }, [addNotification]);
+
+  // Fetch videos when "My Projects" page loads
+  useEffect(() => {
+    if (appStep === 'projects') {
+      fetchVideos();
+    }
+  }, [appStep, fetchVideos]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,25 +210,6 @@ function App() {
     }
   };
 
-  const addNotification = (type: Notification['type'], title: string, message: string) => {
-    const id = Math.random().toString();
-    const notification: Notification = {
-      id,
-      type,
-      title,
-      message,
-      timestamp: new Date(),
-      read: false,
-    };
-    setNotifications((prev) => [notification, ...prev]);
-    
-    // Auto-dismiss success notifications after 2 seconds
-    if (type === 'success') {
-      setTimeout(() => {
-        setNotifications((prev) => prev.filter((n) => n.id !== id));
-      }, 2000);
-    }
-  };
 
   const handleSelectTemplate = (template: Template) => {
     setTitle(template.name);
@@ -281,16 +340,42 @@ function App() {
 
         {appStep === 'projects' && (
           <div className="animate-fade-in">
-            <div className="mb-8">
-              <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                My Projects
-              </h2>
-              <p className="text-slate-600 dark:text-slate-400">
-                Create and manage your AI-generated videos
-              </p>
+            <div className="mb-8 flex items-center justify-between">
+              <div>
+                <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                  My Projects
+                </h2>
+                <p className="text-slate-600 dark:text-slate-400">
+                  Create and manage your AI-generated videos
+                </p>
+              </div>
+              <button
+                onClick={fetchVideos}
+                disabled={isLoadingProjects}
+                className="btn-secondary flex items-center space-x-2"
+              >
+                <span>{isLoadingProjects ? 'Loading...' : 'Refresh'}</span>
+              </button>
             </div>
 
-            {projects.length === 0 ? (
+            {isLoadingProjects ? (
+              <div className="card p-16 text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4 animate-pulse">
+                  <Video className="w-6 h-6 text-blue-600" />
+                </div>
+                <p className="text-slate-500 dark:text-slate-400">Loading projects...</p>
+              </div>
+            ) : projectsError ? (
+              <div className="card p-16 text-center">
+                <p className="text-red-600 dark:text-red-400 mb-4">{projectsError}</p>
+                <button
+                  onClick={fetchVideos}
+                  className="btn-primary"
+                >
+                  Try Again
+                </button>
+              </div>
+            ) : projects.length === 0 ? (
               <div className="card p-16 text-center">
                 <Film className="w-16 h-16 mx-auto text-slate-300 mb-4" />
                 <p className="text-slate-500 dark:text-slate-400 mb-6">No projects yet</p>

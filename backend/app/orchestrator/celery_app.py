@@ -23,4 +23,16 @@ celery_app.conf.update(
     task_soft_time_limit=25 * 60,  # 25 minutes soft limit
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=50,
+    # Include all task modules so Celery can discover them
+    include=[
+        "app.orchestrator.pipeline",
+        "app.phases.phase1_validate.task",
+        "app.phases.phase2_animatic.task",
+    ],
 )
+
+# Import task modules to ensure they're registered
+# This ensures tasks are discovered when the worker starts
+from app.orchestrator import pipeline  # noqa: F401
+from app.phases.phase1_validate import task as phase1_task  # noqa: F401
+from app.phases.phase2_animatic import task as phase2_task  # noqa: F401
