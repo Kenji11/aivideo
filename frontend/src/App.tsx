@@ -17,7 +17,7 @@ import { VideoLibrary } from './pages/VideoLibrary';
 import { Billing } from './pages/Billing';
 import { API } from './pages/API';
 import { supabase, Project } from './lib/supabase';
-import { generateVideo, getVideoStatus, StatusResponse } from './lib/api';
+import { generateVideo, getVideoStatus, StatusResponse, listVideos, VideoListItem } from './lib/api';
 
 type AppStep = 'projects' | 'create' | 'processing' | 'preview' | 'download' | 'templates' | 'settings' | 'analytics' | 'dashboard' | 'library' | 'billing' | 'api' | 'export';
 
@@ -28,13 +28,16 @@ function App() {
   const [description, setDescription] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [projects, setProjects] = useState<VideoListItem[]>([]);
+  const [selectedProject, setSelectedProject] = useState<VideoListItem | null>(null);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [videoId, setVideoId] = useState<string | null>(null);
+  const [animaticUrls, setAnimaticUrls] = useState<string[] | null>(null);
   const [referenceAssets, setReferenceAssets] = useState<StatusResponse['reference_assets'] | null>(null);
+  const [stitchedVideoUrl, setStitchedVideoUrl] = useState<string | null>(null);
 
   const steps = [
     { id: 1, name: 'Create', icon: Sparkles },
@@ -43,12 +46,44 @@ function App() {
     { id: 4, name: 'Download', icon: Download },
   ];
 
+  // Map current_phase to processing step index
+  const getProcessingStepFromPhase = (phase: string | undefined, progress: number): number => {
+    if (!phase) return 0;
+    if (phase === 'phase1_validate') return 0;
+    if (phase === 'phase2_animatic') return 1;
+    if (phase === 'phase3_references') return 2;
+    if (phase === 'phase4_chunks') return 3;
+    return Math.floor(progress / 25); // Fallback to progress-based calculation
+  };
+
+  // Calculate processing steps status based on current progress
+  const getStepStatus = (stepIndex: number): 'completed' | 'processing' | 'pending' => {
+    if (processingProgress > stepIndex) return 'completed';
+    if (processingProgress === stepIndex) return 'processing';
+    return 'pending';
+  };
+
   const processingSteps = [
-    { name: 'Content planning with AI', status: processingProgress > 0 ? 'completed' : 'pending' },
-    { name: 'Generating video scenes', status: processingProgress > 1 ? (processingProgress === 1 ? 'completed' : 'processing') : 'pending' },
-    { name: 'Creating images with AI', status: processingProgress > 2 ? (processingProgress === 2 ? 'completed' : 'processing') : 'pending' },
-    { name: 'Composing final video', status: processingProgress > 3 ? 'completed' : processingProgress === 3 ? 'processing' : 'pending' },
+    { name: 'Content planning with AI', status: getStepStatus(0) },
+    { name: 'Generating animatic frames', status: getStepStatus(1) },
+    { name: 'Creating reference images', status: getStepStatus(2) },
+    { name: 'Generating & stitching video chunks', status: getStepStatus(3) },
   ];
+
+  // Define addNotification before using it in useEffect
+  const addNotification = (type: Notification['type'], title: string, message: string) => {
+    const id = Math.random().toString();
+    const notification: Notification = {
+      id,
+      type,
+      title,
+      message,
+      timestamp: new Date(),
+      read: false,
+    };
+    setNotifications((prev) => [notification, ...prev]);
+    setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 5000);
+  };
 
   // Poll for video status
   useEffect(() => {
@@ -58,13 +93,26 @@ function App() {
       try {
         const status = await getVideoStatus(videoId);
         
-        // Update progress
-        setProcessingProgress(Math.floor(status.progress / 25)); // 0-4 steps
+        // Update progress based on current_phase
+        const currentStep = getProcessingStepFromPhase(status.current_phase, status.progress);
+        setProcessingProgress(currentStep);
+        
+        // Check for Phase 2 animatic frames
+        if (status.animatic_urls && status.animatic_urls.length > 0 && !animaticUrls) {
+          setAnimaticUrls(status.animatic_urls);
+          addNotification('success', 'Animatic Frames Generated', `${status.animatic_urls.length} animatic frames ready!`);
+        }
         
         // Check for Phase 3 reference assets
-        if (status.reference_assets) {
+        if (status.reference_assets && !referenceAssets) {
           setReferenceAssets(status.reference_assets);
           addNotification('success', 'Reference Assets Generated', 'Style guide and product references are ready!');
+        }
+        
+        // Check for Phase 4 stitched video
+        if (status.stitched_video_url && !stitchedVideoUrl) {
+          setStitchedVideoUrl(status.stitched_video_url);
+          addNotification('success', 'Video Chunks Generated', 'Video chunks are being stitched together!');
         }
         
         // Check if complete or failed
@@ -86,7 +134,7 @@ function App() {
     pollStatus(); // Initial call
 
     return () => clearInterval(interval);
-  }, [videoId, isProcessing]);
+  }, [videoId, isProcessing, referenceAssets, stitchedVideoUrl, animaticUrls, addNotification]);
 
   // Timer for elapsed time
   useEffect(() => {
@@ -104,15 +152,18 @@ function App() {
     
     try {
       setIsProcessing(true);
-      setElapsedTime(0);
-      setProcessingProgress(0);
-      setReferenceAssets(null);
-      setAppStep('processing');
+        setElapsedTime(0);
+        setProcessingProgress(0);
+        setReferenceAssets(null);
+        setStitchedVideoUrl(null);
+        setAppStep('processing');
       
       // Call backend API
       const response = await generateVideo({
+        title: title || 'Untitled Video',
+        description: description || undefined,
         prompt: prompt,
-        assets: [] // TODO: Get from UploadZone
+        reference_assets: [] // TODO: Get from UploadZone and convert to asset IDs
       });
       
       setVideoId(response.video_id);
@@ -124,9 +175,40 @@ function App() {
     }
   };
 
-  const handleProjectSelect = (project: Project) => {
+  const handleProjectSelect = (project: VideoListItem) => {
     setSelectedProject(project);
+    // If video is complete, show preview
+    if (project.status === 'complete' && project.final_video_url) {
+      setStitchedVideoUrl(project.final_video_url);
+      setTitle(project.title);
+      setAppStep('preview');
+    } else if (project.status !== 'complete' && project.status !== 'failed') {
+      // If still processing, show processing view
+      setVideoId(project.video_id);
+      setIsProcessing(true);
+      setAppStep('processing');
+    }
   };
+
+  // Fetch projects from backend
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (appStep === 'projects' || appStep === 'create') {
+        setIsLoadingProjects(true);
+        try {
+          const response = await listVideos();
+          setProjects(response.videos);
+        } catch (error) {
+          console.error('Failed to fetch projects:', error);
+          addNotification('error', 'Failed to Load Projects', error instanceof Error ? error.message : 'Unknown error');
+        } finally {
+          setIsLoadingProjects(false);
+        }
+      }
+    };
+
+    fetchProjects();
+  }, [appStep]);
 
   const getCurrentStep = () => {
     switch (appStep) {
@@ -139,20 +221,6 @@ function App() {
       default:
         return 1;
     }
-  };
-
-  const addNotification = (type: Notification['type'], title: string, message: string) => {
-    const id = Math.random().toString();
-    const notification: Notification = {
-      id,
-      type,
-      title,
-      message,
-      timestamp: new Date(),
-      read: false,
-    };
-    setNotifications((prev) => [notification, ...prev]);
-    setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 5000);
   };
 
   const handleSelectTemplate = (template: Template) => {
@@ -293,7 +361,12 @@ function App() {
               </p>
             </div>
 
-            {projects.length === 0 ? (
+            {isLoadingProjects ? (
+              <div className="card p-16 text-center">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mb-4"></div>
+                <p className="text-slate-500 dark:text-slate-400">Loading projects...</p>
+              </div>
+            ) : projects.length === 0 ? (
               <div className="card p-16 text-center">
                 <Film className="w-16 h-16 mx-auto text-slate-300 mb-4" />
                 <p className="text-slate-500 dark:text-slate-400 mb-6">No projects yet</p>
@@ -308,7 +381,7 @@ function App() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {projects.map((project) => (
                   <ProjectCard
-                    key={project.id}
+                    key={project.video_id}
                     project={project}
                     onSelect={handleProjectSelect}
                   />
@@ -400,12 +473,47 @@ function App() {
               Sit back and relax while our AI works its magic...
             </p>
 
-            <div className="max-w-md mx-auto text-left mb-8">
-              <ProcessingSteps steps={processingSteps} elapsedTime={elapsedTime} />
-            </div>
+              <div className="max-w-md mx-auto text-left mb-8">
+                <ProcessingSteps steps={processingSteps} elapsedTime={elapsedTime} />
+              </div>
 
-            {/* Phase 3 Reference Assets */}
-            {referenceAssets && (
+              {/* Phase 2 Animatic Frames */}
+              {animaticUrls && animaticUrls.length > 0 && (
+                <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-1">
+                        🎬 Animatic Frames Generated
+                      </h3>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        {animaticUrls.length} animatic frames ready for video generation
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+                    {animaticUrls.map((url, idx) => (
+                      <div key={idx} className="relative group">
+                        <img
+                          src={url}
+                          alt={`Animatic frame ${idx + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border-2 border-slate-200 dark:border-slate-700 shadow-md group-hover:scale-105 transition-transform cursor-pointer"
+                          onClick={() => window.open(url, '_blank')}
+                          onError={(e) => {
+                            e.currentTarget.src = 'https://via.placeholder.com/200x200?text=Frame+Not+Available';
+                          }}
+                        />
+                        <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                          Frame {idx + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Phase 3 Reference Assets */}
+              {referenceAssets && (
               <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
                   Reference Assets Generated
@@ -467,10 +575,25 @@ function App() {
         {appStep === 'preview' && (
           <div className="card overflow-hidden animate-fade-in">
             <div className="aspect-video bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
-              <div className="text-center text-white">
-                <Film className="w-20 h-20 mx-auto mb-4 opacity-50 animate-float" />
-                <p className="text-lg font-medium opacity-75">Your Video is Ready</p>
-              </div>
+              {stitchedVideoUrl ? (
+                <video
+                  src={stitchedVideoUrl}
+                  controls
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    console.error('Video load error:', e);
+                    // Fallback to placeholder if video fails to load
+                  }}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              ) : (
+                <div className="text-center text-white">
+                  <Film className="w-20 h-20 mx-auto mb-4 opacity-50 animate-float" />
+                  <p className="text-lg font-medium opacity-75">Your Video is Ready</p>
+                  <p className="text-sm opacity-50 mt-2">Loading video...</p>
+                </div>
+              )}
             </div>
             <div className="p-8 space-y-6">
               <div>
@@ -517,8 +640,23 @@ function App() {
                   </button>
                 </div>
                 <button
-                  onClick={() => setAppStep('download')}
-                  className="w-full btn-primary flex items-center justify-center space-x-2"
+                  onClick={() => {
+                    if (stitchedVideoUrl) {
+                      // Create download link
+                      const link = document.createElement('a');
+                      link.href = stitchedVideoUrl;
+                      link.download = `${title || 'video'}.mp4`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      addNotification('success', 'Download Started', 'Your video download has started');
+                      setAppStep('download');
+                    } else {
+                      addNotification('error', 'Video Not Ready', 'Video is still processing');
+                    }
+                  }}
+                  disabled={!stitchedVideoUrl}
+                  className="w-full btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Download className="w-5 h-5" />
                   <span>Download Video</span>
@@ -529,35 +667,72 @@ function App() {
         )}
 
         {appStep === 'download' && (
-          <div className="card p-8 text-center animate-fade-in">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-6">
-              <Download className="w-10 h-10 text-green-600" />
-            </div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-              Download Complete!
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-8">
-              Your video is ready to share with the world
-            </p>
-            <div className="flex flex-col space-y-3">
-              <button
-                onClick={() => {
-                  setAppStep('create');
-                  setPrompt('');
-                  setTitle('');
-                  setDescription('');
-                }}
-                className="btn-primary"
-              >
-                Create New Video
-              </button>
-              <button
-                onClick={() => setAppStep('projects')}
-                className="btn-secondary flex items-center justify-center space-x-2"
-              >
-                <ArrowLeft className="w-5 h-5" />
-                <span>My Projects</span>
-              </button>
+          <div className="space-y-6 animate-fade-in">
+            <div className="card p-8 text-center">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 dark:bg-green-900 rounded-full mb-6">
+                <Download className="w-10 h-10 text-green-600 dark:text-green-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                Your Video is Ready!
+              </h2>
+              <p className="text-slate-600 dark:text-slate-400 mb-8">
+                Download your video or create another one
+              </p>
+              
+              {stitchedVideoUrl && (
+                <div className="mb-8">
+                  <video
+                    src={stitchedVideoUrl}
+                    controls
+                    className="w-full max-w-2xl mx-auto rounded-lg border border-slate-200 dark:border-slate-700"
+                    onError={(e) => {
+                      console.error('Video load error:', e);
+                    }}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+              )}
+              
+              <div className="flex flex-col space-y-3 max-w-md mx-auto">
+                {stitchedVideoUrl && (
+                  <button
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = stitchedVideoUrl;
+                      link.download = `${title || 'video'}.mp4`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      addNotification('success', 'Download Started', 'Your video download has started');
+                    }}
+                    className="w-full btn-primary flex items-center justify-center space-x-2"
+                  >
+                    <Download className="w-5 h-5" />
+                    <span>Download Video</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setAppStep('create');
+                    setPrompt('');
+                    setTitle('');
+                    setDescription('');
+                    setStitchedVideoUrl(null);
+                    setReferenceAssets(null);
+                  }}
+                  className="w-full btn-secondary"
+                >
+                  Create New Video
+                </button>
+                <button
+                  onClick={() => setAppStep('projects')}
+                  className="w-full btn-secondary flex items-center justify-center space-x-2"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                  <span>My Projects</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

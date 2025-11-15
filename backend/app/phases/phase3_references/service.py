@@ -6,7 +6,7 @@ from app.services.replicate import replicate_client
 from app.services.s3 import s3_client
 from app.phases.phase3_references.asset_handler import AssetHandler
 from app.phases.phase3_references.schemas import ReferenceAssetsOutput
-from app.common.constants import COST_SDXL_IMAGE, S3_REFERENCES_PREFIX
+from app.common.constants import COST_FLUX_DEV_IMAGE, S3_REFERENCES_PREFIX
 from app.common.exceptions import PhaseException
 
 
@@ -89,23 +89,28 @@ class ReferenceAssetService:
         prompt = f"{aesthetic} style, {colors_str} colors, {mood} mood, {lighting} lighting, high quality reference image"
         
         try:
-            # Call Replicate SDXL model
+            # Call Replicate FLUX Dev model (better quality than SDXL for style guides)
+            # Cost: $0.025/image (more expensive but better quality)
             output = self.replicate.run(
-                "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
+                "black-forest-labs/flux-dev",
                 input={
                     "prompt": prompt,
-                    "width": 1024,
-                    "height": 1024,
-                    "num_outputs": 1
-                }
+                    "aspect_ratio": "1:1",
+                    "output_format": "png",
+                    "output_quality": 90,  # Higher quality for style guides
+                },
+                timeout=60
             )
             
             # Download generated image
-            # Replicate returns a URL or list of URLs
-            if isinstance(output, list):
+            # FLUX Dev returns a URL or list of URLs
+            if isinstance(output, str):
+                image_url = output
+            elif isinstance(output, list) and len(output) > 0:
                 image_url = output[0]
             else:
-                image_url = output
+                # Handle iterator/other formats
+                image_url = list(output)[0] if hasattr(output, '__iter__') else str(output)
             
             # Download image
             response = requests.get(image_url, timeout=60)
@@ -121,7 +126,7 @@ class ReferenceAssetService:
             s3_url = self.s3.upload_file(temp_path, s3_key)
             
             # Track cost
-            self.total_cost += COST_SDXL_IMAGE
+            self.total_cost += COST_FLUX_DEV_IMAGE
             
             # Cleanup
             if os.path.exists(temp_path):
@@ -153,22 +158,28 @@ class ReferenceAssetService:
         prompt = f"Professional product photography of {product_name}, {product_category}, studio lighting, high quality, clean background"
         
         try:
-            # Call Replicate SDXL model
+            # Call Replicate FLUX Dev model (better quality than SDXL for product references)
+            # Cost: $0.025/image (more expensive but better quality)
             output = self.replicate.run(
-                "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
+                "black-forest-labs/flux-dev",
                 input={
                     "prompt": prompt,
-                    "width": 1024,
-                    "height": 1024,
-                    "num_outputs": 1
-                }
+                    "aspect_ratio": "1:1",
+                    "output_format": "png",
+                    "output_quality": 90,  # Higher quality for product references
+                },
+                timeout=60
             )
             
             # Download generated image
-            if isinstance(output, list):
+            # FLUX Dev returns a URL or list of URLs
+            if isinstance(output, str):
+                image_url = output
+            elif isinstance(output, list) and len(output) > 0:
                 image_url = output[0]
             else:
-                image_url = output
+                # Handle iterator/other formats
+                image_url = list(output)[0] if hasattr(output, '__iter__') else str(output)
             
             # Download image
             response = requests.get(image_url, timeout=60)
@@ -184,7 +195,7 @@ class ReferenceAssetService:
             s3_url = self.s3.upload_file(temp_path, s3_key)
             
             # Track cost
-            self.total_cost += COST_SDXL_IMAGE
+            self.total_cost += COST_FLUX_DEV_IMAGE
             
             # Cleanup
             if os.path.exists(temp_path):
