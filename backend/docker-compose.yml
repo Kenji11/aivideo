@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: dev
       POSTGRES_PASSWORD: devpass
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -36,15 +36,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql://dev:devpass@postgres:5432/videogen
       REDIS_URL: redis://redis:6379/0
-      REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      S3_BUCKET: ${S3_BUCKET:-ai-video-assets-dev}
-      AWS_REGION: us-east-2
+      # Other env vars (REPLICATE_API_TOKEN, OPENAI_API_KEY, AWS_*) loaded from .env file via env_file directive
     volumes:
       - ./app:/app/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
@@ -58,15 +55,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql://dev:devpass@postgres:5432/videogen
       REDIS_URL: redis://redis:6379/0
-      REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      S3_BUCKET: ${S3_BUCKET:-ai-video-assets-dev}
-      AWS_REGION: us-east-2
+      # Other env vars (REPLICATE_API_TOKEN, OPENAI_API_KEY, AWS_*) loaded from .env file via env_file directive
     volumes:
       - ./app:/app/app
     command: celery -A app.orchestrator.celery_app worker --loglevel=info --concurrency=4
