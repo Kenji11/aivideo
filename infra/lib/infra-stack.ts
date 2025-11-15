@@ -236,14 +236,17 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         logGroup,
       }),
       environment: {
+        // Database - construct DATABASE_URL from Aurora components
+        DATABASE_URL: `postgresql://${dbUsername}:${dbPassword}@${auroraCluster.clusterEndpoint.hostname}:${auroraCluster.clusterEndpoint.port}/videogen`,
         REDIS_URL: 'redis://redis.aivideo.local:6379/0',
         S3_BUCKET: videoBucket.bucketName,
         AWS_REGION: this.region,
-        AURORA_ENDPOINT: auroraCluster.clusterEndpoint.hostname,
-        AURORA_PORT: auroraCluster.clusterEndpoint.port.toString(),
-        AURORA_DB_NAME: 'videogen',
-        DATABASE_USERNAME: dbUsername,
-        DATABASE_PASSWORD: dbPassword,
+        // External APIs - from environment variables (set by GitHub Actions)
+        REPLICATE_API_TOKEN: process.env.REPLICATE_API_TOKEN || '',
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+        // AWS Credentials - from environment variables (set by GitHub Actions)
+        AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || '',
+        AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || '',
       },
       portMappings: [
         {
@@ -301,15 +304,17 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
 
       // MERGED environment block (only one allowed)
       environment: {
+        // Database - construct DATABASE_URL from Aurora components
+        DATABASE_URL: `postgresql://${dbUsername}:${dbPassword}@${auroraCluster.clusterEndpoint.hostname}:${auroraCluster.clusterEndpoint.port}/videogen`,
         REDIS_URL: 'redis://redis.aivideo.local:6379/0',
         S3_BUCKET: videoBucket.bucketName,
         AWS_REGION: this.region,
-        AURORA_ENDPOINT: auroraCluster.clusterEndpoint.hostname,
-        AURORA_PORT: auroraCluster.clusterEndpoint.port.toString(),
-        AURORA_DB_NAME: 'videogen',
-
-        DATABASE_USERNAME: dbUsername,
-        DATABASE_PASSWORD: dbPassword,
+        // External APIs - from environment variables (set by GitHub Actions)
+        REPLICATE_API_TOKEN: process.env.REPLICATE_API_TOKEN || '',
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+        // AWS Credentials - from environment variables (set by GitHub Actions)
+        AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || '',
+        AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || '',
       },
 
       healthCheck: {
