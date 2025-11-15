@@ -44,6 +44,15 @@ def validate_prompt(self, video_id: str, prompt: str, assets: list = None):
             error_message=None
         )
         
+        # Log successful phase completion
+        template_name = spec.get('template', 'unknown')
+        beats_count = len(spec.get('beats', []))
+        print(f"✅ Phase 1 (Validation) completed successfully for video {video_id}")
+        print(f"   - Template: {template_name}")
+        print(f"   - Beats: {beats_count}")
+        print(f"   - Cost: ${COST_GPT4_TURBO:.4f}")
+        print(f"   - Duration: {duration_seconds:.2f}s")
+        
         return output.dict()
         
     except Exception as e:
