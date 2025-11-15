@@ -10,12 +10,13 @@ class ChunkSpec(BaseModel):
     start_time: float
     duration: float
     beat: Dict
-    animatic_frame_url: str
+    animatic_frame_url: Optional[str] = None  # Optional: if None, use text-to-video mode
     style_guide_url: Optional[str] = None
     product_reference_url: Optional[str] = None
     previous_chunk_last_frame: Optional[str] = None
     prompt: str
     fps: int = 24  # FPS for frame calculation
+    use_text_to_video: bool = False  # Flag to use text-to-video instead of image-to-video
 
 
 class ChunkGenerationOutput(BaseModel):
