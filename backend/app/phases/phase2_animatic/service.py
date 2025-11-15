@@ -2,12 +2,14 @@ from typing import List, Dict
 import tempfile
 import os
 import requests
+import traceback
 from app.services import replicate_client, s3_client
 from app.phases.phase2_animatic.prompts import (
     generate_animatic_prompt,
     create_negative_prompt,
 )
 from app.common.constants import COST_SDXL_IMAGE, S3_ANIMATIC_PREFIX
+from app.orchestrator.progress import update_progress
 
 
 class AnimaticGenerationService:
@@ -38,6 +40,13 @@ class AnimaticGenerationService:
         
         print(f"Starting animatic generation for {total_frames} frames...")
         
+        # Calculate progress increment per frame
+        # Phase 2 starts at 25% and should reach ~50% when complete
+        # So we have 25% progress to distribute across frames
+        phase_progress_range = 25.0  # 25% to 50%
+        progress_per_frame = phase_progress_range / total_frames if total_frames > 0 else 0
+        base_progress = 25.0  # Starting progress for Phase 2
+        
         for frame_num, beat in enumerate(beats):
             print(f"Generating frame {frame_num + 1}/{total_frames} for beat: {beat.get('name', 'unknown')}")
             
@@ -55,6 +64,15 @@ class AnimaticGenerationService:
             
             frame_urls.append(s3_url)
             self.total_cost += COST_SDXL_IMAGE
+            
+            # Update progress after each frame
+            current_progress = base_progress + (frame_num + 1) * progress_per_frame
+            update_progress(
+                video_id=video_id,
+                status="generating_animatic",
+                progress=current_progress,
+                animatic_urls=frame_urls
+            )
         
         print(f"Completed animatic generation: {total_frames} frames, Total cost: ${self.total_cost:.4f}")
         
@@ -123,4 +141,12 @@ class AnimaticGenerationService:
             return s3_url
             
         except Exception as e:
-            raise Exception(f"Failed to generate frame {frame_num}: {str(e)}")
+            error_msg = f"Failed to generate frame {frame_num}: {str(e)}"
+            print(f"❌ Frame generation error for video {video_id}, frame {frame_num}")
+            print(f"   Error: {str(e)}")
+            print(f"   Error type: {type(e).__name__}")
+            print(f"   Traceback:")
+            for line in traceback.format_exc().split('\n'):
+                if line.strip():
+                    print(f"   {line}")
+            raise Exception(error_msg)

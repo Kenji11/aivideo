@@ -69,3 +69,33 @@ class VideoListResponse(BaseModel):
     """Response from videos list endpoint"""
     videos: List[VideoListItem]
     total: int
+
+class UploadedAsset(BaseModel):
+    """Single uploaded asset response"""
+    asset_id: str
+    filename: str
+    asset_type: str
+    file_size_bytes: int
+    s3_url: str
+
+class UploadResponse(BaseModel):
+    """Response from upload endpoint"""
+    assets: List[UploadedAsset]
+    total: int
+    errors: Optional[List[str]] = None
+    partial_success: Optional[bool] = False
+
+class AssetListItem(BaseModel):
+    """Asset item in list response"""
+    asset_id: str
+    filename: str
+    asset_type: str
+    file_size_bytes: int
+    s3_url: str
+    created_at: Optional[str] = None
+
+class AssetListResponse(BaseModel):
+    """Response from assets list endpoint"""
+    assets: List[AssetListItem]
+    total: int
+    user_id: str
