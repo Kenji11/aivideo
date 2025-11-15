@@ -18,7 +18,7 @@ OPENAI_API_KEY=sk-your_key_here
 # AWS
 AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
-S3_BUCKET=videogen-outputs-dev
+S3_BUCKET=ai-video-assets-dev
 AWS_REGION=us-east-2
 ```
 

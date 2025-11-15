@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.common.schemas import GenerateRequest, GenerateResponse
 from app.common.models import VideoGeneration, VideoStatus
+from app.common.constants import MOCK_USER_ID
 from app.database import get_db
 from app.orchestrator.pipeline import run_pipeline
 import uuid
@@ -18,9 +19,11 @@ async def generate_video(request: GenerateRequest, db: Session = Depends(get_db)
     # Create database record
     video_record = VideoGeneration(
         id=video_id,
-        title=request.prompt[:100],  # Use first 100 chars as title
-        description=request.prompt,
+        user_id=MOCK_USER_ID,  # TODO: Get from auth token in future
+        title=request.title,
+        description=request.description,
         prompt=request.prompt,
+        reference_assets=request.reference_assets,
         status=VideoStatus.QUEUED,
         progress=0.0
     )
@@ -31,7 +34,8 @@ async def generate_video(request: GenerateRequest, db: Session = Depends(get_db)
     
     # Enqueue job
     try:
-        run_pipeline.delay(video_id, request.prompt, request.assets)
+        # Pass reference_assets as assets for backward compatibility with pipeline
+        run_pipeline.delay(video_id, request.prompt, request.reference_assets)
     except Exception as e:
         # If enqueue fails, update status
         video_record.status = VideoStatus.FAILED

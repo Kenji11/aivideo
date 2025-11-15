@@ -545,6 +545,69 @@ ffmpeg_service = FFmpegService()
 - [x] Implement `run_command()` method
 - [x] Create singleton instance
 
+### Task 4.4: Implement GET /api/videos endpoint
+
+**File:** `backend/app/api/video.py` (add to existing file)
+
+Add endpoint to list all videos (draft/queued or completed status).
+
+**File:** `backend/app/common/schemas.py` (add new schema)
+
+```python
+class VideoListItem(BaseModel):
+    """Video item in list response"""
+    video_id: str
+    title: str
+    status: str
+    progress: float
+    final_video_url: Optional[str]
+    cost_usd: float
+    created_at: datetime
+    completed_at: Optional[datetime]
+
+class VideoListResponse(BaseModel):
+    """Response from videos list endpoint"""
+    videos: List[VideoListItem]
+    total: int
+```
+
+**Endpoint implementation:**
+```python
+@router.get("/api/videos")
+async def list_videos(
+    db: Session = Depends(get_db)
+) -> VideoListResponse:
+    """Get list of all videos"""
+    
+    # Order by most recent first
+    videos = db.query(VideoGeneration).order_by(VideoGeneration.created_at.desc()).all()
+    
+    video_items = [
+        VideoListItem(
+            video_id=video.id,
+            title=video.title,
+            status=video.status.value,
+            progress=video.progress,
+            final_video_url=video.final_video_url,
+            cost_usd=video.cost_usd,
+            created_at=video.created_at,
+            completed_at=video.completed_at
+        )
+        for video in videos
+    ]
+    
+    return VideoListResponse(
+        videos=video_items,
+        total=len(video_items)
+    )
+```
+
+- [x] Add VideoListItem schema to schemas.py
+- [x] Add VideoListResponse schema to schemas.py
+- [x] Add GET /api/videos endpoint to video.py
+- [x] Order results by most recent first
+- [x] Return list with total count
+
 ---
 
 ## ✅ PR #3 & #4 Checklist

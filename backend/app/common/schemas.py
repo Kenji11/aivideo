@@ -23,8 +23,10 @@ class PhaseOutput(BaseModel):
 
 class GenerateRequest(BaseModel):
     """Request to generate video"""
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
     prompt: str = Field(..., min_length=10, max_length=1000)
-    assets: List[Dict[str, str]] = Field(default_factory=list)
+    reference_assets: List[str] = Field(default_factory=list, description="List of asset IDs to use as references")
 
 class GenerateResponse(BaseModel):
     """Response from generate endpoint"""
@@ -51,3 +53,50 @@ class VideoResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime]
     spec: Optional[Dict]
+
+class VideoListItem(BaseModel):
+    """Video item in list response"""
+    video_id: str
+    title: str
+    status: str
+    progress: float
+    current_phase: Optional[str] = None
+    final_video_url: Optional[str]
+    cost_usd: float
+    created_at: datetime
+    completed_at: Optional[datetime]
+
+class VideoListResponse(BaseModel):
+    """Response from videos list endpoint"""
+    videos: List[VideoListItem]
+    total: int
+
+class UploadedAsset(BaseModel):
+    """Single uploaded asset response"""
+    asset_id: str
+    filename: str
+    asset_type: str
+    file_size_bytes: int
+    s3_url: str
+
+class UploadResponse(BaseModel):
+    """Response from upload endpoint"""
+    assets: List[UploadedAsset]
+    total: int
+    errors: Optional[List[str]] = None
+    partial_success: Optional[bool] = False
+
+class AssetListItem(BaseModel):
+    """Asset item in list response"""
+    asset_id: str
+    filename: str
+    asset_type: str
+    file_size_bytes: int
+    s3_url: str
+    created_at: Optional[str] = None
+
+class AssetListResponse(BaseModel):
+    """Response from assets list endpoint"""
+    assets: List[AssetListItem]
+    total: int
+    user_id: str
