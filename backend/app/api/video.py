@@ -21,6 +21,7 @@ async def list_videos(
             title=video.title,
             status=video.status.value,
             progress=video.progress,
+            current_phase=video.current_phase,
             final_video_url=video.final_video_url,
             cost_usd=video.cost_usd,
             created_at=video.created_at,
