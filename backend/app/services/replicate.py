@@ -13,31 +13,57 @@ class ReplicateClient:
         Run a model on Replicate with timeout protection.
         
         Args:
-            model: Model identifier (e.g., "meta/musicgen" or version hash)
+            model: Model identifier (e.g., "meta/musicgen" or "model:version_hash")
             input: Input parameters
             timeout: Maximum time to wait in seconds (default 5 minutes)
             
         Returns:
             Model output (URL or list)
         """
-        # Use Replicate client's run() method which handles model/version automatically
-        # This is the recommended way to call Replicate models
         start_time = time.time()
         
         try:
-            # Use the client's run() method which handles both model names and version hashes
-            # It automatically polls and returns the output
-            output = self.client.run(model, input=input)
+            # Check if model is in format "model:version_hash" (version hash format)
+            if ':' in model:
+                # Extract version hash (part after colon)
+                version_hash = model.split(':', 1)[1]
+                # Use version parameter directly via replicate client
+                prediction = self.client.predictions.create(
+                    version=version_hash,
+                    input=input
+                )
+                
+                # Poll for completion
+                while prediction.status not in ["succeeded", "failed", "canceled"]:
+                    if time.time() - start_time > timeout:
+                        raise TimeoutError(f"Replicate prediction timed out after {timeout} seconds")
+                    time.sleep(1)
+                    prediction.reload()
+                
+                if prediction.status == "failed":
+                    error_msg = getattr(prediction, 'error', 'Unknown error')
+                    raise Exception(f"Replicate prediction failed: {error_msg}")
+                
+                if prediction.status == "canceled":
+                    raise Exception("Replicate prediction was canceled")
+                
+                output = prediction.output
+            else:
+                # Use the client's run() method for model names (handles polling automatically)
+                output = self.client.run(model, input=input)
             
-            # The run() method returns an iterator for streaming outputs
-            # For most models, we want the first (and usually only) output
-            if hasattr(output, '__iter__') and not isinstance(output, (str, bytes)):
-                # Convert iterator to list and get first item
+            # Handle output format (can be string URL, iterator, or list)
+            if isinstance(output, str):
+                return output
+            elif hasattr(output, '__iter__') and not isinstance(output, (str, bytes)):
+                # Convert iterator/list to list and get first item
                 output_list = list(output)
                 return output_list[0] if output_list else None
+            elif isinstance(output, dict):
+                # Try common keys for output
+                return output.get('output') or output.get('url') or output.get('audio')
             else:
-                # Already a single value (string URL or other)
-                return output
+                return str(output) if output else None
                 
         except Exception as e:
             # If run() fails, provide detailed error

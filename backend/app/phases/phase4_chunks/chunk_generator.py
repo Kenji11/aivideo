@@ -4,6 +4,7 @@ import tempfile
 import subprocess
 import requests
 import time
+import math
 from datetime import datetime
 from typing import Optional, List, Dict
 from PIL import Image
@@ -12,7 +13,7 @@ from app.orchestrator.celery_app import celery_app
 from app.services.replicate import replicate_client
 from app.services.s3 import s3_client
 from app.phases.phase4_chunks.schemas import ChunkSpec
-from app.phases.phase4_chunks.model_config import get_default_model
+from app.phases.phase4_chunks.model_config import get_default_model, get_model_config
 from app.common.constants import S3_CHUNKS_PREFIX
 from app.common.exceptions import PhaseException
 
@@ -174,16 +175,24 @@ def build_chunk_specs(
     Returns:
         List of ChunkSpec objects, one per chunk
     """
-    from app.phases.phase4_chunks.model_config import get_default_model
+    from app.phases.phase4_chunks.model_config import get_default_model, get_model_config, get_model_config
     import math
     
     duration = spec.get('duration', 30)  # Default 30 seconds
     beats = spec.get('beats', [])
     
+    # Get model from spec (or use default)
+    selected_model = spec.get('model', 'hailuo')
+    try:
+        model_config = get_model_config(selected_model)
+    except Exception as e:
+        print(f"   ⚠️  Invalid model '{selected_model}', falling back to default: {str(e)}")
+        model_config = get_default_model()
+        selected_model = model_config.get('name', 'hailuo')
+    
     # Get model's actual chunk duration (what the model really outputs)
-    model = get_default_model()
-    actual_chunk_duration = model['actual_chunk_duration']
-    model_name = model['name']
+    actual_chunk_duration = model_config.get('actual_chunk_duration', 5.0)  # Default to 5s if not found
+    model_name = model_config.get('name', 'unknown')
     
     # Calculate chunk count based on model's actual output duration
     # This is the REALITY of what the model outputs, not what we request
@@ -198,7 +207,7 @@ def build_chunk_specs(
     print(f"      - Model: {model_name}")
     print(f"      - Model outputs: {actual_chunk_duration}s chunks")
     print(f"      - Chunk count: ceil({duration}s / {actual_chunk_duration}s) = {chunk_count} chunks")
-    print(f"      - Overlap: {chunk_overlap}s (25% of chunk duration)")
+    print(f"      - Overlap: {chunk_overlap:.2f}s (25% of chunk duration)")
     
     # Check if we have animatic URLs - if not, use text-to-video fallback
     use_text_to_video = len(animatic_urls) == 0
@@ -301,7 +310,8 @@ def build_chunk_specs(
             uploaded_asset_url=uploaded_asset_url if has_uploaded_assets else None,  # Specific uploaded image for this chunk
             prompt=prompt,
             fps=spec.get('fps', 24),
-            use_text_to_video=use_text_to_video  # Set based on whether animatic_urls is empty
+            use_text_to_video=use_text_to_video,  # Set based on whether animatic_urls is empty
+            model=selected_model  # Pass model selection to chunk generation
         )
         
         chunk_specs.append(chunk_spec)
@@ -330,8 +340,15 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
     chunk_start_time = time.time()
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # Get model configuration (default model)
-    model_config = get_default_model()
+    # Get model configuration (from chunk spec or default)
+    selected_model = chunk_spec_obj.model or 'hailuo'
+    try:
+        model_config = get_model_config(selected_model)
+    except Exception as e:
+        print(f"   ⚠️  Invalid model '{selected_model}', falling back to default: {str(e)}")
+        model_config = get_default_model()
+        selected_model = model_config.get('name', 'hailuo')
+    
     model_name = model_config['replicate_model']
     model_params = model_config['params']
     cost_per_second = model_config['cost_per_generation']
@@ -414,15 +431,28 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
                         param_names = model_config.get('param_names', {})
                         image_param_name = param_names.get('image', 'image')  # Default to 'image' if not specified
                         
-                        # Use model config parameters
-                        # Timeout: 5 minutes per chunk (should be enough for video generation)
-                        # Use parameter name mapping from model config (e.g., 'first_frame_image' for Hailuo)
+                        # Build input parameters based on model config
+                        # Some models use 'duration' (Seedance) instead of 'num_frames' (Hailuo, Wan, etc.)
                         replicate_input = {
                             image_param_name: img_file,
                             prompt_param_name: prompt,
-                            "num_frames": num_frames,
-                            "fps": fps,
                         }
+                        
+                        # Add duration/num_frames parameter based on model
+                        if 'duration' in param_names:
+                            # Models like Seedance use 'duration' in seconds
+                            duration_param_name = param_names.get('duration', 'duration')
+                            replicate_input[duration_param_name] = int(chunk_duration)  # Round to integer seconds
+                        else:
+                            # Models like Hailuo, Wan use 'num_frames' and 'fps'
+                            replicate_input["num_frames"] = num_frames
+                            replicate_input["fps"] = fps
+                        
+                        # Add width/height if model supports them
+                        if 'width' in param_names:
+                            replicate_input[param_names.get('width', 'width')] = model_params.get('width')
+                        if 'height' in param_names:
+                            replicate_input[param_names.get('height', 'height')] = model_params.get('height')
                         output = replicate_client.run(
                             model_name,
                             input=replicate_input,
@@ -552,12 +582,27 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
                 # Open image file for Replicate
                 # Use parameter name mapping from model config (e.g., 'first_frame_image' for Hailuo)
                 with open(input_image_path, 'rb') as img_file:
+                    # Build input parameters based on model config
                     replicate_input = {
                         image_param_name: img_file,
                         prompt_param_name: prompt,
-                        "num_frames": num_frames,
-                        "fps": fps,
                     }
+                    
+                    # Add duration/num_frames parameter based on model
+                    if 'duration' in param_names:
+                        # Models like Seedance use 'duration' in seconds
+                        duration_param_name = param_names.get('duration', 'duration')
+                        replicate_input[duration_param_name] = int(chunk_duration)  # Round to integer seconds
+                    else:
+                        # Models like Hailuo, Wan use 'num_frames' and 'fps'
+                        replicate_input["num_frames"] = num_frames
+                        replicate_input["fps"] = fps
+                    
+                    # Add width/height if model supports them
+                    if 'width' in param_names:
+                        replicate_input[param_names.get('width', 'width')] = model_params.get('width')
+                    if 'height' in param_names:
+                        replicate_input[param_names.get('height', 'height')] = model_params.get('height')
                     output = replicate_client.run(
                         model_name,
                         input=replicate_input,

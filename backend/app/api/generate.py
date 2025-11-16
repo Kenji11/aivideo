@@ -50,8 +50,9 @@ async def generate_video(request: GenerateRequest, db: Session = Depends(get_db)
     
     # Enqueue job
     try:
-        # Pass asset dictionaries (with s3_key) to pipeline for Phase 1
-        run_pipeline.delay(video_id, request.prompt, asset_dicts)
+        # Pass asset dictionaries (with s3_key) and model selection to pipeline for Phase 1
+        selected_model = request.model or 'hailuo'  # Default to 'hailuo' if not specified
+        run_pipeline.delay(video_id, request.prompt, asset_dicts, selected_model)
     except Exception as e:
         # If enqueue fails, update status
         video_record.status = VideoStatus.FAILED
