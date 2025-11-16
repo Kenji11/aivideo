@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '001_add_final_music_url'
+revision = '002_add_final_music_url'
 down_revision = '001_initial'  # Depends on initial schema migration
 branch_labels = None
 depends_on = None
