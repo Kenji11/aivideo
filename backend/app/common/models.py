@@ -82,6 +82,7 @@ class VideoGeneration(Base):
     stitched_url = Column(String, nullable=True)
     refined_url = Column(String, nullable=True)
     final_video_url = Column(String, nullable=True)
+    final_music_url = Column(String, nullable=True)  # Music URL from Phase 5 (saved even if combining fails)
     phase_outputs = Column(JSON, default=dict)  # Store outputs from each phase
     
     # Metadata

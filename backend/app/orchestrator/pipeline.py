@@ -246,6 +246,8 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
                 video.phase_outputs['phase4_chunks'] = result4
                 video.stitched_url = stitched_video_url
                 video.chunk_urls = chunk_urls
+                # Phase 4 updates final_video_url (will be overwritten by Phase 5 if it runs)
+                video.final_video_url = stitched_video_url
                 # Mark JSON column as modified so SQLAlchemy detects the change
                 from sqlalchemy.orm.attributes import flag_modified
                 flag_modified(video, 'phase_outputs')
@@ -253,22 +255,26 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         finally:
             db.close()
         
-        # Update progress
+        # Update progress - Phase 4 completes at 90%
         update_progress(
             video_id,
             "generating_chunks",
-            70,
+            90,
             current_phase="phase4_chunks",
             total_cost=total_cost
         )
         
         # ============ PHASE 5: REFINE & ENHANCE ============
         if stitched_video_url:
-            update_progress(video_id, "refining", 80, current_phase="phase5_refine")
+            # Phase 5 starts at 90%, will complete at 100%
+            update_progress(video_id, "refining", 90, current_phase="phase5_refine")
             
             # Run Phase 5 task synchronously
             result5_obj = refine_video.apply(args=[video_id, stitched_video_url, spec])
             result5 = result5_obj.result
+            
+            # Extract music_url from Phase 5 output (even if combining failed)
+            music_url = result5.get('output_data', {}).get('music_url')
             
             # Check Phase 5 success
             if result5['status'] != "success":
@@ -283,54 +289,57 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
                 
                 # Extract refined video URL from Phase 5
                 refined_video_url = result5['output_data'].get('refined_video_url', stitched_video_url)
-                
-                # Store Phase 5 output in database
-                db = SessionLocal()
-                try:
-                    video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
-                    if video:
-                        if video.phase_outputs is None:
-                            video.phase_outputs = {}
-                        video.phase_outputs['phase5_refine'] = result5
-                        video.refined_url = refined_video_url
-                        flag_modified(video, 'phase_outputs')
-                        db.commit()
-                finally:
-                    db.close()
+            
+            # Calculate generation time
+            generation_time = time.time() - start_time
+            
+            # Store Phase 5 output in database (including music_url even if combining failed)
+            db = SessionLocal()
+            try:
+                video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+                if video:
+                    if video.phase_outputs is None:
+                        video.phase_outputs = {}
+                    video.phase_outputs['phase5_refine'] = result5
+                    video.refined_url = refined_video_url
+                    # Update final_video_url to the new URL (with music if combining succeeded)
+                    video.final_video_url = refined_video_url
+                    # Save music_url even if combining failed (for retry later)
+                    if music_url:
+                        video.final_music_url = music_url
+                    # Update Phase 5 progress, status, and final metadata
+                    video.progress = 100.0
+                    video.current_phase = "phase5_refine"
+                    video.status = VideoStatus.COMPLETE
+                    video.cost_usd = total_cost
+                    video.generation_time_seconds = generation_time
+                    if video.completed_at is None:
+                        from datetime import datetime
+                        video.completed_at = datetime.utcnow()
+                    flag_modified(video, 'phase_outputs')
+                    db.commit()
+            finally:
+                db.close()
         else:
             refined_video_url = stitched_video_url
-        
-        # Calculate generation time
-        generation_time = time.time() - start_time
-        
-        # Mark as complete
-        # Update final status in database
-        db = SessionLocal()
-        try:
-            video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
-            if video:
-                video.status = VideoStatus.COMPLETE
-                video.progress = 100.0
-                video.current_phase = "phase5_refine" if stitched_video_url else "phase4_chunks"
-                video.cost_usd = total_cost
-                video.generation_time_seconds = generation_time
-                video.final_video_url = refined_video_url  # Use refined video if available, else stitched
-                if video.completed_at is None:
-                    from datetime import datetime
-                    video.completed_at = datetime.utcnow()
-                db.commit()
-        finally:
-            db.close()
-        
-        # Also call update_progress for consistency
-        update_progress(
-            video_id,
-            "complete",
-            100,
-            current_phase="phase4_chunks",
-            total_cost=total_cost,
-            generation_time=generation_time
-        )
+            # Phase 5 was skipped - update final status
+            generation_time = time.time() - start_time
+            db = SessionLocal()
+            try:
+                video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+                if video:
+                    video.status = VideoStatus.COMPLETE
+                    video.progress = 100.0
+                    video.current_phase = "phase4_chunks"
+                    video.cost_usd = total_cost
+                    video.generation_time_seconds = generation_time
+                    video.final_video_url = refined_video_url
+                    if video.completed_at is None:
+                        from datetime import datetime
+                        video.completed_at = datetime.utcnow()
+                    db.commit()
+            finally:
+                db.close()
         
         # Print final cost summary
         print("="*70)
