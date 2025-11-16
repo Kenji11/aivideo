@@ -21,7 +21,9 @@ COST_ZEROSCOPE_VIDEO = COST_ZEROSCOPE
 COST_WAN_480P_VIDEO = COST_WAN  # Phase 4: Video chunks per second (current)
 COST_WAN_720P_VIDEO = 0.25  # Phase 4: Video chunks per second (higher quality)
 COST_ANIMATEDIFF_VIDEO = COST_ANIMATEDIFF
-COST_MUSICGEN = 0.15
+COST_MUSICGEN = 0.15  # Legacy
+COST_BARK_MUSIC = 0.10  # suno/bark-with-music per 30s
+COST_AUDIO_CROP = 0.05  # lucataco/audio-crop per operation
 
 # S3 paths
 S3_ANIMATIC_PREFIX = "animatic"

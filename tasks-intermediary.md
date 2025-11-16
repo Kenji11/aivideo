@@ -6,7 +6,7 @@ Simplify the video generation pipeline for MVP by temporarily removing Phase 2 (
 
 **CRITICAL ISSUE RESOLVED**: Video generation models output different chunk durations regardless of what parameters we request. wan (our default) outputs ~5s chunks, not 2s. This affected chunk count calculation and caused video length issues.
 
-**STATUS: PR #9 In Progress - Hailuo Model Testing & Direction Prompts**
+**STATUS: PR #10 In Progress - Phase 5 Music Generation & Integration**
 
 ### Task Order
 1. **PR #1** - Comment out Phase 2 & 3 (MVP simplification) ✅
@@ -17,7 +17,8 @@ Simplify the video generation pipeline for MVP by temporarily removing Phase 2 (
 6. **PR #7** - Add actual_chunk_duration to model configs ✅
 7. **PR #5** - Video length investigation & fix ✅ (Resolved by PR #7)
 8. **PR #8** - Implement last-frame continuation for temporal coherence ✅
-9. **PR #9** - Switch to Hailuo model & add direction prompts 🔄
+9. **PR #9** - Switch to Hailuo model & add direction prompts ✅
+10. **PR #10** - Phase 5 music generation & audio integration 🔄
 
 ## Model Configuration Reference
 
@@ -42,9 +43,12 @@ Each model config includes: name, replicate_model, cost_per_generation, params (
 - `backend/app/phases/phase4_chunks/service.py` - Chunk service orchestration (receive reference URLs, manage chunk sequence)
 - `backend/app/phases/phase4_chunks/schemas.py` - ChunkSpec schema (use reference images from Phase 3)
 - `backend/app/phases/phase4_chunks/model_config.py` - Model configuration management
-- `backend/app/phases/phase4_chunks/frame_extractor.py` - NEW: Extract last frame from generated chunks
-- `backend/app/common/constants.py` - Model cost constants
-- `backend/app/phases/phase4_chunks/stitcher.py` - Video stitching logic (investigate length issues)
+- `backend/app/phases/phase4_chunks/frame_extractor.py` - Extract last frame from generated chunks
+- `backend/app/phases/phase4_chunks/stitcher.py` - Video stitching logic
+- `backend/app/phases/phase5_refine/service.py` - **NEW**: Music generation and audio integration (simplified from previous scope)
+- `backend/app/phases/phase5_refine/task.py` - Phase 5 Celery task (music workflow)
+- `backend/app/phases/phase5_refine/schemas.py` - Phase 5 schemas (music specs, output)
+- `backend/app/common/constants.py` - Model cost constants (add music generation costs)
 
 ## Tasks
 
@@ -167,32 +171,67 @@ Each model config includes: name, replicate_model, cost_per_generation, params (
   - [x] 8.17 Test: Verify chunks 1+ use last frame from previous chunk (Verified: chunk 1 used last frame from chunk 0)
   - [x] 8.18 Test: Verify temporal coherence (no visual resets between chunks) (Verified in stitched output)
 
-- [ ] 9.0 Switch to Hailuo Model & Add Direction Prompts (PR #9) **← MODEL TESTING**
+- [x] 9.0 Switch to Hailuo Model & Add Direction Prompts (PR #9) **← MODEL TESTING**
   - [x] 9.1 Switch DEFAULT_MODEL from 'wan' to 'hailuo' in `model_config.py`
   - [x] 9.2 Verify COST_HAILUO is imported from `constants.py` (already exists: $0.04)
   - [x] 9.3 Update model documentation to reflect Hailuo as default
   - [x] 9.4 Add model-specific parameter mapping (`param_names` in model config)
   - [x] 9.5 Fix Hailuo parameter: use 'first_frame_image' instead of 'image'
   - [x] 9.6 Update chunk_generator to use model-specific parameter names
-  - [ ] 9.7 Test Hailuo model with basic image-to-video generation
-  - [ ] 9.8 Verify Hailuo accepts image + prompt parameters correctly
-  - [ ] 9.6 Check Hailuo output quality and duration (should be ~5s chunks @ 720p, 30fps)
-  - [ ] 9.7 Add `direction_prompt` field to ChunkSpec schema in `schemas.py`
-  - [ ] 9.8 Build direction prompt from beat specifications (camera movement, action, shot type)
-  - [ ] 9.9 Combine base prompt with direction prompt for image-to-video generation
-  - [ ] 9.10 Format: "{base_prompt}. {direction_prompt}" or separate fields if model supports it
-  - [ ] 9.11 For chunk 0: Include direction from beat in prompt
-  - [ ] 9.12 For chunks 1+: Include direction from corresponding beat in prompt
-  - [ ] 9.13 Add logging: "Using direction prompt: {direction_prompt}" for each chunk
-  - [ ] 9.14 Test: Verify direction prompts improve video motion and camera work
-  - [ ] 9.15 Test: Verify Hailuo respects direction prompts better than wan
-  - [ ] 9.16 Compare output quality: Hailuo (720p @ 30fps) vs wan (480p @ 24fps)
-  - [ ] 9.17 Verify cost tracking: Hailuo should be cheaper ($0.04 vs $0.45 per chunk)
+  - [x] 9.7 Test Hailuo model with basic image-to-video generation
+  - [x] 9.8 Verify Hailuo accepts image + prompt parameters correctly
+  - [x] 9.9 Check Hailuo output quality and duration (should be ~5s chunks @ 720p, 30fps)
+  - [x] 9.10 Add `direction_prompt` field to ChunkSpec schema in `schemas.py`
+  - [x] 9.11 Build direction prompt from beat specifications (camera movement, action, shot type)
+  - [x] 9.12 Combine base prompt with direction prompt for image-to-video generation
+  - [x] 9.13 Format: "{base_prompt}. {direction_prompt}" or separate fields if model supports it
+  - [x] 9.14 For chunk 0: Include direction from beat in prompt
+  - [x] 9.15 For chunks 1+: Include direction from corresponding beat in prompt
+  - [x] 9.16 Add logging: "Using direction prompt: {direction_prompt}" for each chunk
+  - [x] 9.17 Test: Verify direction prompts improve video motion and camera work
+  - [x] 9.18 Test: Verify Hailuo respects direction prompts better than wan
+  - [x] 9.19 Compare output quality: Hailuo (720p @ 30fps) vs wan (480p @ 24fps)
+  - [x] 9.20 Verify cost tracking: Hailuo should be cheaper ($0.04 vs $0.45 per chunk)
+
+- [ ] 10.0 Phase 5: Music Generation & Audio Integration (PR #10) **← AUDIO LAYER**
+  - [x] 10.1 Add test utility: Reuse last generated video for testing (no regeneration)
+  - [x] 10.2 Create `backend/test_with_last_video.py` helper script
+  - [x] 10.3 Load last video_id, spec, and stitched video from database/S3
+  - [x] 10.4 Skip Phase 1-4, start directly at Phase 5 with existing video
+  - [x] 10.5 Add `--use-last-video` flag to pipeline or create separate test endpoint
+  - [x] 10.6 Save time and cost during iterative testing (~$2-3 per test avoided)
+  - [x] 10.7 Update Phase 5 scope: Remove upscaling, temporal smoothing, color grading
+  - [x] 10.8 Phase 5 new focus: Music generation and audio integration ONLY
+  - [x] 10.9 Update `backend/app/phases/phase5_refine/service.py` for music-only workflow
+  - [x] 10.10 Add music generation using `suno/bark-with-music` model
+  - [ ] 10.11 Input: video duration + template audio spec (tempo, mood, style from spec)
+  - [ ] 10.12 Generate music ~5s longer than video duration for safety margin
+  - [ ] 10.13 Crop music to exact video duration using `lucataco/audio-crop`
+  - [ ] 10.14 Extract audio specs from template: music_style, tempo, mood
+  - [ ] 10.15 Build music prompt from template specs (e.g., "energetic hip-hop instrumental, 140-150 BPM")
+  - [ ] 10.16 Download stitched video from Phase 4 (S3)
+  - [ ] 10.17 Use moviepy to combine video + generated music
+  - [ ] 10.18 Set music volume to 0.7 (70%) for balanced audio
+  - [ ] 10.19 Export final video with audio as `final_with_music.mp4`
+  - [ ] 10.20 Upload final video to S3: `{video_id}/final_draft.mp4`
+  - [ ] 10.21 Add cost tracking: music generation (~$0.10-$0.20) + audio crop (~$0.05)
+  - [ ] 10.22 Add logging: music prompt, duration, crop times, export path
+  - [ ] 10.23 Update Phase 5 task to accept video_id and spec as input
+  - [ ] 10.24 Return final video S3 URL from Phase 5
+  - [ ] 10.25 Optional: Add SFX generation using `cjwbw/elevenlabs-sound-effects` (future enhancement)
+  - [ ] 10.26 Optional: Composite multiple audio layers (music + SFX) with moviepy (future)
+  - [ ] 10.27 Test: Use last generated video with test utility (10.1-10.6)
+  - [ ] 10.28 Test: Generate music for existing 10s video
+  - [ ] 10.29 Test: Generate music for existing 30s video
+  - [ ] 10.30 Test: Verify music matches template mood and tempo
+  - [ ] 10.31 Test: Verify audio is properly synced with video
+  - [ ] 10.32 Verify final video plays with audio in browser/player
 
 ## Notes
 
 - **Phase 2 Removal**: Phase 2 (Animatic) remains disabled for MVP. Phase 3 (References) is being re-enabled.
 - **Phase 3 Scope**: Generate ONE reference image (product_ref) per video. Style guide is OUT OF SCOPE for MVP.
+- **Phase 5 Redesign**: Simplified to music-only workflow. Removed upscaling, temporal smoothing, and color grading (models output good quality by default).
 - **Model Strategy**: **Hailuo 2.3 Fast (minimax/hailuo-2.3-fast)** is now default. 720p @ 30fps, outputs 5s chunks, $0.04/chunk (cheaper than wan).
 - **Previous Model**: wan-2.1-480p was default (480p @ 24fps, $0.45/chunk)
 - **Model Switching**: To switch models, simply change `DEFAULT_MODEL` in `model_config.py`. No code changes needed elsewhere.
