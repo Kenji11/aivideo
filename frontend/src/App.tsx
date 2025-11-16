@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Video, Film, Download, ArrowLeft, Settings, BarChart3, Zap, Library, CreditCard, Code2 } from 'lucide-react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Sparkles, Video, Film, Download, Settings, BarChart3, Zap, Library, CreditCard, Code2 } from 'lucide-react';
 import { Header } from './components/Header';
 import { StepIndicator } from './components/StepIndicator';
 import { UploadZone } from './components/UploadZone';
 import { ProjectCard } from './components/ProjectCard';
 import { ProcessingSteps } from './components/ProcessingSteps';
 import { NotificationCenter, Notification } from './components/NotificationCenter';
-// import { TemplateGallery } from './components/TemplateGallery'; // Unused for now
 import type { Template } from './components/TemplateGallery';
 import { ExportPanel } from './components/ExportPanel';
 import { Auth } from './pages/Auth';
@@ -17,13 +17,12 @@ import { Dashboard } from './pages/Dashboard';
 import { VideoLibrary } from './pages/VideoLibrary';
 import { Billing } from './pages/Billing';
 import { API } from './pages/API';
-// import { supabase, Project } from './lib/supabase'; // Unused for now
 import { generateVideo, getVideoStatus, StatusResponse, listVideos, VideoListItem } from './lib/api';
 
-type AppStep = 'projects' | 'create' | 'processing' | 'preview' | 'download' | 'templates' | 'settings' | 'analytics' | 'dashboard' | 'library' | 'billing' | 'api' | 'export';
-
-function App() {
-  const [appStep, setAppStep] = useState<AppStep>('create');
+// Main App Content (inside router)
+function AppContent() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [prompt, setPrompt] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -33,13 +32,16 @@ function App() {
   const [, setSelectedProject] = useState<VideoListItem | null>(null);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    // Check localStorage on mount
+    return localStorage.getItem('isLoggedIn') === 'true';
+  });
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [videoId, setVideoId] = useState<string | null>(null);
   const [animaticUrls, setAnimaticUrls] = useState<string[] | null>(null);
   const [referenceAssets, setReferenceAssets] = useState<StatusResponse['reference_assets'] | null>(null);
   const [stitchedVideoUrl, setStitchedVideoUrl] = useState<string | null>(null);
-  const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]); // Store uploaded asset IDs
+  const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]);
 
   const steps = [
     { id: 1, name: 'Create', icon: Sparkles },
@@ -55,10 +57,9 @@ function App() {
     if (phase === 'phase2_animatic') return 1;
     if (phase === 'phase3_references') return 2;
     if (phase === 'phase4_chunks') return 3;
-    return Math.floor(progress / 25); // Fallback to progress-based calculation
+    return Math.floor(progress / 25);
   };
 
-  // Calculate processing steps status based on current progress
   const getStepStatus = (stepIndex: number): 'completed' | 'processing' | 'pending' => {
     if (processingProgress > stepIndex) return 'completed';
     if (processingProgress === stepIndex) return 'processing';
@@ -72,7 +73,6 @@ function App() {
     { name: 'Generating & stitching video chunks', status: getStepStatus(3) },
   ];
 
-  // Define addNotification before using it in useEffect
   const addNotification = (type: Notification['type'], title: string, message: string) => {
     const id = Math.random().toString();
     const notification: Notification = {
@@ -95,32 +95,27 @@ function App() {
       try {
         const status = await getVideoStatus(videoId);
         
-        // Update progress based on current_phase
         const currentStep = getProcessingStepFromPhase(status.current_phase, status.progress);
         setProcessingProgress(currentStep);
         
-        // Check for Phase 2 animatic frames
         if (status.animatic_urls && status.animatic_urls.length > 0 && !animaticUrls) {
           setAnimaticUrls(status.animatic_urls);
           addNotification('success', 'Animatic Frames Generated', `${status.animatic_urls.length} animatic frames ready!`);
         }
         
-        // Check for Phase 3 reference assets
         if (status.reference_assets && !referenceAssets) {
           setReferenceAssets(status.reference_assets);
           addNotification('success', 'Reference Assets Generated', 'Style guide and product references are ready!');
         }
         
-        // Check for Phase 4 stitched video
         if (status.stitched_video_url && !stitchedVideoUrl) {
           setStitchedVideoUrl(status.stitched_video_url);
           addNotification('success', 'Video Chunks Generated', 'Video chunks are being stitched together!');
         }
         
-        // Check if complete or failed
         if (status.status === 'complete') {
           setIsProcessing(false);
-          setAppStep('preview');
+          navigate('/preview');
           addNotification('success', 'Video Complete', 'Your video is ready!');
         } else if (status.status === 'failed') {
           setIsProcessing(false);
@@ -131,14 +126,12 @@ function App() {
       }
     };
 
-    // Poll every 2 seconds
     const interval = setInterval(pollStatus, 2000);
-    pollStatus(); // Initial call
+    pollStatus();
 
     return () => clearInterval(interval);
-  }, [videoId, isProcessing, referenceAssets, stitchedVideoUrl, animaticUrls, addNotification]);
+  }, [videoId, isProcessing, referenceAssets, stitchedVideoUrl, animaticUrls, navigate]);
 
-  // Timer for elapsed time
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isProcessing) {
@@ -154,18 +147,17 @@ function App() {
     
     try {
       setIsProcessing(true);
-        setElapsedTime(0);
-        setProcessingProgress(0);
-        setReferenceAssets(null);
-        setStitchedVideoUrl(null);
-        setAppStep('processing');
+      setElapsedTime(0);
+      setProcessingProgress(0);
+      setReferenceAssets(null);
+      setStitchedVideoUrl(null);
+      navigate('/processing');
       
-      // Call backend API with uploaded asset IDs
       const response = await generateVideo({
         title: title || 'Untitled Video',
         description: description || undefined,
         prompt: prompt,
-        reference_assets: uploadedAssetIds // Use uploaded asset IDs from UploadZone
+        reference_assets: uploadedAssetIds
       });
       
       setVideoId(response.video_id);
@@ -173,29 +165,26 @@ function App() {
     } catch (error) {
       addNotification('error', 'Generation Failed', error instanceof Error ? error.message : 'Unknown error');
       setIsProcessing(false);
-      setAppStep('create');
+      navigate('/');
     }
   };
 
   const handleProjectSelect = (project: VideoListItem) => {
     setSelectedProject(project);
-    // If video is complete, show preview
     if (project.status === 'complete' && project.final_video_url) {
       setStitchedVideoUrl(project.final_video_url);
       setTitle(project.title);
-      setAppStep('preview');
+      navigate('/preview');
     } else if (project.status !== 'complete' && project.status !== 'failed') {
-      // If still processing, show processing view
       setVideoId(project.video_id);
       setIsProcessing(true);
-      setAppStep('processing');
+      navigate('/processing');
     }
   };
 
-  // Fetch projects from backend
   useEffect(() => {
     const fetchProjects = async () => {
-      if (appStep === 'projects' || appStep === 'create') {
+      if (location.pathname === '/projects' || location.pathname === '/') {
         setIsLoadingProjects(true);
         try {
           const response = await listVideos();
@@ -210,37 +199,43 @@ function App() {
     };
 
     fetchProjects();
-  }, [appStep]);
+  }, [location.pathname]);
 
   const getCurrentStep = () => {
-    switch (appStep) {
-      case 'processing':
-        return 2;
-      case 'preview':
-        return 3;
-      case 'download':
-        return 4;
-      default:
-        return 1;
-    }
+    if (location.pathname === '/processing') return 2;
+    if (location.pathname === '/preview') return 3;
+    if (location.pathname === '/download') return 4;
+    return 1;
   };
 
   const handleSelectTemplate = (template: Template) => {
     setTitle(template.name);
     setDescription(template.description);
-    setAppStep('create');
+    navigate('/');
     addNotification('success', 'Template Selected', `Started with ${template.name} template`);
   };
 
+  const handleAuthSuccess = () => {
+    setIsLoggedIn(true);
+    localStorage.setItem('isLoggedIn', 'true');
+    navigate('/');
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    localStorage.removeItem('isLoggedIn');
+    navigate('/login');
+  };
+
   if (!isLoggedIn) {
-    return <Auth onAuthSuccess={() => setIsLoggedIn(true)} />;
+    return <Auth onAuthSuccess={handleAuthSuccess} />;
   }
+
+  const showStepIndicator = ['/processing', '/preview', '/download'].includes(location.pathname);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <Header
-        onProjectsClick={() => setAppStep(appStep === 'projects' ? 'create' : 'projects')}
-      />
+      <Header onLogout={handleLogout} userName="User" />
 
       <NotificationCenter
         notifications={notifications}
@@ -248,244 +243,235 @@ function App() {
       />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {appStep === 'dashboard' && (
-          <Dashboard onBack={() => setAppStep('create')} />
+        {/* Navigation buttons - always visible on all pages */}
+        <div className="flex items-center justify-between mb-8 overflow-x-auto pb-2">
+          <div className="space-x-2 flex flex-shrink-0">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
+                location.pathname === '/dashboard' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+              }`}
+              title="Dashboard"
+            >
+              <BarChart3 className="w-5 h-5" />
+              <span className="hidden sm:inline">Dashboard</span>
+            </button>
+            <button
+              onClick={() => navigate('/templates')}
+              className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
+                location.pathname === '/templates' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+              }`}
+              title="Templates"
+            >
+              <Zap className="w-5 h-5" />
+              <span className="hidden sm:inline">Templates</span>
+            </button>
+            <button
+              onClick={() => navigate('/library')}
+              className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
+                location.pathname === '/library' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+              }`}
+              title="Video Library"
+            >
+              <Library className="w-5 h-5" />
+              <span className="hidden sm:inline">Library</span>
+            </button>
+            <button
+              onClick={() => navigate('/analytics')}
+              className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
+                location.pathname === '/analytics' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+              }`}
+              title="Analytics"
+            >
+              <BarChart3 className="w-5 h-5" />
+              <span className="hidden sm:inline">Analytics</span>
+            </button>
+            <button
+              onClick={() => navigate('/billing')}
+              className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
+                location.pathname === '/billing' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+              }`}
+              title="Billing"
+            >
+              <CreditCard className="w-5 h-5" />
+              <span className="hidden sm:inline">Billing</span>
+            </button>
+            <button
+              onClick={() => navigate('/api')}
+              className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
+                location.pathname === '/api' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+              }`}
+              title="API"
+            >
+              <Code2 className="w-5 h-5" />
+              <span className="hidden sm:inline">API</span>
+            </button>
+            <button
+              onClick={() => navigate('/settings')}
+              className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
+                location.pathname === '/settings' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+              }`}
+              title="Settings"
+            >
+              <Settings className="w-5 h-5" />
+              <span className="hidden sm:inline">Settings</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Step indicator - only shown on processing/preview/download pages */}
+        {showStepIndicator && (
+          <StepIndicator steps={steps} currentStep={getCurrentStep()} />
         )}
 
-        {appStep === 'settings' && (
-          <SettingsPage onBack={() => setAppStep('create')} />
-        )}
-
-        {appStep === 'analytics' && (
-          <Analytics onBack={() => setAppStep('create')} />
-        )}
-
-        {appStep === 'templates' && (
-          <Templates onBack={() => setAppStep('create')} onSelectTemplate={handleSelectTemplate} />
-        )}
-
-        {appStep === 'library' && (
-          <VideoLibrary onBack={() => setAppStep('create')} />
-        )}
-
-        {appStep === 'billing' && (
-          <Billing onBack={() => setAppStep('create')} />
-        )}
-
-        {appStep === 'api' && (
-          <API onBack={() => setAppStep('create')} />
-        )}
-
-        {appStep === 'export' && (
-          <ExportPanel onExport={() => {
-            addNotification('success', 'Export Started', 'Your video is being exported');
-            setAppStep('preview');
-          }} onCancel={() => setAppStep('preview')} />
-        )}
-
-        {(appStep === 'create' || appStep === 'processing' || appStep === 'preview' || appStep === 'download') && (
-          <>
-            <div className="flex items-center justify-between mb-8 overflow-x-auto pb-2">
-              <div className="space-x-2 flex flex-shrink-0">
-                <button
-                  onClick={() => setAppStep('dashboard')}
-                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap text-sm"
-                  title="Dashboard"
-                >
-                  <BarChart3 className="w-5 h-5" />
-                  <span className="hidden sm:inline">Dashboard</span>
-                </button>
-                <button
-                  onClick={() => setAppStep('templates')}
-                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap text-sm"
-                  title="Templates"
-                >
-                  <Zap className="w-5 h-5" />
-                  <span className="hidden sm:inline">Templates</span>
-                </button>
-                <button
-                  onClick={() => setAppStep('library')}
-                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap text-sm"
-                  title="Video Library"
-                >
-                  <Library className="w-5 h-5" />
-                  <span className="hidden sm:inline">Library</span>
-                </button>
-                <button
-                  onClick={() => setAppStep('analytics')}
-                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap text-sm"
-                  title="Analytics"
-                >
-                  <BarChart3 className="w-5 h-5" />
-                  <span className="hidden sm:inline">Analytics</span>
-                </button>
-                <button
-                  onClick={() => setAppStep('billing')}
-                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap text-sm"
-                  title="Billing"
-                >
-                  <CreditCard className="w-5 h-5" />
-                  <span className="hidden sm:inline">Billing</span>
-                </button>
-                <button
-                  onClick={() => setAppStep('api')}
-                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap text-sm"
-                  title="API"
-                >
-                  <Code2 className="w-5 h-5" />
-                  <span className="hidden sm:inline">API</span>
-                </button>
-                <button
-                  onClick={() => setAppStep('settings')}
-                  className="flex items-center space-x-2 px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap text-sm"
-                  title="Settings"
-                >
-                  <Settings className="w-5 h-5" />
-                  <span className="hidden sm:inline">Settings</span>
-                </button>
+        <Routes>
+          <Route path="/" element={
+            <div className="card p-8 animate-fade-in">
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                  Create Your Video
+                </h2>
+                <p className="text-slate-600 dark:text-slate-400">
+                  Describe your vision and let AI bring it to life, or choose a template to get started
+                </p>
               </div>
-            </div>
 
-            {(appStep !== 'create') && (
-              <StepIndicator steps={steps} currentStep={getCurrentStep()} />
-            )}
-          </>
-        )}
-
-        {appStep === 'projects' && (
-          <div className="animate-fade-in">
-            <div className="mb-8">
-              <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                My Projects
-              </h2>
-              <p className="text-slate-600 dark:text-slate-400">
-                Create and manage your AI-generated videos
-              </p>
-            </div>
-
-            {isLoadingProjects ? (
-              <div className="card p-16 text-center">
-                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mb-4"></div>
-                <p className="text-slate-500 dark:text-slate-400">Loading projects...</p>
-              </div>
-            ) : projects.length === 0 ? (
-              <div className="card p-16 text-center">
-                <Film className="w-16 h-16 mx-auto text-slate-300 mb-4" />
-                <p className="text-slate-500 dark:text-slate-400 mb-6">No projects yet</p>
-                <button
-                  onClick={() => setAppStep('create')}
-                  className="btn-primary"
-                >
-                  Create Your First Video
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {projects.map((project) => (
-                  <ProjectCard
-                    key={project.video_id}
-                    project={project}
-                    onSelect={handleProjectSelect}
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Project Title
+                  </label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="E.g., Summer Travel Vlog"
+                    className="input-field"
+                    required
                   />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+                </div>
 
-        {appStep === 'create' && (
-          <div className="card p-8 animate-fade-in">
-            <div className="mb-8">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Description (optional)
+                  </label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Add more context about your project..."
+                    className="input-field resize-none h-20"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    What would you like to create?
+                  </label>
+                  <textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Describe your video in detail. E.g., Create a promotional video about sustainable living with nature scenes, uplifting music, and inspirational quotes..."
+                    className="input-field resize-none h-32"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Reference Materials
+                  </label>
+                  <UploadZone 
+                    disabled={isProcessing} 
+                    onAssetsUploaded={(assetIds) => {
+                      setUploadedAssetIds(assetIds);
+                      addNotification('success', 'Files Uploaded', `${assetIds.length} file(s) uploaded successfully!`);
+                    }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!prompt || !title || isProcessing}
+                  className="w-full btn-primary flex items-center justify-center space-x-2"
+                >
+                  <Sparkles className="w-5 h-5" />
+                  <span>{isProcessing ? 'Processing...' : 'Start Creating'}</span>
+                </button>
+              </form>
+            </div>
+          } />
+
+          <Route path="/projects" element={
+            <div className="animate-fade-in">
+              <div className="mb-8">
+                <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                  My Projects
+                </h2>
+                <p className="text-slate-600 dark:text-slate-400">
+                  Create and manage your AI-generated videos
+                </p>
+              </div>
+
+              {isLoadingProjects ? (
+                <div className="card p-16 text-center">
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mb-4"></div>
+                  <p className="text-slate-500 dark:text-slate-400">Loading projects...</p>
+                </div>
+              ) : projects.length === 0 ? (
+                <div className="card p-16 text-center">
+                  <Film className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+                  <p className="text-slate-500 dark:text-slate-400 mb-6">No projects yet</p>
+                  <button
+                    onClick={() => navigate('/')}
+                    className="btn-primary"
+                  >
+                    Create Your First Video
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {projects.map((project) => (
+                    <ProjectCard
+                      key={project.video_id}
+                      project={project}
+                      onSelect={handleProjectSelect}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          } />
+
+          <Route path="/processing" element={
+            <div className="card p-8 text-center animate-fade-in">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 dark:bg-blue-900 rounded-full mb-6 animate-pulse-subtle">
+                <Video className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+              </div>
               <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                Create Your Video
+                AI is Creating Your Video
               </h2>
-              <p className="text-slate-600 dark:text-slate-400">
-                Describe your vision and let AI bring it to life, or choose a template to get started
+              <p className="text-slate-600 dark:text-slate-400 mb-8">
+                Sit back and relax while our AI works its magic...
               </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Project Title
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="E.g., Summer Travel Vlog"
-                  className="input-field"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Description (optional)
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Add more context about your project..."
-                  className="input-field resize-none h-20"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  What would you like to create?
-                </label>
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Describe your video in detail. E.g., Create a promotional video about sustainable living with nature scenes, uplifting music, and inspirational quotes..."
-                  className="input-field resize-none h-32"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Reference Materials
-                </label>
-                <UploadZone 
-                  disabled={isProcessing} 
-                  onAssetsUploaded={(assetIds) => {
-                    setUploadedAssetIds(assetIds);
-                    addNotification('success', 'Files Uploaded', `${assetIds.length} file(s) uploaded successfully!`);
-                  }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={!prompt || !title || isProcessing}
-                className="w-full btn-primary flex items-center justify-center space-x-2"
-              >
-                <Sparkles className="w-5 h-5" />
-                <span>{isProcessing ? 'Processing...' : 'Start Creating'}</span>
-              </button>
-            </form>
-          </div>
-        )}
-
-        {appStep === 'processing' && (
-          <div className="card p-8 text-center animate-fade-in">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 dark:bg-blue-900 rounded-full mb-6 animate-pulse-subtle">
-              <Video className="w-10 h-10 text-blue-600 dark:text-blue-400" />
-            </div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-              AI is Creating Your Video
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-8">
-              Sit back and relax while our AI works its magic...
-            </p>
 
               <div className="max-w-md mx-auto text-left mb-8">
                 <ProcessingSteps steps={processingSteps} elapsedTime={elapsedTime} />
               </div>
 
-              {/* Phase 2 Animatic Frames */}
               {animaticUrls && animaticUrls.length > 0 && (
                 <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
                   <div className="flex items-center justify-between mb-6">
@@ -520,232 +506,253 @@ function App() {
                 </div>
               )}
 
-              {/* Phase 3 Reference Assets */}
               {referenceAssets && (
-              <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-                  Reference Assets Generated
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-                  {referenceAssets.style_guide_url && (
-                    <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Style Guide</p>
-                      <img 
-                        src={referenceAssets.style_guide_url} 
-                        alt="Style Guide"
-                        className="w-full h-48 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
-                        onError={(e) => {
-                          // If S3 URL, try to get presigned URL or show placeholder
-                          e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Style+Guide';
-                        }}
-                      />
-                    </div>
-                  )}
-                  {referenceAssets.product_reference_url && (
-                    <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Product Reference</p>
-                      <img 
-                        src={referenceAssets.product_reference_url} 
-                        alt="Product Reference"
-                        className="w-full h-48 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
-                        onError={(e) => {
-                          e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Product+Reference';
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-                {referenceAssets.uploaded_assets && referenceAssets.uploaded_assets.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                      Uploaded Assets ({referenceAssets.uploaded_assets.length})
-                    </p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {referenceAssets.uploaded_assets.map((asset, idx) => (
-                        <img
-                          key={idx}
-                          src={asset.s3_url}
-                          alt={`Uploaded asset ${idx + 1}`}
-                          className="w-full h-24 object-cover rounded border border-slate-200 dark:border-slate-700"
+                <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                    Reference Assets Generated
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                    {referenceAssets.style_guide_url && (
+                      <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Style Guide</p>
+                        <img 
+                          src={referenceAssets.style_guide_url} 
+                          alt="Style Guide"
+                          className="w-full h-48 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
                           onError={(e) => {
-                            e.currentTarget.src = 'https://via.placeholder.com/200x200?text=Asset';
+                            e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Style+Guide';
                           }}
                         />
-                      ))}
-                    </div>
+                      </div>
+                    )}
+                    {referenceAssets.product_reference_url && (
+                      <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Product Reference</p>
+                        <img 
+                          src={referenceAssets.product_reference_url} 
+                          alt="Product Reference"
+                          className="w-full h-48 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
+                          onError={(e) => {
+                            e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Product+Reference';
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {appStep === 'preview' && (
-          <div className="card overflow-hidden animate-fade-in">
-            <div className="aspect-video bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
-              {stitchedVideoUrl ? (
-                <video
-                  src={stitchedVideoUrl}
-                  controls
-                  className="w-full h-full object-contain"
-                  onError={(e) => {
-                    console.error('Video load error:', e);
-                    // Fallback to placeholder if video fails to load
-                  }}
-                >
-                  Your browser does not support the video tag.
-                </video>
-              ) : (
-                <div className="text-center text-white">
-                  <Film className="w-20 h-20 mx-auto mb-4 opacity-50 animate-float" />
-                  <p className="text-lg font-medium opacity-75">Your Video is Ready</p>
-                  <p className="text-sm opacity-50 mt-2">Loading video...</p>
+                  {referenceAssets.uploaded_assets && referenceAssets.uploaded_assets.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                        Uploaded Assets ({referenceAssets.uploaded_assets.length})
+                      </p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {referenceAssets.uploaded_assets.map((asset, idx) => (
+                          <img
+                            key={idx}
+                            src={asset.s3_url}
+                            alt={`Uploaded asset ${idx + 1}`}
+                            className="w-full h-24 object-cover rounded border border-slate-200 dark:border-slate-700"
+                            onError={(e) => {
+                              e.currentTarget.src = 'https://via.placeholder.com/200x200?text=Asset';
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-            <div className="p-8 space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                  {title}
-                </h2>
-                {description && (
-                  <p className="text-slate-600 dark:text-slate-400">
-                    {description}
-                  </p>
-                )}
-              </div>
+          } />
 
-              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Duration</p>
-                  <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">2:45</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Resolution</p>
-                  <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">1080p</p>
-                </div>
-              </div>
-
-              <div className="flex flex-col space-y-3">
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    onClick={() => {
-                      setAppStep('create');
-                      setPrompt('');
-                      setTitle('');
-                      setDescription('');
-                    }}
-                    className="btn-secondary"
-                  >
-                    Create Another
-                  </button>
-                  <button
-                    onClick={() => setAppStep('export')}
-                    className="btn-primary flex items-center justify-center space-x-2"
-                  >
-                    <BarChart3 className="w-5 h-5" />
-                    <span>Export</span>
-                  </button>
-                </div>
-                <button
-                  onClick={() => {
-                    if (stitchedVideoUrl) {
-                      // Create download link
-                      const link = document.createElement('a');
-                      link.href = stitchedVideoUrl;
-                      link.download = `${title || 'video'}.mp4`;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                      addNotification('success', 'Download Started', 'Your video download has started');
-                      setAppStep('download');
-                    } else {
-                      addNotification('error', 'Video Not Ready', 'Video is still processing');
-                    }
-                  }}
-                  disabled={!stitchedVideoUrl}
-                  className="w-full btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Download className="w-5 h-5" />
-                  <span>Download Video</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {appStep === 'download' && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="card p-8 text-center">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 dark:bg-green-900 rounded-full mb-6">
-                <Download className="w-10 h-10 text-green-600 dark:text-green-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                Your Video is Ready!
-              </h2>
-              <p className="text-slate-600 dark:text-slate-400 mb-8">
-                Download your video or create another one
-              </p>
-              
-              {stitchedVideoUrl && (
-                <div className="mb-8">
+          <Route path="/preview" element={
+            <div className="card overflow-hidden animate-fade-in">
+              <div className="aspect-video bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
+                {stitchedVideoUrl ? (
                   <video
                     src={stitchedVideoUrl}
                     controls
-                    className="w-full max-w-2xl mx-auto rounded-lg border border-slate-200 dark:border-slate-700"
+                    className="w-full h-full object-contain"
                     onError={(e) => {
                       console.error('Video load error:', e);
                     }}
                   >
                     Your browser does not support the video tag.
                   </video>
+                ) : (
+                  <div className="text-center text-white">
+                    <Film className="w-20 h-20 mx-auto mb-4 opacity-50 animate-float" />
+                    <p className="text-lg font-medium opacity-75">Your Video is Ready</p>
+                    <p className="text-sm opacity-50 mt-2">Loading video...</p>
+                  </div>
+                )}
+              </div>
+              <div className="p-8 space-y-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                    {title}
+                  </h2>
+                  {description && (
+                    <p className="text-slate-600 dark:text-slate-400">
+                      {description}
+                    </p>
+                  )}
                 </div>
-              )}
-              
-              <div className="flex flex-col space-y-3 max-w-md mx-auto">
-                {stitchedVideoUrl && (
+
+                <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
+                  <div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Duration</p>
+                    <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">2:45</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Resolution</p>
+                    <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">1080p</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => {
+                        setPrompt('');
+                        setTitle('');
+                        setDescription('');
+                        navigate('/');
+                      }}
+                      className="btn-secondary"
+                    >
+                      Create Another
+                    </button>
+                    <button
+                      onClick={() => navigate('/export')}
+                      className="btn-primary flex items-center justify-center space-x-2"
+                    >
+                      <BarChart3 className="w-5 h-5" />
+                      <span>Export</span>
+                    </button>
+                  </div>
                   <button
                     onClick={() => {
-                      const link = document.createElement('a');
-                      link.href = stitchedVideoUrl;
-                      link.download = `${title || 'video'}.mp4`;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                      addNotification('success', 'Download Started', 'Your video download has started');
+                      if (stitchedVideoUrl) {
+                        const link = document.createElement('a');
+                        link.href = stitchedVideoUrl;
+                        link.download = `${title || 'video'}.mp4`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        addNotification('success', 'Download Started', 'Your video download has started');
+                        navigate('/download');
+                      } else {
+                        addNotification('error', 'Video Not Ready', 'Video is still processing');
+                      }
                     }}
-                    className="w-full btn-primary flex items-center justify-center space-x-2"
+                    disabled={!stitchedVideoUrl}
+                    className="w-full btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Download className="w-5 h-5" />
                     <span>Download Video</span>
                   </button>
-                )}
-                <button
-                  onClick={() => {
-                    setAppStep('create');
-                    setPrompt('');
-                    setTitle('');
-                    setDescription('');
-                    setStitchedVideoUrl(null);
-                    setReferenceAssets(null);
-                  }}
-                  className="w-full btn-secondary"
-                >
-                  Create New Video
-                </button>
-                <button
-                  onClick={() => setAppStep('projects')}
-                  className="w-full btn-secondary flex items-center justify-center space-x-2"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                  <span>My Projects</span>
-                </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          } />
+
+          <Route path="/download" element={
+            <div className="space-y-6 animate-fade-in">
+              <div className="card p-8 text-center">
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 dark:bg-green-900 rounded-full mb-6">
+                  <Download className="w-10 h-10 text-green-600 dark:text-green-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                  Your Video is Ready!
+                </h2>
+                <p className="text-slate-600 dark:text-slate-400 mb-8">
+                  Download your video or create another one
+                </p>
+                
+                {stitchedVideoUrl && (
+                  <div className="mb-8">
+                    <video
+                      src={stitchedVideoUrl}
+                      controls
+                      className="w-full max-w-2xl mx-auto rounded-lg border border-slate-200 dark:border-slate-700"
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+                )}
+                
+                <div className="flex flex-col space-y-3 max-w-md mx-auto">
+                  {stitchedVideoUrl && (
+                    <button
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = stitchedVideoUrl;
+                        link.download = `${title || 'video'}.mp4`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        addNotification('success', 'Download Started', 'Your video download has started');
+                      }}
+                      className="w-full btn-primary flex items-center justify-center space-x-2"
+                    >
+                      <Download className="w-5 h-5" />
+                      <span>Download Video</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setPrompt('');
+                      setTitle('');
+                      setDescription('');
+                      setStitchedVideoUrl(null);
+                      setReferenceAssets(null);
+                      navigate('/');
+                    }}
+                    className="w-full btn-secondary"
+                  >
+                    Create New Video
+                  </button>
+                  <button
+                    onClick={() => navigate('/projects')}
+                    className="w-full btn-secondary flex items-center justify-center space-x-2"
+                  >
+                    <Film className="w-5 h-5" />
+                    <span>My Projects</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          } />
+
+          <Route path="/export" element={
+            <ExportPanel 
+              onExport={() => {
+                addNotification('success', 'Export Started', 'Your video is being exported');
+                navigate('/preview');
+              }} 
+              onCancel={() => navigate('/preview')} 
+            />
+          } />
+
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/templates" element={<Templates onSelectTemplate={handleSelectTemplate} />} />
+          <Route path="/library" element={<VideoLibrary />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/billing" element={<Billing />} />
+          <Route path="/api" element={<API />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Routes>
       </div>
     </div>
+  );
+}
+
+// Main App with Router
+function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
   );
 }
 

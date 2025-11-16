@@ -1,9 +1,5 @@
-import { ArrowLeft, Check, Zap, Crown, Infinity } from 'lucide-react';
+import { Check, Zap, Crown, Infinity } from 'lucide-react';
 import { useState } from 'react';
-
-interface BillingProps {
-  onBack: () => void;
-}
 
 const plans = [
   {
@@ -65,19 +61,11 @@ const plans = [
   },
 ];
 
-export function Billing({ onBack }: BillingProps) {
+export function Billing() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
 
   return (
     <div className="max-w-6xl mx-auto animate-fade-in">
-      <button
-        onClick={onBack}
-        className="flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-5 h-5" />
-        <span>Back</span>
-      </button>
-
       <div className="mb-12">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Billing & Plans</h1>
         <p className="text-slate-600 dark:text-slate-400 mt-1">Choose the perfect plan for your needs</p>
