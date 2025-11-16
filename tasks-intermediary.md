@@ -225,14 +225,20 @@ Each model config includes: name, replicate_model, cost_per_generation, params (
   - [x] 10.22 Add logging: music prompt, duration, crop times, export path
   - [x] 10.23 Update Phase 5 task to accept video_id and spec as input
   - [x] 10.24 Return final video S3 URL from Phase 5
-  - [ ] 10.25 Optional: Add SFX generation using `cjwbw/elevenlabs-sound-effects` (future enhancement)
-  - [ ] 10.26 Optional: Composite multiple audio layers (music + SFX) with moviepy (future)
-  - [ ] 10.27 Test: Use last generated video with test utility (10.1-10.6)
-  - [ ] 10.28 Test: Generate music for existing 10s video
-  - [ ] 10.29 Test: Generate music for existing 30s video
-  - [ ] 10.30 Test: Verify music matches template mood and tempo
-  - [ ] 10.31 Test: Verify audio is properly synced with video
-  - [ ] 10.32 Verify final video plays with audio in browser/player
+  - [x] 10.25 Save music_url to database even if combining fails (for retry later)
+  - [x] 10.26 Add `final_music_url` field to VideoGeneration model schema
+  - [x] 10.27 Create Alembic migration for `final_music_url` field
+  - [x] 10.28 Update original migration (for production) to include `final_music_url`
+  - [x] 10.29 Implement retry logic in test script: if video has music_url but no final_video_url, skip music generation and just combine
+  - [x] 10.30 Ensure retry logic is NOT in main pipeline (only in test script)
+  - [ ] 10.31 Optional: Add SFX generation using `cjwbw/elevenlabs-sound-effects` (future enhancement)
+  - [ ] 10.32 Optional: Composite multiple audio layers (music + SFX) with moviepy (future)
+  - [ ] 10.33 Test: Use last generated video with test utility (10.1-10.6)
+  - [ ] 10.34 Test: Generate music for existing 10s video
+  - [ ] 10.35 Test: Generate music for existing 30s video
+  - [ ] 10.36 Test: Verify music matches template mood and tempo
+  - [ ] 10.37 Test: Verify audio is properly synced with video
+  - [ ] 10.38 Verify final video plays with audio in browser/player
 
 ## Notes
 
