@@ -466,10 +466,9 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
 
     // Stage 7: Frontend S3 + CloudFront
     // S3 bucket for frontend static hosting
+    // Note: We don't enable website hosting since CloudFront serves directly via OAI
     const frontendBucket = new s3.Bucket(this, 'FrontendBucket', {
       bucketName: `aivideo-frontend-${this.account}`,
-      websiteIndexDocument: 'index.html',
-      websiteErrorDocument: 'index.html', // SPA fallback
       publicReadAccess: false, // CloudFront will access via OAI
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
@@ -493,7 +492,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     // CloudFront distribution
     const frontendDistribution = new cloudfront.Distribution(this, 'FrontendDistribution', {
       defaultBehavior: {
-        origin: new origins.S3BucketOrigin(frontendBucket, {
+        origin: new origins.S3Origin(frontendBucket, {
           originAccessIdentity,
         }),
         allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
