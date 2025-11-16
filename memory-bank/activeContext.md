@@ -1,33 +1,62 @@
 # Active Context
 
 ## Current Status
-**Project Phase**: MVP Complete - Production Testing  
-**PRD Version**: 2.0  
-**Date**: November 15, 2025  
-**Day**: 1 (Active Development)  
+**Project Phase**: TDD Implementation - Beat-Based Architecture Refactor  
+**TDD Version**: TDD-storyboarding.md (Version 2.0)  
+**Date**: November 16, 2025  
+**Day**: 2 (TDD Implementation)  
 **Team Size**: 1 person (solo development)  
 **Region**: AWS us-east-2 (Ohio)
 
 ## What Just Happened
-1. ✅ **PR #8 Complete**: Last-frame continuation for temporal coherence
-2. ✅ Fixed duration override bug (user-specified durations now respected)
-3. ✅ Enhanced Phase 1 logging (duration optimization + chunk calculation)
-4. ✅ All 8 PRs completed successfully
-5. ✅ Pipeline running end-to-end with Phase 1 → Phase 3 → Phase 4 flow
-6. ✅ Phase 2 (Animatic) temporarily disabled for MVP
-7. ✅ Phase 5 & 6 working (refinement has S3 path issue, being addressed)
+1. ✅ **TDD Created**: New beat-based architecture design complete
+2. ✅ **Implementation Strategy Defined**: Complete replacement of Phase 1
+3. 🔄 **Starting TDD-tasks-1.md**: PR #1 - Beat Library & Template Archetypes
+4. ⏸️ **Previous MVP Paused**: Refactoring to beat-based system
+5. ⏸️ **Testing Postponed**: Will resume after TDD implementation
 
 ## Current Focus
-**Testing 30s video generation with 6 chunks using last-frame continuation**
+**Implementing TDD-tasks-1.md PR #1: Beat Library & Template Archetypes**
 
-### Immediate Tasks
-1. Test 30s video with user-specified duration (should generate 6 chunks)
-2. Verify last-frame continuation works across all 6 chunks
-3. Check video quality and temporal coherence
-4. Fix Phase 5 S3 path issue (stitched video not found)
-5. Document findings and next optimizations
+### Immediate Tasks (TDD PR #1)
+1. ✅ Review TDD and align on implementation strategy
+2. 🔄 Create beat library module (`beat_library.py`) - 15 beats
+3. 🔄 Create template archetypes module (`template_archetypes.py`) - 5 archetypes
+4. 🔄 Update constants for creativity control
+5. 🔄 Plan database migration (execute last)
 
 ## Recent Decisions
+
+### TDD Architecture Decisions (November 16, 2025)
+
+1. **Complete Phase 1 Replacement** ✅
+   - DELETE old template JSON files (product_showcase.json, lifestyle_ad.json, announcement.json)
+   - DELETE old service methods (template selection, duration optimization)
+   - KEEP directory structure (`phase1_validate/` - no renaming)
+   - Replace with beat library + LLM composition system
+
+2. **Strict TDD Adherence** ✅
+   - ALL beat durations MUST be 5s, 10s, or 15s (no exceptions)
+   - LLM composes beat sequences (no hardcoded logic)
+   - 15 beats in library (5 opening, 5 product, 3 dynamic, 2 closing)
+   - 5 template archetypes as high-level guides
+
+3. **Database Strategy** ✅
+   - Add new fields: `creativity_level`, `selected_archetype`, `storyboard_images`, `num_beats`, `num_chunks`
+   - Do NOT remove old fields yet (backward compat for existing data)
+   - Migration executed LAST (after all TDD PRs)
+   - `spec` JSON column handles format changes automatically
+
+4. **No Backward Compatibility for New Videos** ✅
+   - Old videos in DB stay untouched (spec is JSON)
+   - New videos use new spec format
+   - No code to support old format generation
+   - Clean break for forward progress
+
+5. **Phase Integration Deferred** ✅
+   - Don't worry about Phases 2-6 integration yet
+   - Focus on Phase 1 correctness first
+   - Other phases will adapt to new spec format later
 
 ### Key Implementation Decisions (November 15, 2025)
 
@@ -69,27 +98,42 @@
    - Phase 4: Init image selection per chunk
    - Why: Better debugging and transparency
 
-### Template Strategy
-Start with 3 templates:
-1. **Product Showcase**: Luxury goods, details-focused
-2. **Lifestyle Ad**: Real-world usage, dynamic
-3. **Announcement**: Brand messaging, bold graphics
+### New Beat-Based Strategy (TDD)
+**15-Beat Library:**
+- 5 Opening: hero_shot, ambient_lifestyle, teaser_reveal, dynamic_intro, atmospheric_setup
+- 5 Product: detail_showcase, product_in_motion, usage_scenario, lifestyle_context, feature_highlight_sequence
+- 3 Dynamic: action_montage, benefit_showcase, transformation_moment
+- 2 Closing: call_to_action, brand_moment
+
+**5 Template Archetypes:**
+1. **luxury_showcase**: Elegant, cinematic, premium goods
+2. **energetic_lifestyle**: Dynamic, active, motivational
+3. **minimalist_reveal**: Clean, simple, focused
+4. **emotional_storytelling**: Narrative, connection, transformation
+5. **feature_demo**: Informative, benefit-driven, professional
 
 ## Next Steps
 
-### Immediate (Now)
-1. ✅ Test with 30s user-specified duration
-2. 🔄 Verify 6 chunks generated (not 2)
-3. 🔄 Check temporal coherence across all chunks
-4. 🔲 Fix Phase 5 S3 path issue
-5. 🔲 Test full 30s video end-to-end
+### Immediate (TDD PR #1)
+1. 🔄 Create `beat_library.py` with 15 beats
+2. 🔄 Create `template_archetypes.py` with 5 archetypes
+3. 🔄 Update `constants.py` with creativity controls
+4. 🔄 Plan database migration (fields list)
+5. 🔄 Update memory bank with decisions
 
-### Short Term (Next Session)
-1. Optimize chunk generation speed (currently sequential)
-2. Consider batch generation after chunk 0
-3. Add transition effects at beat boundaries (future enhancement)
-4. Improve error handling and retry logic
-5. Add more comprehensive logging
+### Short Term (TDD PRs #2-3)
+1. Phase 1 structure & validation (PR #2)
+2. Phase 1 LLM agent implementation (PR #3)
+3. System prompt builder
+4. Spec validation & builder
+5. Test with multiple prompts
+
+### Medium Term (After TDD)
+1. Update Phases 2-6 to work with new spec format
+2. Execute database migration
+3. Resume testing with new system
+4. Performance optimization (parallel generation)
+5. Fix Phase 5 S3 path issue
 
 ### Known Issues to Address
 1. **Phase 5 S3 Path**: Stitched video not found (404 error)
