@@ -45,7 +45,18 @@ def init_db():
         if os.path.exists(alembic_ini_path):
             alembic_cfg = Config(alembic_ini_path)
             # Run all pending migrations
-            command.upgrade(alembic_cfg, "head")
+            # Use "heads" to upgrade all heads if multiple exist, otherwise "head" for single head
+            try:
+                command.upgrade(alembic_cfg, "head")
+            except Exception as head_error:
+                # If "head" fails due to multiple heads, try "heads" instead
+                if "Multiple head revisions" in str(head_error):
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning("Multiple migration heads detected, upgrading all heads")
+                    command.upgrade(alembic_cfg, "heads")
+                else:
+                    raise
         else:
             # If alembic.ini doesn't exist, just log a warning
             import logging
