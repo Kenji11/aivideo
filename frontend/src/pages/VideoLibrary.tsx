@@ -1,4 +1,4 @@
-import { ArrowLeft, Search, Tag, Play, Download, Trash2 } from 'lucide-react';
+import { Search, Tag, Play, Download, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface LibraryVideo {
@@ -10,10 +10,6 @@ interface LibraryVideo {
   category: string;
   isPublic: boolean;
   createdAt: string;
-}
-
-interface VideoLibraryProps {
-  onBack: () => void;
 }
 
 const mockVideos: LibraryVideo[] = [
@@ -46,7 +42,7 @@ const mockVideos: LibraryVideo[] = [
   },
 ];
 
-export function VideoLibrary({ onBack }: VideoLibraryProps) {
+export function VideoLibrary() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -62,14 +58,6 @@ export function VideoLibrary({ onBack }: VideoLibraryProps) {
 
   return (
     <div className="max-w-6xl mx-auto animate-fade-in">
-      <button
-        onClick={onBack}
-        className="flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-5 h-5" />
-        <span>Back</span>
-      </button>
-
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Video Library</h1>
         <p className="text-slate-600 dark:text-slate-400 mt-1">Manage and organize your reusable video clips</p>

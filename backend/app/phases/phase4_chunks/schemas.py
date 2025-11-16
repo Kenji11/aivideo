@@ -14,6 +14,7 @@ class ChunkSpec(BaseModel):
     style_guide_url: Optional[str] = None
     product_reference_url: Optional[str] = None
     previous_chunk_last_frame: Optional[str] = None
+    uploaded_asset_url: Optional[str] = None  # Specific uploaded image for this chunk (if multiple images provided)
     prompt: str
     fps: int = 24  # FPS for frame calculation
     use_text_to_video: bool = False  # Flag to use text-to-video instead of image-to-video

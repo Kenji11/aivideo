@@ -1,11 +1,7 @@
-import { ArrowLeft, Moon, Bell, Download, Zap, HelpCircle } from 'lucide-react';
+import { Moon, Bell, Download, Zap, HelpCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-interface SettingsProps {
-  onBack: () => void;
-}
-
-export function Settings({ onBack }: SettingsProps) {
+export function Settings() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     // Check localStorage or system preference
     if (typeof window !== 'undefined') {
@@ -39,13 +35,6 @@ export function Settings({ onBack }: SettingsProps) {
 
   return (
     <div className="max-w-3xl mx-auto animate-fade-in">
-      <button
-        onClick={onBack}
-        className="flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-5 h-5" />
-        <span>Back</span>
-      </button>
 
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Settings</h1>
