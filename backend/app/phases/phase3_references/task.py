@@ -6,13 +6,14 @@ from app.common.constants import COST_SDXL_IMAGE
 
 
 @celery_app.task(bind=True)
-def generate_references(self, video_id: str, spec: dict):
+def generate_references(self, video_id: str, spec: dict, user_id: str = None):
     """
     Phase 3: Generate reference assets (style guide, product references).
     
     Args:
         video_id: Unique video generation ID
         spec: Video specification from Phase 1
+        user_id: User ID for organizing outputs in S3 (required for new structure)
         
     Returns:
         PhaseOutput dict with reference URLs or error
@@ -24,7 +25,7 @@ def generate_references(self, video_id: str, spec: dict):
         service = ReferenceAssetService()
         
         # Generate all references
-        references = service.generate_all_references(video_id, spec)
+        references = service.generate_all_references(video_id, spec, user_id)
         
         # Calculate duration
         duration_seconds = time.time() - start_time

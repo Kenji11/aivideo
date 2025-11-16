@@ -37,6 +37,19 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
     start_time = time.time()
     total_cost = 0.0
     
+    # Get user_id from video record for S3 path organization
+    db = SessionLocal()
+    try:
+        video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+        user_id = video.user_id if video else None
+        if not user_id:
+            # Fallback to mock user ID if not set (for development/testing)
+            from app.common.constants import MOCK_USER_ID
+            user_id = MOCK_USER_ID
+            print(f"⚠️  No user_id found for video {video_id}, using mock user ID: {user_id}")
+    finally:
+        db.close()
+    
     try:
         # ============ PHASE 1: VALIDATE & EXTRACT ============
         update_progress(video_id, "validating", 10, current_phase="phase1_validate")
@@ -182,7 +195,8 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
             update_progress(video_id, "generating_references", 30, current_phase="phase3_references")
             
             # Run Phase 3 task synchronously (using apply instead of delay().get())
-            result3_obj = generate_references.apply(args=[video_id, spec])
+            # Pass user_id for new S3 path structure
+            result3_obj = generate_references.apply(args=[video_id, spec, user_id])
             result3 = result3_obj.result  # Get actual result from EagerResult
             
             # Check Phase 3 success
@@ -240,7 +254,8 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
         
         # Run Phase 4 task synchronously
         # Phase 2 is skipped (empty animatic_urls), but Phase 3 reference_urls are passed
-        result4_obj = generate_chunks.apply(args=[video_id, spec, animatic_urls, reference_urls])
+        # Pass user_id for new S3 path structure
+        result4_obj = generate_chunks.apply(args=[video_id, spec, animatic_urls, reference_urls, user_id])
         result4 = result4_obj.result
         
         # Check Phase 4 success
@@ -290,7 +305,8 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
             update_progress(video_id, "refining", 90, current_phase="phase5_refine")
             
             # Run Phase 5 task synchronously
-            result5_obj = refine_video.apply(args=[video_id, stitched_video_url, spec])
+            # Pass user_id for new S3 path structure
+            result5_obj = refine_video.apply(args=[video_id, stitched_video_url, spec, user_id])
             result5 = result5_obj.result
             
             # Extract music_url from Phase 5 output (even if combining failed)

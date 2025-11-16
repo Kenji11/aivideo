@@ -14,7 +14,7 @@ from app.services.replicate import replicate_client
 from app.services.s3 import s3_client
 from app.phases.phase4_chunks.schemas import ChunkSpec
 from app.phases.phase4_chunks.model_config import get_default_model, get_model_config
-from app.common.constants import S3_CHUNKS_PREFIX
+from app.common.constants import get_video_s3_key
 from app.common.exceptions import PhaseException
 
 
@@ -161,7 +161,8 @@ def build_chunk_specs(
     video_id: str,
     spec: Dict,
     animatic_urls: List[str],
-    reference_urls: Dict
+    reference_urls: Dict,
+    user_id: str = None
 ) -> List[ChunkSpec]:
     """
     Build chunk specifications from video spec, animatic URLs, and reference URLs.
@@ -171,6 +172,7 @@ def build_chunk_specs(
         spec: Video specification from Phase 1 (contains beats, duration, etc.)
         animatic_urls: List of animatic frame S3 URLs from Phase 2
         reference_urls: Dictionary with style_guide_url and product_reference_url from Phase 3
+        user_id: User ID for organizing outputs in S3 (required for new structure)
         
     Returns:
         List of ChunkSpec objects, one per chunk
@@ -299,6 +301,7 @@ def build_chunk_specs(
         
         chunk_spec = ChunkSpec(
             video_id=video_id,
+            user_id=user_id,  # Pass user_id for new S3 path structure
             chunk_num=chunk_num,
             start_time=start_time,
             duration=duration_actual,
@@ -333,8 +336,13 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
     """
     chunk_spec_obj = ChunkSpec(**chunk_spec)
     video_id = chunk_spec_obj.video_id
+    user_id = chunk_spec_obj.user_id
     chunk_num = chunk_spec_obj.chunk_num
     use_text_to_video = chunk_spec_obj.use_text_to_video
+    
+    # Validate user_id is provided for new S3 structure
+    if not user_id:
+        raise PhaseException("user_id is required for S3 uploads")
     
     # ============ INPUT LOGGING ============
     chunk_start_time = time.time()
@@ -638,16 +646,16 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
         
-        # Upload chunk to S3
-        chunk_key = f"{S3_CHUNKS_PREFIX}/{video_id}/chunk_{chunk_num:02d}.mp4"
+        # Upload chunk to S3 using new user-scoped structure
+        chunk_key = get_video_s3_key(user_id, video_id, f"chunk_{chunk_num:02d}.mp4")
         chunk_s3_url = s3_client.upload_file(video_path, chunk_key)
         
         # Extract last frame for next chunk's temporal consistency
         last_frame_path = extract_last_frame(video_path)
         temp_files.append(last_frame_path)
         
-        # Upload last frame to S3
-        last_frame_key = f"{S3_CHUNKS_PREFIX}/{video_id}/frames/chunk_{chunk_num}_last_frame.png"
+        # Upload last frame to S3 using new user-scoped structure
+        last_frame_key = get_video_s3_key(user_id, video_id, f"chunk_{chunk_num:02d}_last_frame.png")
         last_frame_s3_url = s3_client.upload_file(last_frame_path, last_frame_key)
         
         # Cleanup temp files

@@ -12,6 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from app.phases.phase3_references.service import ReferenceAssetService
+from app.common.constants import MOCK_USER_ID
 
 
 def test_references():
@@ -86,8 +87,8 @@ def test_references():
         print()
         
         try:
-            # Generate references
-            output = service.generate_all_references(test['video_id'], test['spec'])
+            # Generate references (using mock user ID for testing)
+            output = service.generate_all_references(test['video_id'], test['spec'], MOCK_USER_ID)
             
             # Print results
             print(f"✅ SUCCESS!")

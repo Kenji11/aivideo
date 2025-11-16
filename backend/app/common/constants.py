@@ -37,10 +37,52 @@ COST_BARK_MUSIC = 0.10  # Legacy: suno-ai/bark per 30s
 COST_AUDIO_CROP = 0.05  # FFmpeg audio crop (local, no cost)
 
 # S3 paths
+# Legacy prefixes (deprecated - kept for backward compatibility with existing test data)
 S3_ANIMATIC_PREFIX = "animatic"
-S3_REFERENCES_PREFIX = "references"
-S3_CHUNKS_PREFIX = "chunks"
-S3_FINAL_PREFIX = "final"
+S3_REFERENCES_PREFIX = "references"  # DEPRECATED: Use get_video_s3_prefix() instead
+S3_CHUNKS_PREFIX = "chunks"  # DEPRECATED: Use get_video_s3_prefix() instead
+S3_FINAL_PREFIX = "final"  # DEPRECATED: Use get_video_s3_prefix() instead
+
+
+def get_video_s3_prefix(user_id: str, video_id: str) -> str:
+    """
+    Generate the S3 prefix for all video-related outputs.
+    
+    New standard structure: {userId}/videos/{videoId}/
+    All video outputs (references, chunks, stitched, music, final) are stored here.
+    
+    Args:
+        user_id: User ID from VideoGeneration.user_id
+        video_id: Video generation ID
+        
+    Returns:
+        S3 prefix path (e.g., "user123/videos/video456")
+        
+    Example:
+        >>> get_video_s3_prefix("user-123", "video-456")
+        "user-123/videos/video-456"
+    """
+    return f"{user_id}/videos/{video_id}"
+
+
+def get_video_s3_key(user_id: str, video_id: str, filename: str) -> str:
+    """
+    Generate a full S3 key for a video output file.
+    
+    Args:
+        user_id: User ID from VideoGeneration.user_id
+        video_id: Video generation ID
+        filename: Filename (e.g., "style_guide.png", "chunk_00.mp4")
+        
+    Returns:
+        Full S3 key (e.g., "user123/videos/video456/style_guide.png")
+        
+    Example:
+        >>> get_video_s3_key("user-123", "video-456", "style_guide.png")
+        "user-123/videos/video-456/style_guide.png"
+    """
+    prefix = get_video_s3_prefix(user_id, video_id)
+    return f"{prefix}/{filename}"
 
 # Timeouts (seconds)
 PHASE1_TIMEOUT = 60

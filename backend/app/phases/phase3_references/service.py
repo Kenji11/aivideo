@@ -6,7 +6,7 @@ from app.services.replicate import replicate_client
 from app.services.s3 import s3_client
 from app.phases.phase3_references.asset_handler import AssetHandler
 from app.phases.phase3_references.schemas import ReferenceAssetsOutput
-from app.common.constants import COST_FLUX_DEV_IMAGE, S3_REFERENCES_PREFIX
+from app.common.constants import COST_FLUX_DEV_IMAGE, get_video_s3_key
 from app.common.exceptions import PhaseException
 
 
@@ -19,7 +19,7 @@ class ReferenceAssetService:
         self.asset_handler = AssetHandler()
         self.total_cost = 0.0
     
-    def generate_all_references(self, video_id: str, spec: Dict) -> Dict:
+    def generate_all_references(self, video_id: str, spec: Dict, user_id: str = None) -> Dict:
         """
         Generate all reference assets for a video.
         
@@ -28,6 +28,7 @@ class ReferenceAssetService:
         Args:
             video_id: Unique video generation ID
             spec: Video specification from Phase 1
+            user_id: User ID for organizing outputs in S3 (required for new structure)
             
         Returns:
             Dictionary with reference URLs and metadata
@@ -53,7 +54,7 @@ class ReferenceAssetService:
                 print(f"   Will use uploaded images directly for video generation")
             elif product:
                 print(f"📸 Generating product reference for: {product.get('name', 'product')}...")
-                product_reference_url = self._generate_product_reference(video_id, product)
+                product_reference_url = self._generate_product_reference(video_id, product, user_id)
                 print(f"✅ Product reference generated: {product_reference_url[:80]}...")
             else:
                 print("⚠️  No product information found - skipping product reference generation")
@@ -63,7 +64,8 @@ class ReferenceAssetService:
             if uploaded_assets:
                 processed_assets = self.asset_handler.process_uploaded_assets(
                     uploaded_assets,
-                    video_id
+                    video_id,
+                    user_id
                 )
             
             # Build output
@@ -79,13 +81,14 @@ class ReferenceAssetService:
         except Exception as e:
             raise PhaseException(f"Failed to generate references: {str(e)}")
     
-    def _generate_style_guide(self, video_id: str, style: Dict) -> str:
+    def _generate_style_guide(self, video_id: str, style: Dict, user_id: str = None) -> str:
         """
         Generate style guide image using SDXL.
         
         Args:
             video_id: Video ID
             style: Style specification dictionary
+            user_id: User ID for organizing outputs in S3
             
         Returns:
             S3 URL of generated style guide
@@ -135,8 +138,10 @@ class ReferenceAssetService:
             with open(temp_path, 'wb') as f:
                 f.write(response.content)
             
-            # Upload to S3
-            s3_key = f"{S3_REFERENCES_PREFIX}/{video_id}/style_guide.png"
+            # Upload to S3 using new user-scoped structure
+            if not user_id:
+                raise PhaseException("user_id is required for S3 uploads")
+            s3_key = get_video_s3_key(user_id, video_id, "style_guide.png")
             s3_url = self.s3.upload_file(temp_path, s3_key)
             
             # Track cost
@@ -151,13 +156,14 @@ class ReferenceAssetService:
         except Exception as e:
             raise PhaseException(f"Failed to generate style guide: {str(e)}")
     
-    def _generate_product_reference(self, video_id: str, product: Dict) -> Optional[str]:
+    def _generate_product_reference(self, video_id: str, product: Dict, user_id: str = None) -> Optional[str]:
         """
         Generate product reference image using SDXL.
         
         Args:
             video_id: Video ID
             product: Product specification dictionary
+            user_id: User ID for organizing outputs in S3
             
         Returns:
             S3 URL of generated product reference, or None if no product
@@ -204,8 +210,10 @@ class ReferenceAssetService:
             with open(temp_path, 'wb') as f:
                 f.write(response.content)
             
-            # Upload to S3
-            s3_key = f"{S3_REFERENCES_PREFIX}/{video_id}/product_reference.png"
+            # Upload to S3 using new user-scoped structure
+            if not user_id:
+                raise PhaseException("user_id is required for S3 uploads")
+            s3_key = get_video_s3_key(user_id, video_id, "product_reference.png")
             s3_url = self.s3.upload_file(temp_path, s3_key)
             
             # Track cost

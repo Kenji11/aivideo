@@ -4,7 +4,7 @@ import tempfile
 import subprocess
 from typing import List, Dict
 from app.services.s3 import s3_client
-from app.common.constants import S3_CHUNKS_PREFIX
+from app.common.constants import get_video_s3_key
 from app.common.exceptions import PhaseException
 
 
@@ -19,7 +19,8 @@ class VideoStitcher:
         self,
         video_id: str,
         chunk_urls: List[str],
-        transitions: List[Dict]
+        transitions: List[Dict],
+        user_id: str = None
     ) -> str:
         """
         Stitch video chunks together with transitions using FFmpeg.
@@ -32,6 +33,7 @@ class VideoStitcher:
             video_id: Unique video generation ID
             chunk_urls: List of S3 URLs for video chunks (in order)
             transitions: List of transition specifications from spec
+            user_id: User ID for organizing outputs in S3 (required for new structure)
             
         Returns:
             S3 URL of stitched video
@@ -302,8 +304,10 @@ class VideoStitcher:
             if file_size == 0:
                 raise PhaseException(f"FFmpeg output file is empty: {output_path}")
             
-            # Upload stitched video to S3
-            stitched_key = f"{S3_CHUNKS_PREFIX}/{video_id}/stitched.mp4"
+            # Upload stitched video to S3 using new user-scoped structure
+            if not user_id:
+                raise PhaseException("user_id is required for S3 uploads")
+            stitched_key = get_video_s3_key(user_id, video_id, "stitched.mp4")
             stitched_s3_url = self.s3.upload_file(output_path, stitched_key)
             
             print(f"✅ Stitched video uploaded: {stitched_s3_url}")
