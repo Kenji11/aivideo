@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 import logging
 import os
@@ -38,9 +38,11 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore"  # Ignore extra environment variables (e.g., typos, old variable names)
+    )
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
