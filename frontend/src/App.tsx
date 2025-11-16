@@ -42,6 +42,7 @@ function AppContent() {
   const [referenceAssets, setReferenceAssets] = useState<StatusResponse['reference_assets'] | null>(null);
   const [stitchedVideoUrl, setStitchedVideoUrl] = useState<string | null>(null);
   const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('hailuo');
 
   const steps = [
     { id: 1, name: 'Create', icon: Sparkles },
@@ -166,7 +167,8 @@ function AppContent() {
         title: title || 'Untitled Video',
         description: description || undefined,
         prompt: prompt,
-        reference_assets: uploadedAssetIds
+        reference_assets: uploadedAssetIds,
+        model: selectedModel
       });
       
       setVideoId(response.video_id);
@@ -410,6 +412,36 @@ function AppContent() {
                       addNotification('success', 'Files Uploaded', `${assetIds.length} file(s) uploaded successfully!`);
                     }}
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Video Model
+                  </label>
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="input-field"
+                    disabled={isProcessing}
+                  >
+                    <option value="hailuo">Hailuo 2.3 Fast (Default - Fast & Cheap)</option>
+                    <option value="seedance">Seedance 1.0 Pro Fast</option>
+                    <option value="kling">Kling v2.5 Turbo Pro</option>
+                    <option value="pixverse">Pixverse v5</option>
+                    <option value="wan_25_t2v">Wan 2.5 T2V</option>
+                    <option value="wan_25_i2v">Wan 2.5 I2V Fast</option>
+                    <option value="veo_fast">Google Veo 3.1 Fast</option>
+                    <option value="veo">Google Veo 3.1</option>
+                    <option value="hailuo_23">Minimax Hailuo 2.3</option>
+                    <option value="sora">OpenAI Sora 2</option>
+                    <option value="wan">Wan 2.1 (Legacy)</option>
+                    <option value="zeroscope">Zeroscope v2 XL</option>
+                    <option value="animatediff">AnimateDiff</option>
+                    <option value="runway">Runway Gen-2</option>
+                  </select>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Choose the AI model for video generation. Different models have different quality, speed, and cost characteristics.
+                  </p>
                 </div>
 
                 <button

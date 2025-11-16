@@ -13,7 +13,7 @@ from app.services.s3 import s3_client
 
 
 @celery_app.task
-def run_pipeline(video_id: str, prompt: str, assets: list = None):
+def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = 'hailuo'):
     """
     Main orchestration task - chains phases sequentially.
     Currently implements Phase 1 (Validate) -> Phase 3 (References) -> Phase 4 (Chunks).
@@ -23,6 +23,7 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         video_id: Unique video generation ID
         prompt: User's video description
         assets: Optional list of uploaded assets
+        model: Video generation model to use (default: 'hailuo')
         
     Returns:
         Result dictionary with video_id, status, spec, and cost
@@ -59,6 +60,9 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         
         # Extract spec from Phase 1
         spec = result1['output_data']['spec']
+        
+        # Add model selection to spec for Phase 4
+        spec['model'] = model
         
         # Update progress with spec
         update_progress(
