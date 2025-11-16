@@ -27,6 +27,7 @@ class GenerateRequest(BaseModel):
     description: Optional[str] = Field(None, max_length=2000)
     prompt: str = Field(..., min_length=10, max_length=1000)
     reference_assets: List[str] = Field(default_factory=list, description="List of asset IDs to use as references")
+    model: Optional[str] = Field(None, description="Video generation model to use (e.g., 'hailuo', 'kling', 'sora'). Defaults to 'hailuo'")
 
 class GenerateResponse(BaseModel):
     """Response from generate endpoint"""
@@ -45,6 +46,7 @@ class StatusResponse(BaseModel):
     animatic_urls: Optional[List[str]] = None  # Phase 2 animatic frames
     reference_assets: Optional[Dict] = None  # Phase 3 reference assets
     stitched_video_url: Optional[str] = None  # Phase 4 stitched video
+    final_video_url: Optional[str] = None  # Phase 5 final video (with audio)
 
 class VideoResponse(BaseModel):
     """Response from video endpoint"""

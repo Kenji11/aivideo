@@ -38,16 +38,17 @@ from app.common.constants import (
 )
 
 # Default model (currently used model)
-DEFAULT_MUSIC_MODEL = 'musicgen'
+# Switched to stable_audio because musicgen model identifiers are not working on Replicate
+DEFAULT_MUSIC_MODEL = 'stable_audio'
 
 # Model configurations dictionary
 MUSIC_MODEL_CONFIGS: Dict[str, Dict] = {
     'musicgen': {
         'name': 'musicgen',
-        'replicate_model': 'facebookresearch/musicgen:7a76a8258b23fae65c5a22debb8841d1d7e816b75c2f24218cd2bd8573787906',  # Version hash for stable access
+        'replicate_model': 'meta/musicgen:671ac645ce5e552cc63a54c185625b155cf217a7',  # Use version hash for stable access
         'cost_per_generation': COST_MUSICGEN,  # $0.15 per 30s
         'max_duration': 30,  # MusicGen supports up to 30s per generation
-        'use_version_hash': True,  # Must use version hash (model name doesn't work)
+        'use_version_hash': True,  # Use version hash format
         'input_params': {
             'model_version': 'large',  # Best quality version (options: "melody", "large", "encode-decode")
             'output_format': 'mp3',

@@ -322,7 +322,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       healthCheck: {
         command: [
           'CMD-SHELL',
-          'celery -A app.orchestrator.celery_app inspect ping || exit 1'
+          'pgrep -f "celery.*worker" > /dev/null || exit 1'
         ],
         interval: cdk.Duration.seconds(30),
         timeout: cdk.Duration.seconds(10),
