@@ -5,6 +5,7 @@ from typing import List, Dict, Optional
 from PIL import Image
 from app.services.s3 import s3_client
 from app.common.exceptions import ValidationException
+from app.common.constants import get_video_s3_key
 
 
 class AssetHandler:
@@ -15,13 +16,14 @@ class AssetHandler:
         self.max_dimension = 2048
         self.allowed_formats = ['JPEG', 'PNG', 'JPG']
     
-    def process_uploaded_assets(self, assets: List[Dict], video_id: str) -> List[Dict]:
+    def process_uploaded_assets(self, assets: List[Dict], video_id: str, user_id: str = None) -> List[Dict]:
         """
         Process and validate uploaded assets.
         
         Args:
             assets: List of asset dictionaries with 'url' or 's3_key'
             video_id: Video ID for organizing assets
+            user_id: User ID for organizing outputs in S3 (required for new structure)
             
         Returns:
             List of processed asset metadata dictionaries
@@ -40,8 +42,11 @@ class AssetHandler:
                 # Resize if needed
                 resized_path = self._resize_if_needed(asset_path)
                 
-                # Upload to S3
-                asset_key = f"references/{video_id}/uploaded_assets/asset_{i:02d}.png"
+                # Upload to S3 using new user-scoped structure
+                if not user_id:
+                    raise ValidationException("user_id is required for S3 uploads")
+                # Save uploaded assets in the video folder with descriptive names
+                asset_key = get_video_s3_key(user_id, video_id, f"uploaded_asset_{i:02d}.png")
                 s3_url = self.s3.upload_file(resized_path, asset_key)
                 
                 # Get image metadata

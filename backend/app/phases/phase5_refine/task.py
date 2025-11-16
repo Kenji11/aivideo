@@ -7,7 +7,7 @@ from app.common.exceptions import PhaseException
 
 
 @celery_app.task(bind=True, name="app.phases.phase5_refine.task.refine_video")
-def refine_video(self, video_id: str, stitched_url: str, spec: dict) -> dict:
+def refine_video(self, video_id: str, stitched_url: str, spec: dict, user_id: str = None) -> dict:
     """
     Phase 5: Music Generation & Audio Integration.
     
@@ -24,6 +24,7 @@ def refine_video(self, video_id: str, stitched_url: str, spec: dict) -> dict:
         video_id: Unique video generation ID
         stitched_url: S3 URL of stitched video from Phase 4
         spec: Video specification from Phase 1 (contains audio specs)
+        user_id: User ID for organizing outputs in S3 (required for new structure)
         
     Returns:
         PhaseOutput dictionary with status, output_data (refined_video_url, music_url), cost, etc.
@@ -34,7 +35,7 @@ def refine_video(self, video_id: str, stitched_url: str, spec: dict) -> dict:
         print(f"🎬 Phase 5 (Refinement) starting for video {video_id}...")
         
         service = RefinementService()
-        refined_url, music_url = service.refine_all(video_id, stitched_url, spec)
+        refined_url, music_url = service.refine_all(video_id, stitched_url, spec, user_id)
         
         duration_seconds = time.time() - start_time
         

@@ -20,7 +20,8 @@ class ChunkGenerationService:
         video_id: str,
         spec: Dict,
         animatic_urls: List[str],
-        reference_urls: Dict
+        reference_urls: Dict,
+        user_id: str = None
     ) -> Dict:
         """
         Generate all video chunks in parallel using Celery group.
@@ -30,6 +31,7 @@ class ChunkGenerationService:
             spec: Video specification from Phase 1
             animatic_urls: List of animatic frame S3 URLs from Phase 2
             reference_urls: Dictionary with style_guide_url and product_reference_url from Phase 3
+            user_id: User ID for organizing outputs in S3 (required for new structure)
             
         Returns:
             Dictionary with:
@@ -71,7 +73,7 @@ class ChunkGenerationService:
             
             # Build chunk specifications
             print(f"🔨 Building chunk specifications for {video_id}...")
-            chunk_specs = build_chunk_specs(video_id, spec, animatic_urls, reference_urls)
+            chunk_specs = build_chunk_specs(video_id, spec, animatic_urls, reference_urls, user_id)
             num_chunks = len(chunk_specs)
             
             print(f"Generating {num_chunks} chunks in parallel...")

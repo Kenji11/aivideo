@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 class ChunkSpec(BaseModel):
     """Specification for a single video chunk"""
     video_id: str
+    user_id: Optional[str] = None  # User ID for organizing outputs in S3 (required for new structure)
     chunk_num: int
     start_time: float
     duration: float

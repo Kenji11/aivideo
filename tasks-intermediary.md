@@ -311,3 +311,125 @@ After each PR:
 - [ ] Video length matches expected duration (±0.5s tolerance)
 - [ ] No visual resets between chunks (smooth continuous motion)
 
+---
+
+# PR: Standardize S3 Output Structure
+
+## Overview
+
+Currently, video outputs are scattered across different S3 prefixes (`chunks/`, `references/`, `videos/`). This PR standardizes all video-related outputs to a single user-scoped directory structure: `{userId}/videos/{videoId}/`.
+
+## Goals
+
+1. **User-scoped organization**: All video outputs organized by user ID for better isolation and management
+2. **Consolidated storage**: All files for a single video in one directory (no subfolders)
+3. **Consistency with assets**: Follows the same user-first pattern as `assets/{userId}/`
+4. **Future-proof**: Easier to implement user-level permissions, storage analytics, and lifecycle policies
+5. **Backward compatibility**: Leave existing test outputs in place for demo purposes
+
+## New S3 Structure
+
+```
+{userId}/videos/{videoId}/
+  ├── style_guide.png              # Phase 3: Style reference image
+  ├── product_reference.png        # Phase 3: Product reference image  
+  ├── chunk_00.mp4                 # Phase 4: Individual video chunks
+  ├── chunk_01.mp4
+  ├── chunk_02.mp4
+  ├── ...
+  ├── chunk_NN_last_frame.png      # Phase 4: Last frames for temporal continuity
+  ├── stitched.mp4                 # Phase 4: All chunks stitched together
+  ├── background.mp3               # Phase 5: Generated music
+  └── final_draft.mp4              # Phase 5: Final video with music
+
+Existing structure (unchanged for backward compatibility):
+  assets/{userId}/{assetId}/{filename}  # User-uploaded assets
+```
+
+## Relevant Files
+
+- `backend/app/common/constants.py` - Update S3 prefix constants to use user-scoped paths
+- `backend/app/phases/phase3_references/service.py` - Update reference image upload paths
+- `backend/app/phases/phase3_references/asset_handler.py` - Update uploaded asset reference paths
+- `backend/app/phases/phase4_chunks/chunk_generator.py` - Update chunk and last frame upload paths
+- `backend/app/phases/phase4_chunks/stitcher.py` - Update stitched video upload path
+- `backend/app/phases/phase5_refine/service.py` - Update music and final draft upload paths
+- `backend/app/orchestrator/pipeline.py` - Pass user_id to phase functions that need it
+- `backend/manual_stitch.py` - Update chunk discovery path for manual stitching
+- `backend/check_s3_files.py` - Update verification paths
+- `backend/test_phase5_standalone.py` - Update example S3 paths in comments
+
+## Tasks
+
+- [x] 1.0 Update S3 path constants and utilities
+  - [x] 1.1 Modify `constants.py` to add helper functions for generating user-scoped paths
+  - [x] 1.2 Add `get_video_s3_prefix(user_id: str, video_id: str) -> str` function that returns `{userId}/videos/{videoId}`
+  - [x] 1.3 Deprecate old `S3_REFERENCES_PREFIX`, `S3_CHUNKS_PREFIX` constants (keep for backward compatibility but mark as deprecated)
+  - [x] 1.4 Document the new path structure in constants file
+
+- [x] 2.0 Update Phase 3 (References) S3 paths
+  - [x] 2.1 Modify `phase3_references/service.py` to use `{userId}/videos/{videoId}/style_guide.png` for style guide uploads
+  - [x] 2.2 Modify `phase3_references/service.py` to use `{userId}/videos/{videoId}/product_reference.png` for product reference uploads
+  - [x] 2.3 Update `phase3_references/asset_handler.py` to use new path structure for uploaded assets (note: may stay in old structure if those are system references, confirm intent)
+  - [x] 2.4 Ensure Phase 3 service receives and uses `user_id` parameter from pipeline
+
+- [x] 3.0 Update Phase 4 (Chunks) S3 paths
+  - [x] 3.1 Modify `phase4_chunks/chunk_generator.py` to use `{userId}/videos/{videoId}/chunk_{NN}.mp4` for chunk uploads
+  - [x] 3.2 Modify `phase4_chunks/chunk_generator.py` to use `{userId}/videos/{videoId}/chunk_{NN}_last_frame.png` for last frame uploads
+  - [x] 3.3 Modify `phase4_chunks/stitcher.py` to use `{userId}/videos/{videoId}/stitched.mp4` for stitched video upload
+  - [x] 3.4 Ensure Phase 4 services receive and use `user_id` parameter from pipeline
+
+- [x] 4.0 Update Phase 5 (Refine) S3 paths
+  - [x] 4.1 Modify `phase5_refine/service.py` to use `{userId}/videos/{videoId}/background.mp3` for music uploads
+  - [x] 4.2 Modify `phase5_refine/service.py` to use `{userId}/videos/{videoId}/final_draft.mp4` for final video uploads
+  - [x] 4.3 Ensure Phase 5 service receives and uses `user_id` parameter from pipeline
+
+- [x] 5.0 Update pipeline orchestration
+  - [x] 5.1 Verify `orchestrator/pipeline.py` has access to `user_id` from the video generation record
+  - [x] 5.2 Pass `user_id` to Phase 3, Phase 4, and Phase 5 service functions
+  - [x] 5.3 Update pipeline logging to show the new S3 paths being used
+
+- [ ] 6.0 Update utility and test scripts
+  - [ ] 6.1 Update `manual_stitch.py` to accept `user_id` parameter and use new path structure
+  - [ ] 6.2 Update `check_s3_files.py` to accept `user_id` parameter and use new path structure
+  - [ ] 6.3 Update `test_phase5_standalone.py` example paths in comments to show new structure
+  - [ ] 6.4 Review other test files for hardcoded S3 paths and update as needed
+
+- [ ] 7.0 Testing and validation
+  - [ ] 7.1 Run integration test to verify Phase 3 → Phase 4 → Phase 5 pipeline with new paths
+  - [ ] 7.2 Verify all files are created in correct `{userId}/videos/{videoId}/` directory
+  - [ ] 7.3 Confirm no files are created in old `chunks/`, `references/` directories
+  - [ ] 7.4 Test `manual_stitch.py` with new path structure
+  - [ ] 7.5 Test `check_s3_files.py` with new path structure
+  - [ ] 7.6 Verify existing tests still pass (may use old test data, that's okay)
+
+- [ ] 8.0 Documentation
+  - [ ] 8.1 Update this tasks file with "Key Learnings" section documenting the path structure change
+  - [ ] 8.2 Add comments in code explaining why we use user-scoped paths
+  - [ ] 8.3 Update any README files that reference S3 structure
+
+## Key Decisions
+
+1. **Path Structure**: Using `{userId}/videos/{videoId}` instead of `videos/{videoId}` for better user isolation and consistency with assets structure
+
+2. **No Subfolders**: All files in root `{userId}/videos/{videoId}/` directory for simplicity. Subfolders were considered but rejected to keep it flat and simple.
+
+3. **Backward Compatibility**: Old paths (`chunks/`, `references/`, `videos/`) will remain in place for existing test data and demos. New generations use new structure.
+
+4. **User ID Source**: User ID comes from `VideoGeneration.user_id` field in database, passed through pipeline to each phase
+
+5. **Naming Conventions**:
+   - Chunks: `chunk_00.mp4`, `chunk_01.mp4`, etc. (two-digit zero-padded)
+   - Last frames: `chunk_00_last_frame.png`, `chunk_01_last_frame.png`, etc.
+   - Fixed names: `style_guide.png`, `product_reference.png`, `stitched.mp4`, `background.mp3`, `final_draft.mp4`
+
+## Success Criteria
+
+- [ ] All Phase 3 outputs saved to `{userId}/videos/{videoId}/`
+- [ ] All Phase 4 outputs saved to `{userId}/videos/{videoId}/`
+- [ ] All Phase 5 outputs saved to `{userId}/videos/{videoId}/`
+- [ ] No new files created in old `chunks/`, `references/` directories
+- [ ] All outputs for a single video co-located in one directory
+- [ ] Utility scripts work with new structure
+- [ ] Integration tests pass with new structure
+

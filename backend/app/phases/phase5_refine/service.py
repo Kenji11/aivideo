@@ -9,7 +9,7 @@ from app.services.s3 import s3_client
 from app.services.replicate import replicate_client
 from app.services.openai import openai_client
 from app.common.exceptions import PhaseException
-from app.common.constants import COST_AUDIO_CROP
+from app.common.constants import COST_AUDIO_CROP, get_video_s3_key
 from app.phases.phase5_refine.model_config import get_default_music_model, get_music_model_config
 from moviepy.editor import VideoFileClip
 
@@ -33,7 +33,7 @@ class RefinementService:
     def __init__(self):
         self.total_cost = 0.0
     
-    def refine_all(self, video_id: str, stitched_url: str, spec: dict) -> Tuple[str, Optional[str]]:
+    def refine_all(self, video_id: str, stitched_url: str, spec: dict, user_id: str = None) -> Tuple[str, Optional[str]]:
         """
         Generate music and integrate with video.
         
@@ -41,6 +41,7 @@ class RefinementService:
             video_id: Unique video generation ID
             stitched_url: S3 URL of stitched video from Phase 4
             spec: Video specification from Phase 1
+            user_id: User ID for organizing outputs in S3 (required for new structure)
             
         Returns:
             Tuple of (final_video_url, music_url)
@@ -82,8 +83,10 @@ class RefinementService:
                 
                 if music_path and os.path.exists(music_path):
                     temp_files.append(music_path)
-                    # Upload music to S3
-                    music_key = f"videos/{video_id}/music/background.mp3"
+                    # Upload music to S3 using new user-scoped structure
+                    if not user_id:
+                        raise PhaseException("user_id is required for S3 uploads")
+                    music_key = get_video_s3_key(user_id, video_id, "background.mp3")
                     music_url = s3_client.upload_file(music_path, music_key)
                     print(f"   ✅ Music generated and uploaded: {music_key}")
                 else:
@@ -117,7 +120,9 @@ class RefinementService:
             
             # Step 5: Upload final video (only if we have a valid final_path)
             print("📤 Uploading final video...")
-            final_key = f"videos/{video_id}/final_draft.mp4"
+            if not user_id:
+                raise PhaseException("user_id is required for S3 uploads")
+            final_key = get_video_s3_key(user_id, video_id, "final_draft.mp4")
             try:
                 final_url = s3_client.upload_file(final_path, final_key)
                 print(f"   ✅ Final video uploaded: {final_key}")

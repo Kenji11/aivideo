@@ -13,7 +13,8 @@ def generate_chunks(
     video_id: str,
     spec: dict,
     animatic_urls: list,
-    reference_urls: dict
+    reference_urls: dict,
+    user_id: str = None
 ) -> dict:
     """
     Phase 4: Generate video chunks in parallel and stitch them together.
@@ -24,6 +25,7 @@ def generate_chunks(
         spec: Video specification from Phase 1
         animatic_urls: List of animatic frame S3 URLs from Phase 2
         reference_urls: Dictionary with style_guide_url and product_reference_url from Phase 3
+        user_id: User ID for organizing outputs in S3 (required for new structure)
         
     Returns:
         PhaseOutput dictionary with status, output_data, cost, etc.
@@ -41,7 +43,8 @@ def generate_chunks(
             video_id=video_id,
             spec=spec,
             animatic_urls=animatic_urls,
-            reference_urls=reference_urls
+            reference_urls=reference_urls,
+            user_id=user_id
         )
         
         chunk_urls = chunk_results['chunk_urls']
@@ -62,7 +65,8 @@ def generate_chunks(
         stitched_video_url = stitcher.stitch_with_transitions(
             video_id=video_id,
             chunk_urls=chunk_urls,
-            transitions=transitions
+            transitions=transitions,
+            user_id=user_id
         )
         
         # Update progress after stitching
