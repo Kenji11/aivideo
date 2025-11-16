@@ -27,6 +27,13 @@ def get_db():
         db.close()
 
 def init_db():
-    """Initialize database (create tables)"""
-    from app.common.models import VideoGeneration, Asset
-    Base.metadata.create_all(bind=engine)
+    """Initialize database (create tables)
+    
+    NOTE: With Alembic migrations enabled, this function is deprecated.
+    Tables are now created via: alembic upgrade head
+    
+    This function is kept for backwards compatibility but does nothing.
+    """
+    # Migrations handle schema creation now
+    # Base.metadata.create_all(bind=engine)
+    pass

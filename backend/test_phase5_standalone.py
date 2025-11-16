@@ -103,5 +103,5 @@ def test_phase5_standalone(stitched_url: str = None):
 
 if __name__ == "__main__":
     stitched_url = sys.argv[1] if len(sys.argv) > 1 else None
-    exit(test_phase5_standalone(stitched_url))
+    exit(test_phase5_standalone("s3://ai-video-assets-dev/chunks/b85902c9-1862-4a7c-b530-101bac3b52bb/stitched.mp4"))
 

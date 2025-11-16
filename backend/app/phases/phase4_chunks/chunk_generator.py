@@ -174,31 +174,31 @@ def build_chunk_specs(
     Returns:
         List of ChunkSpec objects, one per chunk
     """
+    from app.phases.phase4_chunks.model_config import get_default_model
+    import math
+    
     duration = spec.get('duration', 30)  # Default 30 seconds
     beats = spec.get('beats', [])
     
-    # Calculate chunk parameters
-    # Adaptive chunk duration based on total video length
-    # Target: 5-6 chunks for 30-second videos
-    if duration <= 10:
-        chunk_duration = 1.5  # 1.5 seconds per chunk for short ads
-        chunk_overlap = 0.3  # 0.3 seconds overlap
-    elif duration <= 20:
-        chunk_duration = 1.8  # 1.8 seconds per chunk for medium videos
-        chunk_overlap = 0.4  # 0.4 seconds overlap
-    elif duration <= 30:
-        # For 30-second videos: use ~5.5-second chunks to get exactly 6 chunks
-        # Formula: chunk_duration = (duration + overlap * (1 + target_chunks)) / target_chunks
-        target_chunks = 6
-        chunk_overlap = 0.5
-        chunk_duration = (duration + chunk_overlap * (1 + target_chunks)) / target_chunks  # ~5.42s
-    else:
-        # For longer videos (>30s): scale proportionally
-        # Target ~6 chunks, so chunk_duration = duration / 6
-        chunk_duration = duration / 6.0
-        chunk_overlap = 0.5  # 0.5 seconds overlap
+    # Get model's actual chunk duration (what the model really outputs)
+    model = get_default_model()
+    actual_chunk_duration = model['actual_chunk_duration']
+    model_name = model['name']
     
-    chunk_count = int((duration + chunk_overlap) / (chunk_duration - chunk_overlap))
+    # Calculate chunk count based on model's actual output duration
+    # This is the REALITY of what the model outputs, not what we request
+    chunk_count = math.ceil(duration / actual_chunk_duration)
+    chunk_duration = actual_chunk_duration
+    
+    # Overlap is 25% of actual chunk duration for smooth transitions
+    chunk_overlap = actual_chunk_duration * 0.25
+    
+    print(f"   📊 Chunk calculation:")
+    print(f"      - Video duration: {duration}s")
+    print(f"      - Model: {model_name}")
+    print(f"      - Model outputs: {actual_chunk_duration}s chunks")
+    print(f"      - Chunk count: ceil({duration}s / {actual_chunk_duration}s) = {chunk_count} chunks")
+    print(f"      - Overlap: {chunk_overlap}s (25% of chunk duration)")
     
     # Check if we have animatic URLs - if not, use text-to-video fallback
     use_text_to_video = len(animatic_urls) == 0
