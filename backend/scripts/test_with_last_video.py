@@ -6,15 +6,29 @@ This script loads the most recent video generation from the database and
 runs Phase 5 (music generation) directly, skipping Phases 1-4.
 
 Usage:
-    python test_with_last_video.py
+    python backend/scripts/test_with_last_video.py
+    # Or from backend directory:
+    python scripts/test_with_last_video.py
 
 This saves time and cost during iterative testing (~$2-3 per test avoided).
 """
 import sys
 import os
+from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add backend directory to path (parent of scripts folder)
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, backend_dir)
+
+# Load .env file from backend directory before importing app modules
+# This ensures Settings can find environment variables
+from dotenv import load_dotenv
+env_path = Path(backend_dir) / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+else:
+    print(f"⚠️  Warning: .env file not found at {env_path}")
+    print("   Make sure you have a .env file in the backend/ directory")
 
 from app.common.models import VideoGeneration, VideoStatus
 from app.phases.phase5_refine.service import RefinementService
@@ -50,7 +64,7 @@ def get_last_video():
         print("      (Note: port 5433 is exposed from Docker container)")
         print("")
         print("   3. Or run the script inside Docker:")
-        print("      docker-compose exec api python test_with_last_video.py")
+        print("      docker-compose exec api python scripts/test_with_last_video.py")
         print("="*70)
         return None
     

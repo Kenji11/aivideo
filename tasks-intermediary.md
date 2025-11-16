@@ -194,6 +194,13 @@ Each model config includes: name, replicate_model, cost_per_generation, params (
   - [x] 9.20 Verify cost tracking: Hailuo should be cheaper ($0.04 vs $0.45 per chunk)
 
 - [ ] 10.0 Phase 5: Music Generation & Audio Integration (PR #10) **← AUDIO LAYER**
+  - [x] 10.0.1 Fix Phase 1 merge logic: Only overwrite template fields with non-null extracted values
+  - [x] 10.0.2 Update `_merge_with_template()` to preserve template defaults for all fields (audio, style, product)
+  - [x] 10.0.3 For nested objects (style, product, audio), merge field-by-field instead of replacing entire object
+  - [x] 10.0.4 Only override template values when extracted data has non-null values
+  - [ ] 10.0.5 Test: Verify template audio defaults are preserved when GPT extracts null values
+  - [ ] 10.0.6 Test: Verify template style defaults are preserved when GPT extracts partial/null values
+  - [ ] 10.0.7 Test: Verify template product defaults are preserved when GPT extracts partial/null values
   - [x] 10.1 Add test utility: Reuse last generated video for testing (no regeneration)
   - [x] 10.2 Create `backend/test_with_last_video.py` helper script
   - [x] 10.3 Load last video_id, spec, and stitched video from database/S3
@@ -203,21 +210,21 @@ Each model config includes: name, replicate_model, cost_per_generation, params (
   - [x] 10.7 Update Phase 5 scope: Remove upscaling, temporal smoothing, color grading
   - [x] 10.8 Phase 5 new focus: Music generation and audio integration ONLY
   - [x] 10.9 Update `backend/app/phases/phase5_refine/service.py` for music-only workflow
-  - [x] 10.10 Add music generation using `suno/bark-with-music` model
-  - [ ] 10.11 Input: video duration + template audio spec (tempo, mood, style from spec)
-  - [ ] 10.12 Generate music ~5s longer than video duration for safety margin
-  - [ ] 10.13 Crop music to exact video duration using `lucataco/audio-crop`
-  - [ ] 10.14 Extract audio specs from template: music_style, tempo, mood
-  - [ ] 10.15 Build music prompt from template specs (e.g., "energetic hip-hop instrumental, 140-150 BPM")
-  - [ ] 10.16 Download stitched video from Phase 4 (S3)
-  - [ ] 10.17 Use moviepy to combine video + generated music
-  - [ ] 10.18 Set music volume to 0.7 (70%) for balanced audio
-  - [ ] 10.19 Export final video with audio as `final_with_music.mp4`
-  - [ ] 10.20 Upload final video to S3: `{video_id}/final_draft.mp4`
-  - [ ] 10.21 Add cost tracking: music generation (~$0.10-$0.20) + audio crop (~$0.05)
-  - [ ] 10.22 Add logging: music prompt, duration, crop times, export path
-  - [ ] 10.23 Update Phase 5 task to accept video_id and spec as input
-  - [ ] 10.24 Return final video S3 URL from Phase 5
+  - [x] 10.10 Add music generation using `meta/musicgen` model (switched from suno-ai/bark, stable-audio had broken model identifier)
+  - [x] 10.11 Input: video duration + template audio spec (tempo, mood, style from spec)
+  - [x] 10.12 Generate music ~5s longer than video duration for safety margin (up to 47s max)
+  - [x] 10.13 Crop music to exact video duration using FFmpeg (local, no Replicate cost)
+  - [x] 10.14 Extract audio specs from template: music_style, tempo, mood
+  - [x] 10.15 Build music prompt from template specs (e.g., "energetic hip-hop instrumental, fast tempo 140-150 BPM, uplifting sports advertisement vibe")
+  - [x] 10.16 Download stitched video from Phase 4 (S3)
+  - [x] 10.17 Use moviepy to combine video + generated music (with FFmpeg fallback)
+  - [x] 10.18 Set music volume to 0.7 (70%) for balanced audio
+  - [x] 10.19 Export final video with audio as `final_with_music.mp4`
+  - [x] 10.20 Upload final video to S3: `{video_id}/final_draft.mp4`
+  - [x] 10.21 Add cost tracking: music generation ($0.10) + audio crop ($0.05, local FFmpeg)
+  - [x] 10.22 Add logging: music prompt, duration, crop times, export path
+  - [x] 10.23 Update Phase 5 task to accept video_id and spec as input
+  - [x] 10.24 Return final video S3 URL from Phase 5
   - [ ] 10.25 Optional: Add SFX generation using `cjwbw/elevenlabs-sound-effects` (future enhancement)
   - [ ] 10.26 Optional: Composite multiple audio layers (music + SFX) with moviepy (future)
   - [ ] 10.27 Test: Use last generated video with test utility (10.1-10.6)
