@@ -39,7 +39,7 @@ from app.common.constants import (
 
 # Default model (currently used model)
 # Switched to stable_audio because musicgen model identifiers are not working on Replicate
-DEFAULT_MUSIC_MODEL = 'stable_audio'
+DEFAULT_MUSIC_MODEL = 'musicgen'
 
 # Model configurations dictionary
 MUSIC_MODEL_CONFIGS: Dict[str, Dict] = {
