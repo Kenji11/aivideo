@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-Standalone Phase 5 Test - Works without database
-Just needs a stitched video URL to test audio generation
+Standalone Phase 5 Test - Fetches video from database
+Prompts for video ID and runs Phase 5 refinement on existing video
 """
 import sys
 import os
-import uuid
 from pathlib import Path
 
 # Load .env if exists
@@ -18,69 +17,90 @@ else:
     print(f"⚠️  No .env file found at {env_path}")
     print("   Make sure environment variables are set")
 
+# Override database URL for local testing (connects to Docker Compose postgres on localhost)
+os.environ['DATABASE_URL'] = 'postgresql://dev:devpass@localhost:5434/videogen'
+
 # Add app to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'app'))
 
+from app.database import SessionLocal
+from app.common.models import VideoGeneration
 from app.phases.phase5_refine.service import RefinementService
-from app.common.constants import MOCK_USER_ID
 
-def test_phase5_standalone(stitched_url: str = None, user_id: str = None):
-    """Test Phase 5 with a stitched video URL"""
+def test_phase5_standalone(video_id: str = None):
+    """Test Phase 5 by fetching video from database"""
     
     print("=" * 80)
     print("🎵 Phase 5 Standalone Test - Audio Generation")
     print("=" * 80)
     print()
     
-    # Get stitched URL from argument or prompt
-    if not stitched_url:
+    # Get video ID from argument or prompt
+    if not video_id:
         if len(sys.argv) > 1:
-            stitched_url = sys.argv[1]
+            video_id = sys.argv[1]
         else:
-            print("❌ Please provide a stitched video URL")
-            print()
-            print("Usage:")
-            print("  python test_phase5_standalone.py <stitched_video_url> [user_id]")
-            print()
-            print("Example:")
-            print("  python test_phase5_standalone.py s3://bucket/user123/videos/abc123/stitched.mp4 user123")
-            print("  python test_phase5_standalone.py s3://bucket/user123/videos/abc123/stitched.mp4")
-            print()
-            print("Or get from last video:")
-            print("  # Check docker logs or database for stitched_url")
-            return 1
+            video_id = input("Enter video ID: ").strip()
+            if not video_id:
+                print("❌ Video ID is required")
+                print()
+                print("Usage:")
+                print("  python test_phase5_standalone.py <video_id>")
+                print()
+                print("Example:")
+                print("  python test_phase5_standalone.py 550e8400-e29b-41d4-a716-446655440000")
+                return 1
     
-    # Create test video ID
-    video_id = str(uuid.uuid4())
-    
-    # Use provided user_id or default to mock
-    if not user_id:
-        user_id = MOCK_USER_ID
-        print(f"⚠️  No user_id provided, using mock user ID: {user_id}")
-    
-    # Create minimal spec with audio
-    spec = {
-        'duration': 30,
-        'audio': {
-            'music_style': 'orchestral',
-            'tempo': 'moderate',
-            'mood': 'sophisticated'
-        }
-    }
-    
-    print(f"📹 Test Configuration:")
-    print(f"   Video ID: {video_id}")
-    print(f"   User ID: {user_id}")
-    print(f"   Stitched URL: {stitched_url}")
-    print(f"   Duration: {spec['duration']}s")
-    print(f"   Audio Style: {spec['audio']['music_style']}")
-    print(f"   Tempo: {spec['audio']['tempo']}")
-    print(f"   Mood: {spec['audio']['mood']}")
-    print()
-    print("🚀 Starting Phase 5 (Audio Generation)...")
-    print()
-    
+    # Fetch video from database
+    print(f"🔍 Fetching video {video_id} from database...")
+    db = SessionLocal()
     try:
+        video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+        
+        if not video:
+            print(f"❌ Video not found: {video_id}")
+            print()
+            print("💡 Tip: Use scripts/list_recent_videos.py to see available videos")
+            return 1
+        
+        # Check if video has stitched URL
+        if not video.stitched_url:
+            print(f"❌ Video {video_id} does not have a stitched_url")
+            print(f"   Current status: {video.status}")
+            print()
+            print("💡 Video must have completed Phase 4 (stitching) before running Phase 5")
+            return 1
+        
+        # Extract necessary information
+        stitched_url = video.stitched_url
+        spec = video.spec or {}
+        user_id = video.user_id
+        
+        print("✅ Video found!")
+        print()
+        print(f"📹 Video Information:")
+        print(f"   Video ID: {video_id}")
+        print(f"   User ID: {user_id}")
+        print(f"   Title: {video.title}")
+        print(f"   Status: {video.status}")
+        print(f"   Prompt: {video.prompt[:100]}..." if len(video.prompt) > 100 else f"   Prompt: {video.prompt}")
+        print(f"   Stitched URL: {stitched_url}")
+        
+        # Show audio config if available
+        if 'audio' in spec:
+            audio = spec['audio']
+            print(f"   Audio Config:")
+            print(f"     - Style: {audio.get('music_style', 'N/A')}")
+            print(f"     - Tempo: {audio.get('tempo', 'N/A')}")
+            print(f"     - Mood: {audio.get('mood', 'N/A')}")
+        else:
+            print(f"   ⚠️  No audio config in spec (will use defaults)")
+        
+        print()
+        print("🚀 Starting Phase 5 (Audio Generation)...")
+        print()
+        
+        # Run Phase 5
         service = RefinementService()
         refined_url, music_url = service.refine_all(video_id, stitched_url, spec, user_id)
         
@@ -108,11 +128,10 @@ def test_phase5_standalone(stitched_url: str = None, user_id: str = None):
         traceback.print_exc()
         print("=" * 80)
         return 1
+    finally:
+        db.close()
 
 if __name__ == "__main__":
-    stitched_url = sys.argv[1] if len(sys.argv) > 1 else None
-    user_id = sys.argv[2] if len(sys.argv) > 2 else None
-    # Example with old path structure (for backward compatibility testing)
-    # exit(test_phase5_standalone("s3://ai-video-assets-dev/chunks/695dd358-fa93-47ba-99b5-8b14dff9c0fd/stitched.mp4", "user-123"))
-    exit(test_phase5_standalone(stitched_url, user_id))
+    video_id = sys.argv[1] if len(sys.argv) > 1 else None
+    exit(test_phase5_standalone(video_id))
 
