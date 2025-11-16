@@ -336,6 +336,11 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
     model_params = model_config['params']
     cost_per_second = model_config['cost_per_generation']
     
+    # Get parameter name mappings (some models use different parameter names)
+    param_names = model_config.get('param_names', {})
+    image_param_name = param_names.get('image', 'image')  # Default to 'image' if not specified
+    prompt_param_name = param_names.get('prompt', 'prompt')  # Default to 'prompt' if not specified
+    
     # Build prompt (already formatted in build_chunk_specs from beat prompt_template)
     prompt = chunk_spec_obj.prompt
     prompt_preview = prompt[:100] + "..." if len(prompt) > 100 else prompt
@@ -411,16 +416,16 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
                         
                         # Use model config parameters
                         # Timeout: 5 minutes per chunk (should be enough for video generation)
-                        input_params = {
-                            image_param_name: img_file,  # Use model-specific parameter name
-                            "prompt": prompt,
+                        # Use parameter name mapping from model config (e.g., 'first_frame_image' for Hailuo)
+                        replicate_input = {
+                            image_param_name: img_file,
+                            prompt_param_name: prompt,
                             "num_frames": num_frames,
                             "fps": fps,
                         }
-                        
                         output = replicate_client.run(
                             model_name,
-                            input=input_params,
+                            input=replicate_input,
                             timeout=300  # 5 minutes timeout
                         )
                         
@@ -517,9 +522,23 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
                     input_image_path = s3_client.download_temp(prev_frame_key)
                     temp_files.append(input_image_path)
                     print(f"   Using previous chunk's last frame as input image")
+            elif chunk_spec_obj.product_reference_url:
+                # Fallback: Use product reference if previous chunk's last frame is not available
+                # This can happen if previous chunk failed or last frame extraction failed
+                product_ref_url = chunk_spec_obj.product_reference_url
+                if product_ref_url.startswith('s3://'):
+                    product_ref_key = product_ref_url.replace(f's3://{s3_client.bucket}/', '')
+                elif product_ref_url.startswith('http'):
+                    product_ref_key = product_ref_url.split(f'{s3_client.bucket}/', 1)[-1].split('?')[0]
+                else:
+                    product_ref_key = product_ref_url
+                
+                input_image_path = s3_client.download_temp(product_ref_key)
+                temp_files.append(input_image_path)
+                print(f"   ⚠️  Warning: Previous chunk's last frame not available, using product reference as fallback")
             else:
                 raise PhaseException(
-                    f"Chunk {chunk_num} requires previous chunk's last frame or uploaded asset, but neither is available"
+                    f"Chunk {chunk_num} requires previous chunk's last frame or uploaded asset, but neither is available and no product reference fallback exists"
                 )
             
             # Generate video using the input image
@@ -531,17 +550,17 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
                 image_param_name = param_names.get('image', 'image')  # Default to 'image' if not specified
                 
                 # Open image file for Replicate
+                # Use parameter name mapping from model config (e.g., 'first_frame_image' for Hailuo)
                 with open(input_image_path, 'rb') as img_file:
-                    input_params = {
-                        image_param_name: img_file,  # Use model-specific parameter name
-                        "prompt": prompt,
+                    replicate_input = {
+                        image_param_name: img_file,
+                        prompt_param_name: prompt,
                         "num_frames": num_frames,
                         "fps": fps,
                     }
-                    
                     output = replicate_client.run(
                         model_name,
-                        input=input_params,
+                        input=replicate_input,
                         timeout=300  # 5 minutes timeout
                     )
                 
