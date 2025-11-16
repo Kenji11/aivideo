@@ -122,28 +122,44 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
         
         # ============ PHASE 3: GENERATE REFERENCE ASSETS ============
         # Skip Phase 3 if user uploaded images - use them directly instead of generating references
-        has_uploaded_assets = assets and len(assets) > 0
+        # Check both assets parameter and spec['uploaded_assets'] (Phase 1 adds assets to spec)
+        spec_uploaded_assets = spec.get('uploaded_assets', [])
+        has_uploaded_assets = (assets and len(assets) > 0) or (spec_uploaded_assets and len(spec_uploaded_assets) > 0)
+        
+        # Use assets from spec if available (more reliable), otherwise use assets parameter
+        assets_to_use = spec_uploaded_assets if spec_uploaded_assets else (assets or [])
         
         print(f"🔍 Phase 3 Skip Check:")
-        print(f"   - assets type: {type(assets)}")
-        print(f"   - assets value: {assets}")
-        print(f"   - assets length: {len(assets) if assets else 0}")
+        print(f"   - assets parameter: {len(assets) if assets else 0} items")
+        print(f"   - spec['uploaded_assets']: {len(spec_uploaded_assets) if spec_uploaded_assets else 0} items")
         print(f"   - has_uploaded_assets: {has_uploaded_assets}")
+        print(f"   - Will use: {len(assets_to_use)} uploaded asset(s)")
         
         if has_uploaded_assets:
             # User uploaded images - skip Phase 3 generation, use uploaded assets directly
-            print(f"📸 User uploaded {len(assets)} image(s) - skipping Phase 3 reference generation")
+            print(f"📸 User uploaded {len(assets_to_use)} image(s) - skipping Phase 3 reference generation")
             print(f"   Will use uploaded images directly for video generation")
+            print(f"   ❌ DO NOT GENERATE NEW REFERENCE IMAGES - using uploaded images only")
             
             # Create reference_urls dict with uploaded assets
             # Format: {uploaded_assets: [{s3_key: ..., asset_id: ...}, ...]}
             uploaded_assets_list = []
-            for asset in assets:
-                uploaded_assets_list.append({
-                    's3_key': asset.get('s3_key'),
-                    's3_url': f"s3://{s3_client.bucket}/{asset.get('s3_key')}" if asset.get('s3_key') else None,
-                    'asset_id': asset.get('asset_id')
-                })
+            for asset in assets_to_use:
+                # Handle both dict format (from API) and direct format (from spec)
+                if isinstance(asset, dict):
+                    s3_key = asset.get('s3_key')
+                    asset_id = asset.get('asset_id')
+                else:
+                    # Fallback if asset is in different format
+                    s3_key = getattr(asset, 's3_key', None) if hasattr(asset, 's3_key') else None
+                    asset_id = getattr(asset, 'asset_id', None) if hasattr(asset, 'asset_id') else None
+                
+                if s3_key:
+                    uploaded_assets_list.append({
+                        's3_key': s3_key,
+                        's3_url': f"s3://{s3_client.bucket}/{s3_key}",
+                        'asset_id': asset_id
+                    })
             
             reference_urls = {
                 'uploaded_assets': uploaded_assets_list,

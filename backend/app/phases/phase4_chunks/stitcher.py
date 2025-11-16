@@ -24,6 +24,10 @@ class VideoStitcher:
         """
         Stitch video chunks together with transitions using FFmpeg.
         
+        CRITICAL: Must complete within 7 minutes (420 seconds) total for entire pipeline.
+        Phase 5 (audio generation) needs 1-2 minutes, so stitching must finish in ~6 minutes.
+        Uses ultrafast presets and skips normalization when possible to meet deadline.
+        
         Args:
             video_id: Unique video generation ID
             chunk_urls: List of S3 URLs for video chunks (in order)
@@ -33,8 +37,13 @@ class VideoStitcher:
             S3 URL of stitched video
             
         Raises:
-            PhaseException: If stitching fails
+            PhaseException: If stitching fails or exceeds time limit
         """
+        import time
+        start_time = time.time()
+        # 6 minutes max for stitching (leaves 1-2 min for Phase 5 audio + upload)
+        MAX_STITCH_TIME = 360  # 6 minutes (360s) - leaves 60-120s for Phase 5
+        
         temp_dir = None
         temp_files = []
         
@@ -86,20 +95,31 @@ class VideoStitcher:
                 for chunk_path in chunk_paths:
                     cmd.extend(['-i', chunk_path])
                 
-                # Add filter complex
+                # Check time budget before stitching
+                elapsed = time.time() - start_time
+                time_remaining = MAX_STITCH_TIME - elapsed
+                if time_remaining < 45:  # Need at least 45s for stitching
+                    raise PhaseException(
+                        f"Not enough time remaining ({time_remaining:.0f}s) to stitch video. "
+                        f"Elapsed: {elapsed:.0f}s. Total pipeline must complete in 7 minutes."
+                    )
+                
+                # Add filter complex with memory-efficient and speed-optimized settings
                 cmd.extend([
                     '-filter_complex', filter_complex,
                     '-map', '[v]',  # Map output from filter
                     '-c:v', 'libx264',
                     '-pix_fmt', 'yuv420p',
                     '-r', '24',  # 24 fps
-                    '-preset', 'medium',
+                    '-preset', 'ultrafast',  # Use 'ultrafast' for speed (8 min deadline)
                     '-crf', '23',  # Quality setting
+                    '-threads', '2',  # Limit threads to reduce memory
                     '-s', f'{target_width}x{target_height}',  # Explicit output resolution
                     output_path
                 ])
                 
                 print(f"FFmpeg command (filter complex): {' '.join(cmd)}")
+                print(f"   ⏱️  Time remaining: {time_remaining:.0f}s")
                 
                 # Execute FFmpeg with better error handling
                 result = subprocess.run(
@@ -107,10 +127,11 @@ class VideoStitcher:
                     capture_output=True,
                     text=True,
                     check=True,
-                    timeout=300  # 5 minute timeout
+                    timeout=int(time_remaining)  # Use remaining time budget
                 )
                 
-                print("✅ Filter complex method succeeded")
+                elapsed_total = time.time() - start_time
+                print(f"✅ Filter complex method succeeded ({elapsed_total:.1f}s total)")
                 
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
                 # Method 2: Fallback to concat demuxer (more reliable, simpler)
@@ -130,30 +151,84 @@ class VideoStitcher:
                 
                 # Build simpler concat command with resolution normalization
                 # For concat demuxer, we need to normalize chunks first, then concat
-                # This is more complex, so we'll use a two-pass approach
+                # Normalize sequentially to avoid memory issues
                 print(f"   Normalizing chunks to {target_width}x{target_height} before concat...")
                 
-                # Normalize each chunk first
-                normalized_chunks = []
-                for i, chunk_path in enumerate(chunk_paths):
-                    normalized_path = os.path.join(temp_dir, f'normalized_{i:02d}.mp4')
-                    normalize_cmd = [
-                        'ffmpeg',
-                        '-y',
-                        '-i', chunk_path,
-                        '-vf', f'scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p',
-                        '-c:v', 'libx264',
-                        '-preset', 'medium',
-                        '-crf', '23',
-                        normalized_path
-                    ]
-                    try:
-                        subprocess.run(normalize_cmd, capture_output=True, text=True, check=True, timeout=60)
-                        normalized_chunks.append(normalized_path)
-                        temp_files.append(normalized_path)
-                    except subprocess.CalledProcessError as e:
-                        print(f"   ⚠️  Failed to normalize chunk {i}, using original: {e.stderr[:200]}")
-                        normalized_chunks.append(chunk_path)  # Fallback to original
+                # Check if normalization is needed (chunks might already be same resolution)
+                # Also check if resolution difference is small enough to skip (within 10%)
+                needs_normalization = False
+                chunk_resolutions = []
+                for chunk_path in chunk_paths:
+                    width, height = self._get_video_resolution(chunk_path)
+                    chunk_resolutions.append((width, height))
+                    if width != target_width or height != target_height:
+                        # Check if difference is small (< 10%) - can skip normalization
+                        width_diff = abs(width - target_width) / target_width
+                        height_diff = abs(height - target_height) / target_height
+                        if width_diff > 0.1 or height_diff > 0.1:  # More than 10% difference
+                            needs_normalization = True
+                
+                if not needs_normalization:
+                    print(f"   ✅ All chunks already at target resolution {target_width}x{target_height}, skipping normalization")
+                    normalized_chunks = chunk_paths
+                else:
+                    # Calculate time budget: leave at least 90 seconds for stitching
+                    elapsed = time.time() - start_time
+                    time_remaining = MAX_STITCH_TIME - elapsed
+                    time_per_chunk = max(20, (time_remaining - 90) / len(chunk_paths))  # At least 20s per chunk, 90s for stitching
+                    
+                    print(f"   ⏱️  Time budget: {time_remaining:.0f}s remaining, {time_per_chunk:.0f}s per chunk")
+                    
+                    # Normalize each chunk sequentially (one at a time to save memory)
+                    normalized_chunks = []
+                    for i, chunk_path in enumerate(chunk_paths):
+                        # Check time budget
+                        elapsed = time.time() - start_time
+                        if elapsed > MAX_STITCH_TIME - 90:  # Less than 90s left for stitching
+                            print(f"   ⚠️  Running out of time, using original chunks for remaining {len(chunk_paths) - i} chunks")
+                            normalized_chunks.extend(chunk_paths[i:])
+                            break
+                        
+                        width, height = chunk_resolutions[i]
+                        if width == target_width and height == target_height:
+                            print(f"   ✅ Chunk {i} already at target resolution, skipping")
+                            normalized_chunks.append(chunk_path)
+                            continue
+                        
+                        normalized_path = os.path.join(temp_dir, f'normalized_{i:02d}.mp4')
+                        normalize_cmd = [
+                            'ffmpeg',
+                            '-y',
+                            '-i', chunk_path,
+                            '-vf', f'scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p',
+                            '-c:v', 'libx264',
+                            '-preset', 'ultrafast',  # Use 'ultrafast' for speed (8 min deadline)
+                            '-crf', '23',
+                            '-threads', '2',  # Limit threads to reduce memory usage
+                            normalized_path
+                        ]
+                        try:
+                            print(f"   🔄 Normalizing chunk {i+1}/{len(chunk_paths)} ({width}x{height} → {target_width}x{target_height})...")
+                            result = subprocess.run(
+                                normalize_cmd, 
+                                capture_output=True, 
+                                text=True, 
+                                check=True, 
+                                timeout=int(time_per_chunk)  # Dynamic timeout based on time budget
+                            )
+                            normalized_chunks.append(normalized_path)
+                            temp_files.append(normalized_path)
+                            print(f"   ✅ Chunk {i+1} normalized successfully ({time.time() - start_time:.1f}s elapsed)")
+                        except subprocess.TimeoutExpired:
+                            print(f"   ⚠️  Chunk {i} normalization timed out, using original")
+                            normalized_chunks.append(chunk_path)  # Fallback to original
+                        except subprocess.CalledProcessError as e:
+                            # Log FULL error message for debugging
+                            full_error = f"Return code: {e.returncode}\n"
+                            full_error += f"Stdout: {e.stdout}\n" if e.stdout else ""
+                            full_error += f"Stderr: {e.stderr}\n" if e.stderr else ""
+                            print(f"   ❌ Failed to normalize chunk {i}:\n{full_error}")
+                            normalized_chunks.append(chunk_path)  # Fallback to original
                 
                 # Update concat file with normalized chunks
                 with open(concat_file, 'w') as f:
@@ -161,7 +236,16 @@ class VideoStitcher:
                         abs_path = os.path.abspath(chunk_path)
                         f.write(f"file '{abs_path}'\n")
                 
-                # Build concat command
+                # Check time budget before stitching
+                elapsed = time.time() - start_time
+                time_remaining = MAX_STITCH_TIME - elapsed
+                if time_remaining < 45:  # Need at least 45s for stitching
+                    raise PhaseException(
+                        f"Not enough time remaining ({time_remaining:.0f}s) to stitch video. "
+                        f"Elapsed: {elapsed:.0f}s. Total pipeline must complete in 7 minutes."
+                    )
+                
+                # Build concat command with memory-efficient and speed-optimized settings
                 cmd = [
                     'ffmpeg',
                     '-y',
@@ -171,13 +255,15 @@ class VideoStitcher:
                     '-c:v', 'libx264',
                     '-pix_fmt', 'yuv420p',
                     '-r', '24',
-                    '-preset', 'medium',
+                    '-preset', 'ultrafast',  # Use 'ultrafast' for speed (8 min deadline)
                     '-crf', '23',
+                    '-threads', '2',  # Limit threads to reduce memory
                     '-s', f'{target_width}x{target_height}',  # Explicit output resolution
                     output_path
                 ]
                 
                 print(f"FFmpeg command (concat demuxer): {' '.join(cmd)}")
+                print(f"   ⏱️  Time remaining: {time_remaining:.0f}s")
                 
                 try:
                     result = subprocess.run(
@@ -185,12 +271,21 @@ class VideoStitcher:
                         capture_output=True,
                         text=True,
                         check=True,
-                        timeout=300
+                        timeout=int(time_remaining)  # Use remaining time budget
                     )
-                    print("✅ Concat demuxer method succeeded")
+                    elapsed_total = time.time() - start_time
+                    print(f"✅ Concat demuxer method succeeded ({elapsed_total:.1f}s total)")
                 except subprocess.TimeoutExpired:
-                    raise PhaseException("FFmpeg stitching timed out after 5 minutes")
+                    elapsed_total = time.time() - start_time
+                    raise PhaseException(f"FFmpeg stitching timed out after {elapsed_total:.0f}s (7 minute total pipeline limit exceeded)")
                 except subprocess.CalledProcessError as e:
+                    # Check if it was killed by system (SIGKILL = -9)
+                    if e.returncode == -9:
+                        raise PhaseException(
+                            f"FFmpeg process was killed (likely out of memory). "
+                            f"Try reducing number of chunks or using lower resolution. "
+                            f"Command: {' '.join(cmd[:10])}..."
+                        )
                     # Log full error for debugging
                     error_msg = f"FFmpeg failed with return code {e.returncode}\n"
                     error_msg += f"Command: {' '.join(cmd)}\n"

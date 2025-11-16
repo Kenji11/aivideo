@@ -49,6 +49,7 @@ class ReferenceAssetService:
             product_reference_url = None
             if has_uploaded_assets:
                 print(f"📸 User uploaded {len(uploaded_assets)} image(s) - skipping product reference generation")
+                print(f"   ❌ DO NOT GENERATE NEW REFERENCE IMAGES - using uploaded images only")
                 print(f"   Will use uploaded images directly for video generation")
             elif product:
                 print(f"📸 Generating product reference for: {product.get('name', 'product')}...")
