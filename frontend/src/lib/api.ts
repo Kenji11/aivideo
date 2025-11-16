@@ -51,6 +51,7 @@ export interface GenerateRequest {
   prompt: string;
   assets?: string[]; // For backward compatibility, can also be reference_assets
   reference_assets?: string[];
+  model?: string; // Video generation model to use (e.g., 'hailuo', 'kling', 'sora')
 }
 
 export interface GenerateResponse {
@@ -225,6 +226,7 @@ export async function generateVideo(request: GenerateRequest): Promise<GenerateR
     description: request.description,
     prompt: request.prompt,
     reference_assets: request.reference_assets || request.assets || [],
+    model: request.model, // Include model selection
   };
   return api.generateVideo(normalizedRequest);
 }

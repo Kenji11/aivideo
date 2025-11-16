@@ -15,6 +15,16 @@ COST_ZEROSCOPE = 0.10  # Zeroscope v2 XL
 COST_ANIMATEDIFF = 0.20  # AnimateDiff
 COST_RUNWAY = 0.25  # Runway Gen-2 (estimated)
 COST_HAILUO = 0.04  # Hailuo 2.3 (fast)
+COST_SEEDANCE = 0.06  # Seedance 1.0 Pro Fast (estimated, 2-12s clips, 60% cheaper than Pro)
+# New models
+COST_KLING = 0.08  # Kling v2.5 Turbo Pro (estimated)
+COST_PIXVERSE = 0.07  # Pixverse v5 (estimated)
+COST_WAN_25_T2V = 0.10  # Wan 2.5 T2V (estimated)
+COST_WAN_25_I2V = 0.09  # Wan 2.5 I2V Fast (estimated)
+COST_VEO_FAST = 0.12  # Google Veo 3.1 Fast (estimated)
+COST_VEO = 0.15  # Google Veo 3.1 (estimated)
+COST_HAILUO_23 = 0.05  # Minimax Hailuo 2.3 (standard, not fast)
+COST_SORA = 0.20  # OpenAI Sora 2 (estimated)
 
 # Legacy constants (kept for backwards compatibility)
 COST_ZEROSCOPE_VIDEO = COST_ZEROSCOPE
