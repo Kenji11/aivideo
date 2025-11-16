@@ -11,7 +11,7 @@ from app.services.openai import openai_client
 from app.common.exceptions import PhaseException
 from app.common.constants import COST_AUDIO_CROP
 from app.phases.phase5_refine.model_config import get_default_music_model, get_music_model_config
-from moviepy import VideoFileClip
+from moviepy.editor import VideoFileClip
 
 
 class RefinementService:
