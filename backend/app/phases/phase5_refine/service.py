@@ -192,8 +192,8 @@ class RefinementService:
                 print(f"   ❌ Error during music generation: {str(e)}")
                 raise
             
-            # Download music file (output is URL)
-            # Replicate returns either a string URL or a list/iterator
+            # Download music file (output is URL from Replicate)
+            # Replicate returns a URL string to the generated audio file
             if isinstance(output, str):
                 music_url = output
             elif hasattr(output, '__iter__') and not isinstance(output, (str, bytes)):
@@ -210,27 +210,35 @@ class RefinementService:
                 print(f"   ⚠️  Music generation returned no URL (output type: {type(output)})")
                 return None
             
+            # Ensure we have a valid URL string
+            if not isinstance(music_url, str):
+                print(f"   ⚠️  Music URL is not a string (type: {type(music_url)})")
+                return None
+            
+            print(f"   📥 Downloading music from: {music_url[:80]}...")
+            
+            # Download the audio file from the URL
             raw_music_path = tempfile.mktemp(suffix='.mp3')
             
             try:
-                # Try to get URL first (for logging)
-                music_url = output.url() if hasattr(output, 'url') else None
-                if music_url:
-                    print(f"   📥 Downloading music from: {music_url[:80]}...")
+                response = requests.get(music_url, timeout=60)
+                response.raise_for_status()
                 
-                # Write file directly from output
+                # Write the downloaded audio to file
                 print(f"   💾 Writing music to: {raw_music_path}")
                 with open(raw_music_path, 'wb') as f:
-                    if hasattr(output, 'read'):
-                        # File-like object with .read() method
-                        f.write(output.read())
-                    elif isinstance(output, (str, bytes)):
-                        # Direct string/bytes
-                        f.write(output if isinstance(output, bytes) else output.encode())
-                    else:
-                        raise Exception(f"Unexpected output type: {type(output)}")
+                    f.write(response.content)
+                
+                # Verify file size
+                file_size = os.path.getsize(raw_music_path)
+                print(f"   ✅ Downloaded {file_size} bytes")
+                
+                if file_size < 1000:  # Less than 1KB is suspicious
+                    print(f"   ⚠️  WARNING: Music file is very small ({file_size} bytes), may be invalid")
+                    return None
+                    
             except Exception as e:
-                print(f"   ⚠️  Failed to save music file: {str(e)}")
+                print(f"   ⚠️  Failed to download music file: {str(e)}")
                 return None
             
             self.total_cost += cost
