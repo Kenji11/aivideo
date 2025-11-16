@@ -5,8 +5,8 @@ import requests
 import base64
 import json
 from typing import Dict, Tuple, Optional, List
+import replicate
 from app.services.s3 import s3_client
-from app.services.replicate import replicate_client
 from app.services.openai import openai_client
 from app.common.exceptions import PhaseException
 from app.common.constants import COST_AUDIO_CROP, get_video_s3_key
@@ -213,14 +213,13 @@ class RefinementService:
             print(f"   🔧 Input params: {list(input_params.keys())}")
             print(f"   🔧 Prompt length: {len(input_params.get('prompt', ''))}")
             
-            # Use replicate_client.run() which handles both model names and version hashes
-            # The run() method automatically handles the correct API call format
+            # Use replicate.run() directly with the modern Replicate API
+            # Replicate automatically handles both model names and version hashes
             try:
                 print(f"   🔧 Calling Replicate API...")
-                output = replicate_client.run(
-                    replicate_model,  # Can be model name or version hash
-                    input=input_params,
-                    timeout=180  # 3 minutes for music generation
+                output = replicate.run(
+                    replicate_model,  # Can be "owner/model" or "owner/model:version"
+                    input=input_params
                 )
                 print(f"   ✅ Music generation completed")
             except Exception as e:

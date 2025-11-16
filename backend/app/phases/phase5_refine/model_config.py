@@ -45,7 +45,7 @@ DEFAULT_MUSIC_MODEL = 'musicgen'
 MUSIC_MODEL_CONFIGS: Dict[str, Dict] = {
     'musicgen': {
         'name': 'musicgen',
-        'replicate_model': 'meta/musicgen:671ac645ce5e552cc63a54c185625b155cf217a7',  # Use version hash for stable access
+        'replicate_model': 'meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb',  # Use version hash for stable access
         'cost_per_generation': COST_MUSICGEN,  # $0.15 per 30s
         'max_duration': 30,  # MusicGen supports up to 30s per generation
         'use_version_hash': True,  # Use version hash format
@@ -58,7 +58,7 @@ MUSIC_MODEL_CONFIGS: Dict[str, Dict] = {
     },
     'stable_audio': {
         'name': 'stable_audio',
-        'replicate_model': 'stackadoc/stable-audio-open-1.0:2cd7d762d12df80757b18439c8fcd0ac3311251eb94ac6bdc026bb4ce4540868',  # replicate.run() handles model:version format
+        'replicate_model': 'stackadoc/stable-audio-open-1.0:9aff84a639f96d0f7e6081cdea002d15133d0043727f849c40abdd166b7c75a8',  # replicate.run() handles model:version format
         'cost_per_generation': COST_STABLE_AUDIO,  # $0.10 per 30s
         'max_duration': 47,  # Stable Audio Open supports up to 47s
         'input_params': {
