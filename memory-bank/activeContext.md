@@ -42,10 +42,11 @@
    - 5 template archetypes as high-level guides
 
 3. **Database Strategy** ✅
-   - Add new fields: `creativity_level`, `selected_archetype`, `storyboard_images`, `num_beats`, `num_chunks`
+   - Add ONLY `storyboard_images` field (JSON, list of image URLs)
+   - Store `creativity_level`, `selected_archetype`, `num_beats`, `num_chunks` in `spec` JSON
    - Do NOT remove old fields yet (backward compat for existing data)
+   - Do NOT modify `VideoStatus` enum (out of scope)
    - Migration executed LAST (after all TDD PRs)
-   - `spec` JSON column handles format changes automatically
 
 4. **No Backward Compatibility for New Videos** ✅
    - Old videos in DB stay untouched (spec is JSON)

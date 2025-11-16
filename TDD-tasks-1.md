@@ -91,19 +91,9 @@
 
 **File:** `backend/app/common/models.py`
 
-- [ ] Update `VideoStatus` enum to include:
-  - [ ] `PLANNING = "planning"`
-  - [ ] `STORYBOARDING = "storyboarding"`
-  - [ ] `GENERATING_CHUNKS = "generating_chunks"`
-  - [ ] `STITCHING = "stitching"`
-  - [ ] `ADDING_MUSIC = "adding_music"`
-- [ ] Add `creativity_level` column (Float, default 0.5)
-- [ ] Add `selected_archetype` column (String, nullable)
 - [ ] Add `storyboard_images` column (JSON, default list)
-- [ ] Add `num_beats` column (Integer, nullable)
-- [ ] Add `num_chunks` column (Integer, nullable)
-- [ ] Remove old `animatic_urls` column if exists
-- [ ] Remove old `reference_urls` column if exists
+- [ ] Note: `creativity_level`, `selected_archetype`, `num_beats`, `num_chunks` stored in `spec` JSON
+- [ ] Note: Keep existing `VideoStatus` enum unchanged (out of scope)
 
 ---
 
@@ -272,12 +262,15 @@ Before merging:
 ### Fields to ADD:
 ```python
 # Add to VideoGeneration model
-creativity_level = Column(Float, default=0.5, nullable=True)
-selected_archetype = Column(String, nullable=True)
 storyboard_images = Column(JSON, default=list, nullable=True)
-num_beats = Column(Integer, nullable=True)
-num_chunks = Column(Integer, nullable=True)
 ```
+
+### Fields Stored in `spec` JSON (No DB columns needed):
+- `creativity_level` - User creativity setting (0.0-1.0)
+- `selected_archetype` - Which template archetype was chosen
+- `num_beats` - Number of beats in composition
+- `num_chunks` - Number of video chunks
+- All beat-specific data (beat_id, duration, prompt, etc.)
 
 ### Fields to KEEP (Do NOT Remove):
 - `animatic_urls` - Keep for backward compat with existing videos
@@ -292,7 +285,7 @@ num_chunks = Column(Integer, nullable=True)
 
 ### Migration Tasks:
 - [ ] Create migration file after all TDD PRs complete
-- [ ] Add new columns with nullable=True (backward compat)
+- [ ] Add `storyboard_images` column with nullable=True (backward compat)
 - [ ] Test migration on development database
 - [ ] Verify existing videos still accessible
 - [ ] Run migration on production
@@ -305,14 +298,15 @@ num_chunks = Column(Integer, nullable=True)
 - **Database**: Both formats coexist via JSON column flexibility
 - **Code**: Only generate new format, don't support generating old format
 
-### Status Enum Updates (Already Exists):
-Current statuses map to new TDD phases:
-- `VALIDATING` → Phase 1 (Planning) ✅
-- `GENERATING_ANIMATIC` → Phase 2 (Storyboard) - rename later
-- `GENERATING_REFERENCES` → Phase 3 (References) ✅
-- `GENERATING_CHUNKS` → Phase 4 (Chunks) ✅
-- `REFINING` → Phase 5 (Refinement) ✅
-- `EXPORTING` → Phase 6 (Export) ✅
+### Status Enum:
+- **No changes to VideoStatus enum** (out of scope)
+- Use existing statuses for TDD implementation
+- `VALIDATING` → Phase 1 (Planning)
+- `GENERATING_ANIMATIC` → Phase 2 (Storyboard)
+- `GENERATING_REFERENCES` → Phase 3 (References)
+- `GENERATING_CHUNKS` → Phase 4 (Chunks)
+- `REFINING` → Phase 5 (Refinement)
+- `EXPORTING` → Phase 6 (Export)
 
 **Note:** Migration executed LAST after full TDD implementation and testing.
 
