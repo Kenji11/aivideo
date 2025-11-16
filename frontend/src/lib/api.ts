@@ -81,6 +81,7 @@ export interface StatusResponse {
   reference_assets?: ReferenceAssets;
   animatic_urls?: string[];
   stitched_video_url?: string;
+  final_video_url?: string;  // Phase 5 final video (with audio)
 }
 
 export interface VideoResponse {

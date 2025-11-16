@@ -113,10 +113,19 @@ function AppContent() {
           addNotification('success', 'Video Chunks Generated', 'Video chunks are being stitched together!');
         }
         
+        // Update to final video URL when Phase 5 completes (prefer final_video_url over stitched_video_url)
+        if (status.final_video_url && status.final_video_url !== stitchedVideoUrl) {
+          setStitchedVideoUrl(status.final_video_url);
+        }
+        
         if (status.status === 'complete') {
           setIsProcessing(false);
           navigate('/preview');
-          addNotification('success', 'Video Complete', 'Your video is ready!');
+          if (status.final_video_url) {
+            addNotification('success', 'Video Complete', 'Your video with audio is ready!');
+          } else {
+            addNotification('success', 'Video Complete', 'Your video is ready!');
+          }
         } else if (status.status === 'failed') {
           setIsProcessing(false);
           addNotification('error', 'Generation Failed', status.error || 'Unknown error');

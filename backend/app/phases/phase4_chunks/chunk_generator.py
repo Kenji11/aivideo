@@ -4,6 +4,7 @@ import tempfile
 import subprocess
 import requests
 import time
+import math
 from datetime import datetime
 from typing import Optional, List, Dict
 from PIL import Image
@@ -181,9 +182,9 @@ def build_chunk_specs(
     beats = spec.get('beats', [])
     
     # Get model's actual chunk duration (what the model really outputs)
-    model = get_default_model()
-    actual_chunk_duration = model['actual_chunk_duration']
-    model_name = model['name']
+    model_config = get_default_model()
+    actual_chunk_duration = model_config.get('actual_chunk_duration', 5.0)  # Default to 5s if not found
+    model_name = model_config.get('name', 'unknown')
     
     # Calculate chunk count based on model's actual output duration
     # This is the REALITY of what the model outputs, not what we request
@@ -198,7 +199,7 @@ def build_chunk_specs(
     print(f"      - Model: {model_name}")
     print(f"      - Model outputs: {actual_chunk_duration}s chunks")
     print(f"      - Chunk count: ceil({duration}s / {actual_chunk_duration}s) = {chunk_count} chunks")
-    print(f"      - Overlap: {chunk_overlap}s (25% of chunk duration)")
+    print(f"      - Overlap: {chunk_overlap:.2f}s (25% of chunk duration)")
     
     # Check if we have animatic URLs - if not, use text-to-video fallback
     use_text_to_video = len(animatic_urls) == 0

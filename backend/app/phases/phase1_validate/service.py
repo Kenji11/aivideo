@@ -177,19 +177,49 @@ Choose the template that best matches the user's intent. Extract all available i
         # Start with template as base
         spec = template.copy()
         
-        # Optimize duration for ads - start with shorter videos (5-10s) that can be extended
+        # Optimize duration for ads or short videos - check for explicit duration requests
         prompt_lower = extracted.get('original_prompt', '').lower() if 'original_prompt' in extracted else ''
         is_ad = 'ad' in prompt_lower or 'advertisement' in prompt_lower or 'commercial' in prompt_lower
         
-        if is_ad:
-            # For ads, start with 5-10 seconds (can be extended later)
-            # Use 5 seconds for quick ads, 10 seconds for standard ads
-            target_duration = 5 if 'quick' in prompt_lower or 'short' in prompt_lower else 10
+        # Check for explicit duration requests (e.g., "10 second", "10s", "10 seconds")
+        import re
+        duration_match = re.search(r'(\d+)\s*(?:second|sec|s)', prompt_lower)
+        if duration_match:
+            requested_duration = int(duration_match.group(1))
+            # Limit to reasonable range (5-60 seconds)
+            requested_duration = max(5, min(60, requested_duration))
             original_duration = spec.get('duration', 30)
             
-            # Only reduce duration if it's significantly longer than target (e.g., >60s)
-            # For 30-second ads, keep the original duration
-            if original_duration > target_duration and original_duration > 60:
+            # FORCE the requested duration if user explicitly specified it (always apply, not just if less)
+            if requested_duration != original_duration:
+                spec['duration'] = requested_duration
+                # Scale down beat durations proportionally, but keep at least 1 second per beat
+                total_beat_duration = sum(beat.get('duration', 0) for beat in spec.get('beats', []))
+                if total_beat_duration > 0:
+                    scale_factor = requested_duration / original_duration
+                    for beat in spec.get('beats', []):
+                        new_duration = max(1, int(beat.get('duration', 0) * scale_factor))
+                        beat['duration'] = new_duration
+                    # Recalculate start times
+                    current_start = 0
+                    for beat in spec.get('beats', []):
+                        beat['start'] = current_start
+                        current_start += beat.get('duration', 0)
+                
+                print(f"   📏 Duration FORCED: {original_duration}s → {requested_duration}s (user explicitly requested)")
+        elif is_ad:
+            # For ads without explicit duration, FORCE to 10-15 seconds (default 12 seconds)
+            # Use 10 seconds for quick ads, 15 seconds for standard ads
+            if 'quick' in prompt_lower or 'short' in prompt_lower:
+                target_duration = 10
+            elif 'long' in prompt_lower or 'extended' in prompt_lower:
+                target_duration = 15
+            else:
+                target_duration = 12  # Default for ads: 12 seconds
+            original_duration = spec.get('duration', 30)
+            
+            # FORCE ad duration (always apply, not just if longer)
+            if original_duration != target_duration:
                 spec['duration'] = target_duration
                 # Scale down beat durations proportionally, but keep at least 1 second per beat
                 total_beat_duration = sum(beat.get('duration', 0) for beat in spec.get('beats', []))
@@ -207,6 +237,7 @@ Choose the template that best matches the user's intent. Extract all available i
                 # Mark as ad for potential extension
                 spec['is_ad'] = True
                 spec['original_duration'] = original_duration
+                print(f"   📏 Ad duration FORCED: {original_duration}s → {target_duration}s (ad detected)")
         
         # Update template field
         spec['template'] = extracted.get('template', template.get('name', 'product_showcase'))
