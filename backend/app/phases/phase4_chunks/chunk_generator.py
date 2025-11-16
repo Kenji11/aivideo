@@ -277,14 +277,16 @@ def build_chunk_specs(
             asset_index = chunk_num % len(uploaded_assets)
             selected_asset = uploaded_assets[asset_index]
             chunk_reference_url = selected_asset.get('s3_url') or selected_asset.get('s3_key')
-            if chunk_num == 0:
-                print(f"   📸 Chunk {chunk_num}: Using uploaded image {asset_index + 1}/{len(uploaded_assets)}")
-        elif chunk_num == 0:
-            # Chunk 0: Use style guide or product reference
-            chunk_reference_url = style_guide_url or product_reference_url
+            uploaded_asset_url = chunk_reference_url  # Store for this specific chunk
+            print(f"   📸 Chunk {chunk_num}: Using uploaded image {asset_index + 1}/{len(uploaded_assets)}")
         else:
-            # Other chunks: Use product reference if available
-            chunk_reference_url = product_reference_url
+            uploaded_asset_url = None
+            if chunk_num == 0:
+                # Chunk 0: Use style guide or product reference
+                chunk_reference_url = style_guide_url or product_reference_url
+            else:
+                # Other chunks: Use product reference if available
+                chunk_reference_url = product_reference_url
         
         chunk_spec = ChunkSpec(
             video_id=video_id,
@@ -296,6 +298,7 @@ def build_chunk_specs(
             style_guide_url=chunk_reference_url,  # Use uploaded asset or generated reference
             product_reference_url=product_reference_url,
             previous_chunk_last_frame=None,  # Will be set after previous chunk generates
+            uploaded_asset_url=uploaded_asset_url if has_uploaded_assets else None,  # Specific uploaded image for this chunk
             prompt=prompt,
             fps=spec.get('fps', 24),
             use_text_to_video=use_text_to_video  # Set based on whether animatic_urls is empty
@@ -402,16 +405,22 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
                     try:
                         print(f"   Trying model: {model_name} (image-to-video)...")
                         
+                        # Get model-specific parameter names (e.g., hailuo uses 'first_frame_image' instead of 'image')
+                        param_names = model_config.get('param_names', {})
+                        image_param_name = param_names.get('image', 'image')  # Default to 'image' if not specified
+                        
                         # Use model config parameters
                         # Timeout: 5 minutes per chunk (should be enough for video generation)
+                        input_params = {
+                            image_param_name: img_file,  # Use model-specific parameter name
+                            "prompt": prompt,
+                            "num_frames": num_frames,
+                            "fps": fps,
+                        }
+                        
                         output = replicate_client.run(
                             model_name,
-                            input={
-                                "image": img_file,
-                                "prompt": prompt,
-                                "num_frames": num_frames,
-                                "fps": fps,
-                            },
+                            input=input_params,
                             timeout=300  # 5 minutes timeout
                         )
                         
@@ -487,30 +496,52 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
                         "Cannot generate video without an input image."
                     )
             elif chunk_spec_obj.previous_chunk_last_frame:
-                # Chunk 1+: Use previous chunk's last frame
-                prev_frame_key = chunk_spec_obj.previous_chunk_last_frame.replace(f's3://{s3_client.bucket}/', '')
-                input_image_path = s3_client.download_temp(prev_frame_key)
-                temp_files.append(input_image_path)
-                print(f"   Using previous chunk's last frame as input image")
+                # Chunk 1+: Use previous chunk's last frame OR uploaded asset (if provided)
+                # If we have an uploaded asset for this chunk, use it; otherwise use previous frame
+                if chunk_spec_obj.uploaded_asset_url:
+                    # Use the specific uploaded image assigned to this chunk
+                    uploaded_url = chunk_spec_obj.uploaded_asset_url
+                    if uploaded_url.startswith('s3://'):
+                        uploaded_key = uploaded_url.replace(f's3://{s3_client.bucket}/', '')
+                    elif uploaded_url.startswith('http'):
+                        uploaded_key = uploaded_url.split(f'{s3_client.bucket}/', 1)[-1].split('?')[0]
+                    else:
+                        uploaded_key = uploaded_url
+                    
+                    input_image_path = s3_client.download_temp(uploaded_key)
+                    temp_files.append(input_image_path)
+                    print(f"   📸 Using uploaded image for chunk {chunk_num} (from multiple images)")
+                else:
+                    # Fallback to previous chunk's last frame for temporal consistency
+                    prev_frame_key = chunk_spec_obj.previous_chunk_last_frame.replace(f's3://{s3_client.bucket}/', '')
+                    input_image_path = s3_client.download_temp(prev_frame_key)
+                    temp_files.append(input_image_path)
+                    print(f"   Using previous chunk's last frame as input image")
             else:
                 raise PhaseException(
-                    f"Chunk {chunk_num} requires previous chunk's last frame, but it's not available"
+                    f"Chunk {chunk_num} requires previous chunk's last frame or uploaded asset, but neither is available"
                 )
             
             # Generate video using the input image
             try:
                 print(f"   Trying image-to-video model: {model_name}...")
                 
+                # Get model-specific parameter names (e.g., hailuo uses 'first_frame_image' instead of 'image')
+                param_names = model_config.get('param_names', {})
+                image_param_name = param_names.get('image', 'image')  # Default to 'image' if not specified
+                
                 # Open image file for Replicate
                 with open(input_image_path, 'rb') as img_file:
+                    input_params = {
+                        image_param_name: img_file,  # Use model-specific parameter name
+                        "prompt": prompt,
+                        "num_frames": num_frames,
+                        "fps": fps,
+                    }
+                    
                     output = replicate_client.run(
                         model_name,
-                        input={
-                            "image": img_file,
-                            "prompt": prompt,
-                            "num_frames": num_frames,
-                            "fps": fps,
-                        },
+                        input=input_params,
                         timeout=300  # 5 minutes timeout
                     )
                 

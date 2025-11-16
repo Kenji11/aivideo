@@ -1,9 +1,5 @@
-import { ArrowLeft, TrendingUp, Video, Clock, Users } from 'lucide-react';
+import { TrendingUp, Video, Clock, Users } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
-interface AnalyticsProps {
-  onBack: () => void;
-}
 
 const chartData = [
   { date: 'Mon', videos: 2, views: 400 },
@@ -15,17 +11,9 @@ const chartData = [
   { date: 'Sun', videos: 3, views: 800 },
 ];
 
-export function Analytics({ onBack }: AnalyticsProps) {
+export function Analytics() {
   return (
     <div className="max-w-6xl mx-auto animate-fade-in">
-      <button
-        onClick={onBack}
-        className="flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-5 h-5" />
-        <span>Back</span>
-      </button>
-
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Analytics</h1>
         <p className="text-slate-600 dark:text-slate-400 mt-1">Track your video creation activity and performance</p>

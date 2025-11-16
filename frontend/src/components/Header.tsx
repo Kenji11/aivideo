@@ -1,20 +1,21 @@
 import { Film, LogOut, Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   userName?: string;
   onLogout?: () => void;
-  onProjectsClick?: () => void;
 }
 
-export function Header({ userName, onLogout, onProjectsClick }: HeaderProps) {
+export function Header({ userName, onLogout }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <nav className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 dark:border-slate-700 sticky top-0 z-50 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <div className="flex items-center space-x-2 cursor-pointer group" onClick={onProjectsClick}>
+          <div className="flex items-center space-x-2 cursor-pointer group" onClick={() => navigate('/')}>
             <div className="relative">
               <Film className="w-8 h-8 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
               <div className="absolute inset-0 bg-blue-600/20 rounded-lg blur-md group-hover:blur-lg transition-all" />
@@ -27,7 +28,7 @@ export function Header({ userName, onLogout, onProjectsClick }: HeaderProps) {
 
           <div className="hidden md:flex items-center space-x-4">
             <button
-              onClick={onProjectsClick}
+              onClick={() => navigate('/projects')}
               className="text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-300 hover:text-slate-900 dark:text-slate-100 dark:hover:text-slate-100 px-4 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-700 transition-colors"
             >
               My Projects
@@ -66,7 +67,7 @@ export function Header({ userName, onLogout, onProjectsClick }: HeaderProps) {
         {mobileMenuOpen && (
           <div className="md:hidden pb-4 space-y-2 border-t border-slate-200 dark:border-slate-700 dark:border-slate-700 pt-4 animate-slide-in">
             <button
-              onClick={onProjectsClick}
+              onClick={() => navigate('/projects')}
               className="w-full text-left text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-300 px-4 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-700 transition-colors"
             >
               My Projects

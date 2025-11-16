@@ -1,9 +1,8 @@
-import { ArrowLeft, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useState } from 'react';
 import { TemplateGallery, Template } from '../components/TemplateGallery';
 
 interface TemplatesProps {
-  onBack: () => void;
   onSelectTemplate: (template: Template) => void;
 }
 
@@ -52,7 +51,7 @@ const mockTemplates: Template[] = [
   },
 ];
 
-export function Templates({ onBack, onSelectTemplate }: TemplatesProps) {
+export function Templates({ onSelectTemplate }: TemplatesProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -74,14 +73,6 @@ export function Templates({ onBack, onSelectTemplate }: TemplatesProps) {
 
   return (
     <div className="max-w-6xl mx-auto animate-fade-in">
-      <button
-        onClick={onBack}
-        className="flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-5 h-5" />
-        <span>Back</span>
-      </button>
-
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Templates</h1>
         <p className="text-slate-600 dark:text-slate-400 mt-1">Choose from professionally designed templates to jumpstart your video</p>

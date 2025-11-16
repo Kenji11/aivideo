@@ -31,7 +31,12 @@ def validate_prompt(self, video_id: str, prompt: str, assets: list = None):
     print(f"   - Prompt length: {len(prompt)} characters")
     print(f"   - Assets provided: {len(assets)}")
     if assets:
-        print(f"   - Asset IDs: {', '.join(assets[:5])}{'...' if len(assets) > 5 else ''}")
+        # Assets can be either list of strings (asset IDs) or list of dicts (with s3_key, asset_id)
+        if assets and isinstance(assets[0], dict):
+            asset_ids = [asset.get('asset_id', 'unknown') for asset in assets[:5]]
+        else:
+            asset_ids = assets[:5]
+        print(f"   - Asset IDs: {', '.join(str(aid) for aid in asset_ids)}{'...' if len(assets) > 5 else ''}")
     
     try:
         # Initialize validation service

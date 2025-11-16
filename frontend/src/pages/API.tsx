@@ -1,11 +1,7 @@
-import { ArrowLeft, Copy, Check, Code } from 'lucide-react';
+import { Copy, Check, Code } from 'lucide-react';
 import { useState } from 'react';
 
-interface APIProps {
-  onBack: () => void;
-}
-
-export function API({ onBack }: APIProps) {
+export function API() {
   const [copiedEndpoint, setCopiedEndpoint] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, id: string) => {
@@ -62,14 +58,6 @@ export function API({ onBack }: APIProps) {
 
   return (
     <div className="max-w-6xl mx-auto animate-fade-in">
-      <button
-        onClick={onBack}
-        className="flex items-center space-x-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 mb-6 transition-colors"
-      >
-        <ArrowLeft className="w-5 h-5" />
-        <span>Back</span>
-      </button>
-
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">API Documentation</h1>
         <p className="text-slate-600 dark:text-slate-400 mt-1">Integrate VideoAI Studio into your application</p>
