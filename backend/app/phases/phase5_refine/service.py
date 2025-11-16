@@ -141,9 +141,16 @@ class RefinementService:
             
             # Extract audio specs from template
             audio_spec = spec.get('audio', {})
+            if not audio_spec:
+                print(f"   ⚠️  WARNING: No audio spec found in video spec! Using defaults.")
+                print(f"   📋 Spec keys: {list(spec.keys())}")
+                audio_spec = {}
+            
             music_style = audio_spec.get('music_style', 'orchestral')
             tempo = audio_spec.get('tempo', 'moderate')
             mood = audio_spec.get('mood', 'sophisticated')
+            
+            print(f"   🎵 Audio spec: style={music_style}, tempo={tempo}, mood={mood}")
             
             # Build music prompt from template specs
             prompt = self._build_music_prompt(music_style, tempo, mood)
@@ -166,44 +173,40 @@ class RefinementService:
                 input_params['seconds_total'] = music_duration
             
             # Use configured model via Replicate
-            # If use_version_hash is True, extract version hash from replicate_model
-            if model_config.get('use_version_hash', False) and ':' in replicate_model:
-                # Extract version hash (part after colon)
-                version_hash = replicate_model.split(':', 1)[1]
-                # Use version parameter directly via replicate client
-                output = replicate_client.client.predictions.create(
-                    version=version_hash,
-                    input=input_params
-                )
-                # Poll for completion (same logic as replicate_client.run)
-                import time
-                start_time = time.time()
-                while output.status not in ["succeeded", "failed", "canceled"]:
-                    if time.time() - start_time > 180:
-                        raise TimeoutError("Music generation timed out after 180 seconds")
-                    time.sleep(1)
-                    output.reload()
-                
-                if output.status == "failed":
-                    error_msg = getattr(output, 'error', 'Unknown error')
-                    raise Exception(f"Music generation failed: {error_msg}")
-                
-                if output.status == "canceled":
-                    raise Exception("Music generation was canceled")
-                
-                output = output.output
-            else:
-                # Use regular model name (musicgen uses model name)
+            print(f"   🔧 Model: {replicate_model}")
+            print(f"   🔧 Input params: {list(input_params.keys())}")
+            print(f"   🔧 Prompt length: {len(input_params.get('prompt', ''))}")
+            
+            # Use replicate_client.run() which handles both model names and version hashes
+            # The run() method automatically handles the correct API call format
+            try:
+                print(f"   🔧 Calling Replicate API...")
                 output = replicate_client.run(
-                    replicate_model,
+                    replicate_model,  # Can be model name or version hash
                     input=input_params,
                     timeout=180  # 3 minutes for music generation
                 )
+                print(f"   ✅ Music generation completed")
+            except Exception as e:
+                print(f"   ❌ Error during music generation: {str(e)}")
+                raise
             
             # Download music file (output is URL)
-            music_url = output if isinstance(output, str) else (output[0] if isinstance(output, list) else output.get('audio'))
+            # Replicate returns either a string URL or a list/iterator
+            if isinstance(output, str):
+                music_url = output
+            elif hasattr(output, '__iter__') and not isinstance(output, (str, bytes)):
+                # If it's an iterator/list, get first item
+                music_list = list(output) if hasattr(output, '__iter__') else [output]
+                music_url = music_list[0] if music_list else None
+            elif isinstance(output, dict):
+                # Try common keys for audio output
+                music_url = output.get('audio') or output.get('output') or output.get('url')
+            else:
+                music_url = str(output) if output else None
+            
             if not music_url:
-                print(f"   ⚠️  Music generation returned no URL")
+                print(f"   ⚠️  Music generation returned no URL (output type: {type(output)})")
                 return None
             
             raw_music_path = tempfile.mktemp(suffix='.mp3')
