@@ -667,10 +667,10 @@ Provide a detailed analysis of what music would best match this video content.""
                 # No video audio, just use music
                 final_audio = music
             
-            # Set audio to video - MoviePy 2.x uses with_audio instead of set_audio
-            final_video = video.with_audio(final_audio)
+            # Set audio to video - MoviePy 1.x uses set_audio
+            final_video = video.set_audio(final_audio)
             
-            # Export - MoviePy 2.x API changes
+            # Export with MoviePy 1.x
             output_path = tempfile.mktemp(suffix='.mp4')
             final_video.write_videofile(
                 output_path,
