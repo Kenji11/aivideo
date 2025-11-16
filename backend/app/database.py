@@ -27,6 +27,34 @@ def get_db():
         db.close()
 
 def init_db():
-    """Initialize database (create tables)"""
+    """Initialize database (create tables and run migrations)"""
     from app.common.models import VideoGeneration, Asset
+    
+    # Create tables if they don't exist (for initial setup)
     Base.metadata.create_all(bind=engine)
+    
+    # Run Alembic migrations to handle schema changes
+    try:
+        from alembic.config import Config
+        from alembic import command
+        import os
+        
+        # Get the alembic.ini path (should be in backend directory)
+        alembic_ini_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "alembic.ini")
+        
+        if os.path.exists(alembic_ini_path):
+            alembic_cfg = Config(alembic_ini_path)
+            # Run all pending migrations
+            command.upgrade(alembic_cfg, "head")
+        else:
+            # If alembic.ini doesn't exist, just log a warning
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Alembic config not found at {alembic_ini_path}, skipping migrations")
+    except Exception as e:
+        # Log error but don't fail startup if migrations fail
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to run migrations: {str(e)}")
+        # Still continue - the app should start even if migrations fail
+        # (they can be run manually later)
