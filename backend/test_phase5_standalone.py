@@ -22,8 +22,9 @@ else:
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'app'))
 
 from app.phases.phase5_refine.service import RefinementService
+from app.common.constants import MOCK_USER_ID
 
-def test_phase5_standalone(stitched_url: str = None):
+def test_phase5_standalone(stitched_url: str = None, user_id: str = None):
     """Test Phase 5 with a stitched video URL"""
     
     print("=" * 80)
@@ -39,10 +40,11 @@ def test_phase5_standalone(stitched_url: str = None):
             print("❌ Please provide a stitched video URL")
             print()
             print("Usage:")
-            print("  python test_phase5_standalone.py <stitched_video_url>")
+            print("  python test_phase5_standalone.py <stitched_video_url> [user_id]")
             print()
             print("Example:")
-            print("  python test_phase5_standalone.py s3://bucket/videos/abc123/chunks/stitched.mp4")
+            print("  python test_phase5_standalone.py s3://bucket/user123/videos/abc123/stitched.mp4 user123")
+            print("  python test_phase5_standalone.py s3://bucket/user123/videos/abc123/stitched.mp4")
             print()
             print("Or get from last video:")
             print("  # Check docker logs or database for stitched_url")
@@ -50,6 +52,11 @@ def test_phase5_standalone(stitched_url: str = None):
     
     # Create test video ID
     video_id = str(uuid.uuid4())
+    
+    # Use provided user_id or default to mock
+    if not user_id:
+        user_id = MOCK_USER_ID
+        print(f"⚠️  No user_id provided, using mock user ID: {user_id}")
     
     # Create minimal spec with audio
     spec = {
@@ -63,6 +70,7 @@ def test_phase5_standalone(stitched_url: str = None):
     
     print(f"📹 Test Configuration:")
     print(f"   Video ID: {video_id}")
+    print(f"   User ID: {user_id}")
     print(f"   Stitched URL: {stitched_url}")
     print(f"   Duration: {spec['duration']}s")
     print(f"   Audio Style: {spec['audio']['music_style']}")
@@ -74,7 +82,7 @@ def test_phase5_standalone(stitched_url: str = None):
     
     try:
         service = RefinementService()
-        refined_url, music_url = service.refine_all(video_id, stitched_url, spec)
+        refined_url, music_url = service.refine_all(video_id, stitched_url, spec, user_id)
         
         print()
         print("=" * 80)
@@ -103,5 +111,8 @@ def test_phase5_standalone(stitched_url: str = None):
 
 if __name__ == "__main__":
     stitched_url = sys.argv[1] if len(sys.argv) > 1 else None
-    exit(test_phase5_standalone("s3://ai-video-assets-dev/chunks/695dd358-fa93-47ba-99b5-8b14dff9c0fd/stitched.mp4"))
+    user_id = sys.argv[2] if len(sys.argv) > 2 else None
+    # Example with old path structure (for backward compatibility testing)
+    # exit(test_phase5_standalone("s3://ai-video-assets-dev/chunks/695dd358-fa93-47ba-99b5-8b14dff9c0fd/stitched.mp4", "user-123"))
+    exit(test_phase5_standalone(stitched_url, user_id))
 

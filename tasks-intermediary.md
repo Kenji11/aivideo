@@ -389,24 +389,24 @@ Existing structure (unchanged for backward compatibility):
   - [x] 5.2 Pass `user_id` to Phase 3, Phase 4, and Phase 5 service functions
   - [x] 5.3 Update pipeline logging to show the new S3 paths being used
 
-- [ ] 6.0 Update utility and test scripts
-  - [ ] 6.1 Update `manual_stitch.py` to accept `user_id` parameter and use new path structure
-  - [ ] 6.2 Update `check_s3_files.py` to accept `user_id` parameter and use new path structure
-  - [ ] 6.3 Update `test_phase5_standalone.py` example paths in comments to show new structure
-  - [ ] 6.4 Review other test files for hardcoded S3 paths and update as needed
+- [x] 6.0 Update utility and test scripts
+  - [x] 6.1 Update `manual_stitch.py` to accept `user_id` parameter and use new path structure
+  - [x] 6.2 Update `check_s3_files.py` to accept `user_id` parameter and use new path structure
+  - [x] 6.3 Update `test_phase5_standalone.py` example paths in comments to show new structure
+  - [x] 6.4 Review other test files for hardcoded S3 paths and update as needed
 
-- [ ] 7.0 Testing and validation
-  - [ ] 7.1 Run integration test to verify Phase 3 → Phase 4 → Phase 5 pipeline with new paths
-  - [ ] 7.2 Verify all files are created in correct `{userId}/videos/{videoId}/` directory
-  - [ ] 7.3 Confirm no files are created in old `chunks/`, `references/` directories
-  - [ ] 7.4 Test `manual_stitch.py` with new path structure
-  - [ ] 7.5 Test `check_s3_files.py` with new path structure
-  - [ ] 7.6 Verify existing tests still pass (may use old test data, that's okay)
+- [x] 7.0 Testing and validation
+  - [x] 7.1 Run integration test to verify Phase 3 → Phase 4 → Phase 5 pipeline with new paths
+  - [x] 7.2 Verify all files are created in correct `{userId}/videos/{videoId}/` directory
+  - [x] 7.3 Confirm no files are created in old `chunks/`, `references/` directories
+  - [x] 7.4 Test `manual_stitch.py` with new path structure
+  - [x] 7.5 Test `check_s3_files.py` with new path structure
+  - [x] 7.6 Verify existing tests still pass (may use old test data, that's okay)
 
-- [ ] 8.0 Documentation
-  - [ ] 8.1 Update this tasks file with "Key Learnings" section documenting the path structure change
-  - [ ] 8.2 Add comments in code explaining why we use user-scoped paths
-  - [ ] 8.3 Update any README files that reference S3 structure
+- [x] 8.0 Documentation
+  - [x] 8.1 Update this tasks file with "Key Learnings" section documenting the path structure change
+  - [x] 8.2 Add comments in code explaining why we use user-scoped paths
+  - [x] 8.3 Update any README files that reference S3 structure
 
 ## Key Decisions
 
@@ -423,13 +423,65 @@ Existing structure (unchanged for backward compatibility):
    - Last frames: `chunk_00_last_frame.png`, `chunk_01_last_frame.png`, etc.
    - Fixed names: `style_guide.png`, `product_reference.png`, `stitched.mp4`, `background.mp3`, `final_draft.mp4`
 
+## Key Learnings
+
+### S3 Path Structure Standardization (PR Completed)
+
+**Problem**: Video outputs were scattered across different S3 prefixes (`chunks/`, `references/`, `videos/`), making it difficult to:
+- Locate all files for a single video
+- Implement user-level permissions and policies
+- Calculate per-user storage costs
+- Clean up or migrate user data
+
+**Solution**: Standardized all video-related outputs to a single user-scoped directory: `{userId}/videos/{videoId}/`
+
+**Implementation Details**:
+1. **Helper Functions**: Created `get_video_s3_prefix()` and `get_video_s3_key()` in `constants.py` for consistent path generation
+2. **Phase Updates**: Updated all phases (3, 4, 5) to accept `user_id` parameter and use new path structure
+3. **Pipeline Integration**: Pipeline fetches `user_id` from database at start and passes it to all phases
+4. **Backward Compatibility**: Utility scripts check both new and old paths for compatibility with existing test data
+
+**Benefits**:
+- **User Isolation**: All user data naturally partitioned at top level
+- **Consistency**: Matches existing `assets/{userId}/` pattern
+- **Scalability**: Easier to implement user-level permissions, storage analytics, and lifecycle policies
+- **Organization**: All files for a single video co-located in one directory
+
+**Files Changed**:
+- `backend/app/common/constants.py` - Added path helper functions
+- `backend/app/phases/phase3_references/` - Updated all reference image uploads
+- `backend/app/phases/phase4_chunks/` - Updated chunk, last frame, and stitched video uploads
+- `backend/app/phases/phase5_refine/` - Updated music and final video uploads
+- `backend/app/orchestrator/pipeline.py` - Passes user_id to all phases
+- `backend/manual_stitch.py` - Updated to use new paths with fallback to old
+- `backend/check_s3_files.py` - Updated to check new structure first, then old
+- `backend/test_phase5_standalone.py` - Updated examples to show new structure
+
+**Migration Notes**:
+- Old paths remain for backward compatibility with existing test data
+- New video generations automatically use new structure
+- Utility scripts support both old and new paths for transition period
+
 ## Success Criteria
 
-- [ ] All Phase 3 outputs saved to `{userId}/videos/{videoId}/`
-- [ ] All Phase 4 outputs saved to `{userId}/videos/{videoId}/`
-- [ ] All Phase 5 outputs saved to `{userId}/videos/{videoId}/`
-- [ ] No new files created in old `chunks/`, `references/` directories
-- [ ] All outputs for a single video co-located in one directory
-- [ ] Utility scripts work with new structure
-- [ ] Integration tests pass with new structure
+- [x] All Phase 3 outputs saved to `{userId}/videos/{videoId}/` ✅
+- [x] All Phase 4 outputs saved to `{userId}/videos/{videoId}/` ✅
+- [x] All Phase 5 outputs saved to `{userId}/videos/{videoId}/` ✅
+- [x] No new files created in old `chunks/`, `references/` directories ✅ (old paths deprecated, new code uses new structure)
+- [x] All outputs for a single video co-located in one directory ✅
+- [x] Utility scripts work with new structure ✅ (updated with backward compatibility)
+- [x] Integration tests pass with new structure ✅
+
+## Implementation Status
+
+**✅ COMPLETED**: All code changes implemented and tested.
+
+**All tasks completed:**
+1. ✅ Full pipeline (Phase 1 → Phase 3 → Phase 4 → Phase 5) tested with new paths
+2. ✅ All files verified to be created in `{userId}/videos/{videoId}/` directory
+3. ✅ Confirmed no files in old paths for new generations
+4. ✅ Utility scripts (`manual_stitch.py`, `check_s3_files.py`) tested and working
+5. ✅ Existing tests verified to still pass
+
+**PR Status**: Ready for merge. All S3 outputs now standardized to user-scoped paths.
 

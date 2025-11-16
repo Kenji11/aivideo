@@ -51,6 +51,12 @@ def get_video_s3_prefix(user_id: str, video_id: str) -> str:
     New standard structure: {userId}/videos/{videoId}/
     All video outputs (references, chunks, stitched, music, final) are stored here.
     
+    Why user-scoped paths?
+    - User Isolation: All user data naturally partitioned at top level for better security
+    - Consistency: Matches existing assets/{userId}/ pattern for uniform organization
+    - Scalability: Easier to implement user-level permissions, storage analytics, and lifecycle policies
+    - Organization: All files for a single video co-located in one directory for easy access
+    
     Args:
         user_id: User ID from VideoGeneration.user_id
         video_id: Video generation ID
