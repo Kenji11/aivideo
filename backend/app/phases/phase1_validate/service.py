@@ -232,6 +232,7 @@ Choose the template that best matches the user's intent. Extract all available i
             )
         
         # Merge audio if present (preserve template defaults, only override non-null values)
+        # Always ensure audio is in spec (from template if not in extracted)
         if 'audio' in extracted:
             template_audio = spec.get('audio', {})
             extracted_audio = extracted.get('audio', {})
@@ -240,6 +241,13 @@ Choose the template that best matches the user's intent. Extract all available i
                 extracted_audio,
                 ['music_style', 'tempo', 'mood']
             )
+        # Ensure audio exists even if not in extracted (use template default)
+        if 'audio' not in spec or not spec.get('audio'):
+            spec['audio'] = template.get('audio', {
+                'music_style': 'orchestral',
+                'tempo': 'moderate',
+                'mood': 'sophisticated'
+            })
         
         # Enrich beat prompts with merged data (use spec values, fallback to extracted, then defaults)
         product_name = spec.get('product', {}).get('name') or extracted.get('product', {}).get('name', 'product')

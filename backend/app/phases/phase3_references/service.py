@@ -42,9 +42,15 @@ class ReferenceAssetService:
             style_guide_url = None
             print("ℹ️  Style guide generation disabled (OUT OF SCOPE for MVP)")
             
-            # Generate product reference if product exists
+            # Skip product reference generation if user uploaded images
+            # User-uploaded images should be used directly instead of generating references
+            has_uploaded_assets = uploaded_assets and len(uploaded_assets) > 0
+            
             product_reference_url = None
-            if product:
+            if has_uploaded_assets:
+                print(f"📸 User uploaded {len(uploaded_assets)} image(s) - skipping product reference generation")
+                print(f"   Will use uploaded images directly for video generation")
+            elif product:
                 print(f"📸 Generating product reference for: {product.get('name', 'product')}...")
                 product_reference_url = self._generate_product_reference(video_id, product)
                 print(f"✅ Product reference generated: {product_reference_url[:80]}...")

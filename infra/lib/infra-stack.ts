@@ -10,6 +10,8 @@ import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53targets from 'aws-cdk-lib/aws-route53-targets';
+import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
+import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
@@ -460,6 +462,90 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'APIURL', {
       value: `https://aivideo-api.gauntlet3.com`,
       description: 'API endpoint URL',
+    });
+
+    // Stage 7: Frontend S3 + CloudFront
+    // S3 bucket for frontend static hosting
+    // Note: We don't enable website hosting since CloudFront serves directly via OAI
+    const frontendBucket = new s3.Bucket(this, 'FrontendBucket', {
+      bucketName: `aivideo-frontend-${this.account}`,
+      publicReadAccess: false, // CloudFront will access via OAI
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      autoDeleteObjects: false,
+    });
+
+    // Origin Access Identity for CloudFront
+    const originAccessIdentity = new cloudfront.OriginAccessIdentity(this, 'FrontendOAI', {
+      comment: 'OAI for aivideo frontend',
+    });
+
+    // Grant CloudFront access to S3 bucket
+    frontendBucket.grantRead(originAccessIdentity);
+
+    // ACM Certificate for frontend domain
+    const frontendCertificate = new acm.Certificate(this, 'FrontendCertificate', {
+      domainName: 'aivideo.gauntlet3.com',
+      validation: acm.CertificateValidation.fromDns(hostedZone),
+    });
+
+    // CloudFront distribution
+    const frontendDistribution = new cloudfront.Distribution(this, 'FrontendDistribution', {
+      defaultBehavior: {
+        origin: new origins.S3Origin(frontendBucket, {
+          originAccessIdentity,
+        }),
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+        cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        compress: true,
+        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+      },
+      // SPA fallback - redirect all 404s to index.html
+      errorResponses: [
+        {
+          httpStatus: 404,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html',
+          ttl: cdk.Duration.seconds(0),
+        },
+        {
+          httpStatus: 403,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html',
+          ttl: cdk.Duration.seconds(0),
+        },
+      ],
+      domainNames: ['aivideo.gauntlet3.com'],
+      certificate: frontendCertificate,
+      defaultRootObject: 'index.html',
+      priceClass: cloudfront.PriceClass.PRICE_CLASS_100, // Use only North America and Europe
+      minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+    });
+
+    // Route53 A record for frontend
+    new route53.ARecord(this, 'FrontendRecord', {
+      zone: hostedZone,
+      recordName: 'aivideo',
+      target: route53.RecordTarget.fromAlias(
+        new route53targets.CloudFrontTarget(frontendDistribution)
+      ),
+    });
+
+    // Outputs
+    new cdk.CfnOutput(this, 'FrontendBucketName', {
+      value: frontendBucket.bucketName,
+      exportName: 'FrontendBucketName',
+    });
+
+    new cdk.CfnOutput(this, 'FrontendDistributionId', {
+      value: frontendDistribution.distributionId,
+      exportName: 'FrontendDistributionId',
+    });
+
+    new cdk.CfnOutput(this, 'FrontendURL', {
+      value: `https://aivideo.gauntlet3.com`,
+      description: 'Frontend URL',
     });
   }
 }
