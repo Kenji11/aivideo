@@ -90,6 +90,32 @@ async def get_status(video_id: str, db: Session = Depends(get_db)) -> StatusResp
             elif stitched_url:
                 stitched_video_url = stitched_url
     
+    # Look for Phase 5 output (final video with audio)
+    final_video_url = None
+    if video.final_video_url:
+        # Phase 5 completed - use final_video_url (with audio)
+        final_url = video.final_video_url
+        if final_url.startswith('s3://'):
+            # Convert S3 URL to presigned URL
+            from app.services.s3 import s3_client
+            s3_path = final_url.replace(f's3://{s3_client.bucket}/', '')
+            final_video_url = s3_client.generate_presigned_url(s3_path, expiration=3600)
+        else:
+            final_video_url = final_url
+    elif video.phase_outputs:
+        # Check Phase 5 output if final_video_url not set yet
+        phase5_output = video.phase_outputs.get('phase5_refine')
+        if phase5_output and phase5_output.get('status') == 'success':
+            phase5_data = phase5_output.get('output_data', {})
+            refined_url = phase5_data.get('refined_video_url') or video.refined_url
+            if refined_url:
+                if refined_url.startswith('s3://'):
+                    from app.services.s3 import s3_client
+                    s3_path = refined_url.replace(f's3://{s3_client.bucket}/', '')
+                    final_video_url = s3_client.generate_presigned_url(s3_path, expiration=3600)
+                else:
+                    final_video_url = refined_url
+    
     return StatusResponse(
         video_id=video.id,
         status=video.status.value,
@@ -99,5 +125,6 @@ async def get_status(video_id: str, db: Session = Depends(get_db)) -> StatusResp
         error=video.error_message,
         animatic_urls=animatic_urls,
         reference_assets=reference_assets,
-        stitched_video_url=stitched_video_url
+        stitched_video_url=stitched_video_url,
+        final_video_url=final_video_url
     )
