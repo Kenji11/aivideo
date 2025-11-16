@@ -104,7 +104,16 @@ class ChunkGenerationService:
                     
                     # Generate chunk synchronously (using apply to get result immediately)
                     result = generate_single_chunk.apply(args=[chunk_spec.dict()])
-                    chunk_result = result.result
+                    
+                    # Accessing result.result may raise an exception if the task failed
+                    try:
+                        chunk_result = result.result
+                    except Exception as e:
+                        # Task raised an exception - add to failed chunks
+                        failed_chunks.append((i, chunk_spec))
+                        error_type = type(e).__name__
+                        print(f"   ❌ Chunk {i+1} task exception ({error_type}): {str(e)}")
+                        continue  # Skip to next chunk
                     
                     if isinstance(chunk_result, dict) and 'chunk_url' in chunk_result:
                         chunk_urls.append(chunk_result['chunk_url'])
@@ -116,19 +125,27 @@ class ChunkGenerationService:
                         failed_chunks.append((i, chunk_spec))
                         print(f"   ❌ Chunk {i+1} failed: {chunk_result}")
                 except Exception as e:
+                    # Catch any other exceptions (e.g., from apply() itself)
                     failed_chunks.append((i, chunk_spec))
-                    print(f"   ❌ Chunk {i+1} exception: {str(e)}")
+                    error_type = type(e).__name__
+                    print(f"   ❌ Chunk {i+1} exception ({error_type}): {str(e)}")
             
-            # Retry failed chunks
+            # Retry failed chunks (must be in order to maintain last_frame dependencies)
             if failed_chunks:
                 print(f"Retrying {len(failed_chunks)} failed chunks...")
-                retry_results = self._retry_failed_chunks(failed_chunks)
+                # Sort by chunk index to retry in order
+                failed_chunks.sort(key=lambda x: x[0])
+                retry_results = self._retry_failed_chunks(failed_chunks, last_frame_urls)
                 
-                # Add retry results
+                # Add retry results (maintain order)
                 for i, retry_result in retry_results:
                     if isinstance(retry_result, dict) and 'chunk_url' in retry_result:
-                        chunk_urls.insert(i, retry_result['chunk_url'])
-                        last_frame_urls.insert(i, retry_result.get('last_frame_url'))
+                        # Insert at correct position (chunks are in order)
+                        while len(chunk_urls) <= i:
+                            chunk_urls.append(None)
+                            last_frame_urls.append(None)
+                        chunk_urls[i] = retry_result['chunk_url']
+                        last_frame_urls[i] = retry_result.get('last_frame_url')
                         # Use cost from result (calculated using model config in chunk_generator)
                         self.total_cost += retry_result.get('cost', 0.0)
                     else:
@@ -159,12 +176,14 @@ class ChunkGenerationService:
         except Exception as e:
             raise PhaseException(f"Failed to generate chunks: {str(e)}")
     
-    def _retry_failed_chunks(self, failed_chunks: List[tuple]) -> List[tuple]:
+    def _retry_failed_chunks(self, failed_chunks: List[tuple], last_frame_urls: List[str]) -> List[tuple]:
         """
         Retry failed chunks individually (not in parallel).
+        Maintains temporal consistency by setting previous_chunk_last_frame.
         
         Args:
-            failed_chunks: List of (chunk_index, ChunkSpec) tuples for failed chunks
+            failed_chunks: List of (chunk_index, ChunkSpec) tuples for failed chunks (must be sorted by index)
+            last_frame_urls: List of last_frame_urls from successfully generated chunks (for temporal consistency)
             
         Returns:
             List of (chunk_index, result) tuples
@@ -175,25 +194,73 @@ class ChunkGenerationService:
         for chunk_index, chunk_spec in failed_chunks:
             retry_count = 0
             success = False
+            last_error = None
             
             while retry_count < max_retries and not success:
                 retry_count += 1
                 print(f"Retrying chunk {chunk_index} (attempt {retry_count}/{max_retries})...")
                 
                 try:
-                    result = generate_single_chunk(chunk_spec.dict())
-                    if isinstance(result, dict) and 'chunk_url' in result:
-                        retry_results.append((chunk_index, result))
+                    # Update previous_chunk_last_frame if this chunk needs it
+                    if chunk_index > 0:
+                        # Find previous chunk's last frame (from successful chunks or retried chunks)
+                        prev_frame_url = None
+                        if chunk_index - 1 < len(last_frame_urls):
+                            prev_frame_url = last_frame_urls[chunk_index - 1]
+                        else:
+                            # Check if previous chunk was retried successfully
+                            for retry_idx, retry_result in retry_results:
+                                if retry_idx == chunk_index - 1 and isinstance(retry_result, dict):
+                                    prev_frame_url = retry_result.get('last_frame_url')
+                                    break
+                        
+                        if prev_frame_url:
+                            chunk_spec.previous_chunk_last_frame = prev_frame_url
+                            print(f"   Using previous chunk's last frame: {prev_frame_url[:60]}...")
+                        else:
+                            print(f"   ⚠️  Warning: Chunk {chunk_index} requires previous chunk's last frame, but it's not available")
+                    
+                    # Generate chunk synchronously (using apply to get result immediately)
+                    result = generate_single_chunk.apply(args=[chunk_spec.dict()])
+                    
+                    # Accessing result.result may raise an exception if the task failed
+                    try:
+                        chunk_result = result.result
+                    except Exception as e:
+                        # Task raised an exception - capture it
+                        error_msg = str(e)
+                        error_type = type(e).__name__
+                        print(f"Chunk {chunk_index} retry {retry_count} task exception ({error_type}): {error_msg}")
+                        last_error = error_msg
+                        continue  # Skip to next retry attempt
+                    
+                    if isinstance(chunk_result, dict) and 'chunk_url' in chunk_result:
+                        retry_results.append((chunk_index, chunk_result))
                         success = True
+                        # Update last_frame_urls for future chunks
+                        if chunk_index < len(last_frame_urls):
+                            last_frame_urls[chunk_index] = chunk_result.get('last_frame_url')
+                        else:
+                            while len(last_frame_urls) <= chunk_index:
+                                last_frame_urls.append(None)
+                            last_frame_urls[chunk_index] = chunk_result.get('last_frame_url')
                     else:
-                        print(f"Chunk {chunk_index} retry {retry_count} failed: {result}")
+                        # Task completed but returned invalid result
+                        error_msg = f"Invalid result format: {chunk_result}"
+                        print(f"Chunk {chunk_index} retry {retry_count} failed: {error_msg}")
+                        last_error = error_msg
                 except Exception as e:
-                    print(f"Chunk {chunk_index} retry {retry_count} exception: {str(e)}")
+                    # Catch any other exceptions (e.g., from apply() itself)
+                    error_msg = str(e)
+                    error_type = type(e).__name__
+                    print(f"Chunk {chunk_index} retry {retry_count} exception ({error_type}): {error_msg}")
+                    last_error = error_msg
                 
                 if not success and retry_count < max_retries:
                     time.sleep(2)  # Brief delay before retry
             
             if not success:
-                retry_results.append((chunk_index, {'error': f'Failed after {max_retries} retries'}))
+                error_detail = last_error if last_error else 'Unknown error'
+                retry_results.append((chunk_index, {'error': f'Failed after {max_retries} retries: {error_detail}'}))
         
         return retry_results
