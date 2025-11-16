@@ -1,7 +1,7 @@
 """Add final_music_url column
 
-Revision ID: 001_add_final_music_url
-Revises: 
+Revision ID: 002_add_final_music_url
+Revises: 001_initial
 Create Date: 2025-11-16 02:15:00
 
 """
@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '001_add_final_music_url'
-down_revision = None  # This is the first migration
+revision = '002_add_final_music_url'
+down_revision = '001_initial'  # Depends on initial schema
 branch_labels = None
 depends_on = None
 

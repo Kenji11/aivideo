@@ -314,8 +314,8 @@ class RefinementService:
             Path to cropped audio file
         """
         try:
-            # MoviePy 2.x uses direct imports (no .editor module)
-            from moviepy import AudioFileClip
+            # MoviePy 1.x uses .editor module
+            from moviepy.editor import AudioFileClip
             
             # Load audio and crop to target duration
             audio = AudioFileClip(audio_path)
@@ -362,11 +362,11 @@ class RefinementService:
             Exception: If video/audio combination fails
         """
         try:
-            # MoviePy 2.x uses direct imports (no .editor module)
-            from moviepy import VideoFileClip, AudioFileClip, CompositeAudioClip
+            # MoviePy 1.x uses .editor module
+            from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
         except ImportError:
             raise ImportError(
-                "moviepy is not installed. Install it with: pip install moviepy\n"
+                "moviepy is not installed. Install it with: pip install moviepy==1.0.3\n"
                 "It should be in requirements.txt for deployment."
             )
         
@@ -375,7 +375,7 @@ class RefinementService:
             video = VideoFileClip(video_path)
             music = AudioFileClip(music_path)
             
-            # Set music volume to 0.7 (70%)
+            # Set music volume to 0.7 (70%) using MoviePy 1.x API
             music = music.volumex(0.7)
             
             # If video has audio, mix it; otherwise just use music
