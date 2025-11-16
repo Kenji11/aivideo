@@ -16,5 +16,20 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Create entrypoint script to run migrations before starting the app
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+# Run database migrations\n\
+echo "Running database migrations..."\n\
+alembic upgrade head\n\
+\n\
+# Execute the main command\n\
+exec "$@"\n\
+' > /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh
+
+# Set entrypoint
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+
 # Default command (overridden in docker-compose for worker)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -62,3 +62,58 @@ curl http://localhost:8000/health
 ```
 
 Expected response: `{"status": "ok"}`
+
+## Database Migrations
+
+This project uses Alembic for database schema management.
+
+> 📖 **Detailed guide**: See [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) for comprehensive migration documentation
+
+### Running Migrations
+
+**First time setup:**
+```bash
+# Run migrations to create tables
+alembic upgrade head
+```
+
+**After pulling new code:**
+```bash
+# Check current migration status
+alembic current
+
+# Apply new migrations
+alembic upgrade head
+```
+
+### Creating New Migrations
+
+When you modify the SQLAlchemy models in `app/common/models.py`:
+
+```bash
+# Generate a new migration automatically
+alembic revision --autogenerate -m "description of changes"
+
+# Review the generated migration file in alembic/versions/
+# Edit if needed, then apply it
+alembic upgrade head
+```
+
+### Docker Setup
+
+When using Docker, migrations run automatically on container startup. If you need to run them manually:
+
+```bash
+# Access the API container
+docker-compose exec api bash
+
+# Run migrations
+alembic upgrade head
+```
+
+### Migration Best Practices
+
+1. **Never delete committed migration files** - create a new migration to revert changes
+2. **Always review auto-generated migrations** - they may not catch everything
+3. **Test migrations on a copy of production data** before deploying
+4. **Keep migrations idempotent** - running twice should be safe
