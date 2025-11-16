@@ -641,4 +641,18 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
                 except Exception:
                     pass
         
-        raise PhaseException(f"Failed to generate chunk {chunk_num}: {str(e)}")
+        # Enhanced error logging
+        import traceback
+        error_type = type(e).__name__
+        error_msg = str(e)
+        error_traceback = traceback.format_exc()
+        
+        print(f"   ❌ Chunk {chunk_num} Error Details:")
+        print(f"      Error Type: {error_type}")
+        print(f"      Error Message: {error_msg}")
+        print(f"      Full Traceback:")
+        for line in error_traceback.split('\n')[-15:]:  # Last 15 lines
+            if line.strip():
+                print(f"         {line}")
+        
+        raise PhaseException(f"Failed to generate chunk {chunk_num}: {error_type}: {error_msg}")

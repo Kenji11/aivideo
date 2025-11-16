@@ -198,7 +198,7 @@ class ChunkGenerationService:
             
             while retry_count < max_retries and not success:
                 retry_count += 1
-                print(f"Retrying chunk {chunk_index} (attempt {retry_count}/{max_retries})...")
+                print(f"🔄 Retrying chunk {chunk_index} (attempt {retry_count}/{max_retries})...")
                 
                 try:
                     # Update previous_chunk_last_frame if this chunk needs it
@@ -237,6 +237,7 @@ class ChunkGenerationService:
                     if isinstance(chunk_result, dict) and 'chunk_url' in chunk_result:
                         retry_results.append((chunk_index, chunk_result))
                         success = True
+                        print(f"   ✅ Chunk {chunk_index} retry {retry_count} succeeded!")
                         # Update last_frame_urls for future chunks
                         if chunk_index < len(last_frame_urls):
                             last_frame_urls[chunk_index] = chunk_result.get('last_frame_url')
@@ -246,21 +247,31 @@ class ChunkGenerationService:
                             last_frame_urls[chunk_index] = chunk_result.get('last_frame_url')
                     else:
                         # Task completed but returned invalid result
-                        error_msg = f"Invalid result format: {chunk_result}"
-                        print(f"Chunk {chunk_index} retry {retry_count} failed: {error_msg}")
+                        error_msg = chunk_result.get('error', str(chunk_result)) if isinstance(chunk_result, dict) else str(chunk_result)
+                        print(f"   ❌ Chunk {chunk_index} retry {retry_count} failed: {error_msg}")
                         last_error = error_msg
                 except Exception as e:
                     # Catch any other exceptions (e.g., from apply() itself)
+                    import traceback
+                    error_details = traceback.format_exc()
                     error_msg = str(e)
                     error_type = type(e).__name__
-                    print(f"Chunk {chunk_index} retry {retry_count} exception ({error_type}): {error_msg}")
+                    print(f"   ❌ Chunk {chunk_index} retry {retry_count} exception:")
+                    print(f"      Error type: {error_type}")
+                    print(f"      Error message: {error_msg}")
+                    print(f"      Full traceback:")
+                    for line in error_details.split('\n')[-10:]:  # Last 10 lines
+                        if line.strip():
+                            print(f"         {line}")
                     last_error = error_msg
                 
                 if not success and retry_count < max_retries:
+                    print(f"   ⏳ Waiting 2 seconds before next retry...")
                     time.sleep(2)  # Brief delay before retry
             
             if not success:
                 error_detail = last_error if last_error else 'Unknown error'
+                print(f"   ❌ Chunk {chunk_index} failed after {max_retries} retries - giving up")
                 retry_results.append((chunk_index, {'error': f'Failed after {max_retries} retries: {error_detail}'}))
         
         return retry_results
