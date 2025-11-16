@@ -144,6 +144,25 @@ Choose the template that best matches the user's intent. Extract all available i
         except Exception as e:
             raise ValidationException(f"Failed to extract intent from prompt: {str(e)}")
     
+    def _merge_nested_dict(self, base: Dict, override: Dict, keys: List[str]) -> Dict:
+        """
+        Merge nested dictionary, only overwriting base values with non-null override values.
+        
+        Args:
+            base: Base dictionary (template defaults)
+            override: Override dictionary (extracted from GPT)
+            keys: List of keys to merge
+            
+        Returns:
+            Merged dictionary
+        """
+        result = base.copy() if base else {}
+        if override:
+            for key in keys:
+                if key in override and override[key] is not None:
+                    result[key] = override[key]
+        return result
+    
     def _merge_with_template(self, extracted: Dict, template: Dict) -> Dict:
         """
         Merge extracted data with template structure.
@@ -192,21 +211,39 @@ Choose the template that best matches the user's intent. Extract all available i
         # Update template field
         spec['template'] = extracted.get('template', template.get('name', 'product_showcase'))
         
-        # Merge style if present
+        # Merge style if present (preserve template defaults, only override non-null values)
         if 'style' in extracted:
-            spec['style'] = extracted['style']
+            template_style = spec.get('style', {})
+            extracted_style = extracted.get('style', {})
+            spec['style'] = self._merge_nested_dict(
+                template_style,
+                extracted_style,
+                ['aesthetic', 'color_palette', 'mood', 'lighting']
+            )
         
-        # Merge product if present
+        # Merge product if present (preserve template defaults, only override non-null values)
         if 'product' in extracted:
-            spec['product'] = extracted['product']
+            template_product = spec.get('product', {})
+            extracted_product = extracted.get('product', {})
+            spec['product'] = self._merge_nested_dict(
+                template_product,
+                extracted_product,
+                ['name', 'category']
+            )
         
-        # Merge audio if present
+        # Merge audio if present (preserve template defaults, only override non-null values)
         if 'audio' in extracted:
-            spec['audio'] = extracted['audio']
+            template_audio = spec.get('audio', {})
+            extracted_audio = extracted.get('audio', {})
+            spec['audio'] = self._merge_nested_dict(
+                template_audio,
+                extracted_audio,
+                ['music_style', 'tempo', 'mood']
+            )
         
-        # Enrich beat prompts with extracted data
-        product_name = extracted.get('product', {}).get('name', 'product')
-        style_aesthetic = extracted.get('style', {}).get('aesthetic', 'cinematic')
+        # Enrich beat prompts with merged data (use spec values, fallback to extracted, then defaults)
+        product_name = spec.get('product', {}).get('name') or extracted.get('product', {}).get('name', 'product')
+        style_aesthetic = spec.get('style', {}).get('aesthetic') or extracted.get('style', {}).get('aesthetic', 'cinematic')
         
         for beat in spec['beats']:
             # Format prompt template with actual values

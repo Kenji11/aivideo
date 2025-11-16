@@ -9,22 +9,24 @@ from app.common.exceptions import PhaseException
 @celery_app.task(bind=True, name="app.phases.phase5_refine.task.refine_video")
 def refine_video(self, video_id: str, stitched_url: str, spec: dict) -> dict:
     """
-    Phase 5: Refine and polish video.
+    Phase 5: Music Generation & Audio Integration.
     
     Steps:
-    - Upscale to 1080p
-    - Color grading (optional)
-    - Generate background music
-    - Mix audio
-    - Final encode
+    - Generate background music using configured model (default: meta/musicgen)
+    - Extract audio specs from template (music_style, tempo, mood)
+    - Build music prompt from template specs
+    - Adjust music to exact video duration using FFmpeg if needed
+    - Combine video + music using moviepy (FFmpeg fallback)
+    - Set music volume to 70% for balanced audio
+    - Upload final video with audio to S3
     
     Args:
         video_id: Unique video generation ID
         stitched_url: S3 URL of stitched video from Phase 4
-        spec: Video specification from Phase 1
+        spec: Video specification from Phase 1 (contains audio specs)
         
     Returns:
-        PhaseOutput dictionary with status, output_data, cost, etc.
+        PhaseOutput dictionary with status, output_data (refined_video_url, music_url), cost, etc.
     """
     start_time = time.time()
     

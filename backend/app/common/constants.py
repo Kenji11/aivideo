@@ -21,9 +21,10 @@ COST_ZEROSCOPE_VIDEO = COST_ZEROSCOPE
 COST_WAN_480P_VIDEO = COST_WAN  # Phase 4: Video chunks per second (current)
 COST_WAN_720P_VIDEO = 0.25  # Phase 4: Video chunks per second (higher quality)
 COST_ANIMATEDIFF_VIDEO = COST_ANIMATEDIFF
-COST_MUSICGEN = 0.15  # Legacy
-COST_BARK_MUSIC = 0.10  # suno/bark-with-music per 30s
-COST_AUDIO_CROP = 0.05  # lucataco/audio-crop per operation
+COST_MUSICGEN = 0.15  # meta/musicgen per 30s
+COST_STABLE_AUDIO = 0.10  # stackadoc/stable-audio-open-1.0 per 30s (avg $0.06-$0.15)
+COST_BARK_MUSIC = 0.10  # Legacy: suno-ai/bark per 30s
+COST_AUDIO_CROP = 0.05  # FFmpeg audio crop (local, no cost)
 
 # S3 paths
 S3_ANIMATIC_PREFIX = "animatic"

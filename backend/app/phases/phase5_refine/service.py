@@ -8,15 +8,17 @@ from app.services.s3 import s3_client
 from app.services.ffmpeg import ffmpeg_service
 from app.services.replicate import replicate_client
 from app.common.exceptions import PhaseException
-from app.common.constants import COST_BARK_MUSIC, COST_AUDIO_CROP
+from app.common.constants import COST_AUDIO_CROP
+from app.phases.phase5_refine.model_config import get_default_music_model, get_music_model_config
 
 
 class RefinementService:
     """Service for music generation and audio integration (Phase 5 - simplified scope).
     
     Phase 5 scope (MVP):
-    - Generate background music using suno/bark-with-music
-    - Crop music to exact video duration using lucataco/audio-crop
+    - Generate background music using configured model (default: meta/musicgen)
+    - Supports multiple models via model_config.py (musicgen, stable_audio)
+    - Crop music to exact video duration using FFmpeg
     - Combine video + music using moviepy
     - Set music volume to 70% for balanced audio
     
@@ -76,25 +78,32 @@ class RefinementService:
                 traceback.print_exc()
             
             # Step 3: Combine video + music
+            final_path = stitched_path  # Default to stitched video
             if music_path and os.path.exists(music_path):
                 print("🎬 Combining video with music...")
                 try:
-                    final_path = self._combine_video_audio(stitched_path, music_path)
-                    temp_files.append(final_path)
-                    print(f"   ✅ Video and audio combined successfully")
+                    combined_path = self._combine_video_audio(stitched_path, music_path)
+                    if combined_path and os.path.exists(combined_path):
+                        temp_files.append(combined_path)
+                        final_path = combined_path
+                        print(f"   ✅ Video and audio combined successfully")
+                    else:
+                        print(f"   ⚠️  Audio combination returned no file, using video without music")
                 except Exception as e:
                     print(f"   ⚠️  Audio combination failed: {str(e)}, using video without music")
-                    final_path = stitched_path
+                    # Don't upload failed merge - use original stitched video
             else:
                 # No music - use video as-is
                 print("   ⚠️  No music available, using video without audio")
-                final_path = stitched_path
             
-            # Step 4: Upload final video
+            # Step 4: Upload final video (only if we have a valid final_path)
             print("📤 Uploading final video...")
             final_key = f"videos/{video_id}/final_draft.mp4"
-            final_url = s3_client.upload_file(final_path, final_key)
-            print(f"   ✅ Final video uploaded: {final_key}")
+            try:
+                final_url = s3_client.upload_file(final_path, final_key)
+                print(f"   ✅ Final video uploaded: {final_key}")
+            except Exception as e:
+                raise PhaseException(f"Failed to upload final video: {str(e)}")
             
             return final_url, music_url
             
@@ -110,15 +119,26 @@ class RefinementService:
                     pass
     
     def _generate_music(self, video_id: str, spec: dict, duration: int = 30) -> Optional[str]:
-        """Generate background music using suno/bark-with-music model.
+        """Generate background music using configured music model.
         
         Process:
-        1. Extract audio specs from template (music_style, tempo, mood)
-        2. Build music prompt from specs
-        3. Generate music ~5s longer than video duration for safety margin
-        4. Crop music to exact video duration using lucataco/audio-crop
+        1. Get music model config (default: musicgen)
+        2. Extract audio specs from template (music_style, tempo, mood)
+        3. Build music prompt from specs
+        4. Generate music matching video duration (respects model max_duration)
+        5. Crop/extend music to exact video duration using FFmpeg if needed
         """
         try:
+            # Get music model configuration (default: musicgen)
+            model_config = get_default_music_model()
+            model_name = model_config['name']
+            replicate_model = model_config['replicate_model']
+            max_duration = model_config['max_duration']
+            cost = model_config['cost_per_generation']
+            input_params = model_config['input_params'].copy()
+            
+            print(f"   🎼 Using music model: {model_name} ({model_config.get('description', '')})")
+            
             # Extract audio specs from template
             audio_spec = spec.get('audio', {})
             music_style = audio_spec.get('music_style', 'orchestral')
@@ -126,28 +146,62 @@ class RefinementService:
             mood = audio_spec.get('mood', 'sophisticated')
             
             # Build music prompt from template specs
-            # Example: "energetic hip-hop instrumental, 140-150 BPM, upbeat mood"
             prompt = self._build_music_prompt(music_style, tempo, mood)
             
             print(f"   🎵 Music prompt: '{prompt}'")
             print(f"   ⏱️  Video duration: {duration}s")
             
-            # Generate music ~5s longer than video duration for safety margin
-            music_duration = duration + 5
-            print(f"   📏 Generating {music_duration}s music (will crop to {duration}s)")
+            # Respect model's max duration
+            music_duration = min(duration, max_duration)
+            print(f"   📏 Generating {music_duration}s music (model max: {max_duration}s)")
             
-            # Use suno/bark-with-music via Replicate
-            output = replicate_client.run(
-                "suno/bark-with-music",
-                input={
-                    "prompt": prompt,
-                    "duration": min(music_duration, 30),  # Bark max is 30s, but we'll handle longer
-                },
-                timeout=180  # 3 minutes for music generation
-            )
+            # Build input parameters based on model
+            if model_name == 'musicgen':
+                # MusicGen uses 'duration' parameter
+                input_params['prompt'] = prompt
+                input_params['duration'] = music_duration
+            elif model_name == 'stable_audio':
+                # Stable Audio uses 'seconds_total' parameter
+                input_params['prompt'] = prompt
+                input_params['seconds_total'] = music_duration
             
-            # Download music file
-            music_url = output if isinstance(output, str) else output[0]
+            # Use configured model via Replicate
+            # If use_version_hash is True, extract version hash from replicate_model
+            if model_config.get('use_version_hash', False) and ':' in replicate_model:
+                # Extract version hash (part after colon)
+                version_hash = replicate_model.split(':', 1)[1]
+                # Use version parameter directly via replicate client
+                output = replicate_client.client.predictions.create(
+                    version=version_hash,
+                    input=input_params
+                )
+                # Poll for completion (same logic as replicate_client.run)
+                import time
+                start_time = time.time()
+                while output.status not in ["succeeded", "failed", "canceled"]:
+                    if time.time() - start_time > 180:
+                        raise TimeoutError("Music generation timed out after 180 seconds")
+                    time.sleep(1)
+                    output.reload()
+                
+                if output.status == "failed":
+                    error_msg = getattr(output, 'error', 'Unknown error')
+                    raise Exception(f"Music generation failed: {error_msg}")
+                
+                if output.status == "canceled":
+                    raise Exception("Music generation was canceled")
+                
+                output = output.output
+            else:
+                # Use regular model name (musicgen uses model name)
+                output = replicate_client.run(
+                    replicate_model,
+                    input=input_params,
+                    timeout=180  # 3 minutes for music generation
+                )
+            
+            # Download music file (output is URL)
+            music_url = output if isinstance(output, str) else (output[0] if isinstance(output, list) else output.get('audio'))
             if not music_url:
                 print(f"   ⚠️  Music generation returned no URL")
                 return None
@@ -162,18 +216,19 @@ class RefinementService:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
             
-            self.total_cost += COST_BARK_MUSIC
-            print(f"   ✅ Music generated: {raw_music_path} (${COST_BARK_MUSIC:.4f})")
+            self.total_cost += cost
+            print(f"   ✅ Music generated: {raw_music_path} (${cost:.4f})")
             
-            # Crop music to exact video duration using FFmpeg
-            print(f"   ✂️  Cropping music to exact video duration ({duration}s)...")
-            cropped_music_path = self._crop_audio(raw_music_path, duration)
-            os.remove(raw_music_path)  # Remove raw music
+            # If video is longer than generated music, crop it to exact duration
+            if duration != music_duration:
+                print(f"   ✂️  Adjusting music to exact video duration ({duration}s)...")
+                cropped_music_path = self._crop_audio(raw_music_path, duration)
+                os.remove(raw_music_path)  # Remove raw music
+                self.total_cost += COST_AUDIO_CROP
+                print(f"   ✅ Music adjusted: {cropped_music_path} (${COST_AUDIO_CROP:.4f})")
+                return cropped_music_path
             
-            self.total_cost += COST_AUDIO_CROP
-            print(f"   ✅ Music cropped: {cropped_music_path} (${COST_AUDIO_CROP:.4f})")
-            
-            return cropped_music_path
+            return raw_music_path
             
         except Exception as e:
             print(f"   ⚠️  Music generation error: {str(e)}")
@@ -184,6 +239,9 @@ class RefinementService:
     def _build_music_prompt(self, music_style: str, tempo: str, mood: str) -> str:
         """Build music prompt from template specs.
         
+        Format for MusicGen: Clear, descriptive style description
+        "upbeat electronic pop music with energetic synthesizers and driving drums"
+        
         Args:
             music_style: Style from template (e.g., "orchestral", "upbeat_pop", "cinematic_epic")
             tempo: Tempo from template (e.g., "moderate", "fast", "slow")
@@ -192,35 +250,36 @@ class RefinementService:
         Returns:
             Formatted prompt string for music generation
         """
-        # Map template values to descriptive prompts
+        # Map template values to MusicGen-friendly prompts
         style_map = {
-            "orchestral": "orchestral instrumental",
-            "upbeat_pop": "upbeat pop instrumental",
-            "cinematic_epic": "cinematic epic instrumental",
+            "orchestral": "orchestral music with strings and brass",
+            "upbeat_pop": "upbeat electronic pop music with energetic synthesizers and driving drums",
+            "cinematic_epic": "cinematic epic orchestral music with powerful brass and dramatic percussion",
         }
         
         tempo_map = {
             "moderate": "moderate tempo",
-            "fast": "fast tempo, 140-150 BPM",
-            "slow": "slow tempo, 60-80 BPM",
+            "fast": "fast tempo with high energy",
+            "slow": "slow tempo, calm and steady",
         }
         
         mood_map = {
-            "sophisticated": "sophisticated, elegant",
-            "energetic": "energetic, dynamic",
-            "inspiring": "inspiring, uplifting",
+            "sophisticated": "elegant and sophisticated mood",
+            "energetic": "energetic and dynamic, uplifting mood",
+            "inspiring": "inspiring and uplifting, powerful mood",
         }
         
-        style_desc = style_map.get(music_style, music_style)
-        tempo_desc = tempo_map.get(tempo, tempo)
-        mood_desc = mood_map.get(mood, mood)
+        style_desc = style_map.get(music_style, f"{music_style} instrumental music")
+        tempo_desc = tempo_map.get(tempo, f"{tempo} tempo")
+        mood_desc = mood_map.get(mood, f"{mood} mood")
         
-        # Build prompt: "style, tempo, mood, background music for advertisement"
-        prompt = f"{style_desc}, {tempo_desc}, {mood_desc} mood, background music for advertisement"
+        # Build prompt for MusicGen
+        # Example: "upbeat electronic pop music with energetic synthesizers and driving drums, fast tempo with high energy, energetic and dynamic uplifting mood"
+        prompt = f"{style_desc}, {tempo_desc}, {mood_desc}"
         return prompt
     
     def _crop_audio(self, audio_path: str, target_duration: int) -> str:
-        """Crop audio to exact target duration using lucataco/audio-crop.
+        """Crop audio to exact target duration using FFmpeg.
         
         Args:
             audio_path: Path to input audio file
@@ -230,9 +289,6 @@ class RefinementService:
             Path to cropped audio file
         """
         try:
-            # Use lucataco/audio-crop via Replicate
-            # First, upload audio to a temporary location or use direct file
-            # For now, we'll use FFmpeg to crop (simpler than Replicate for local files)
             output_path = tempfile.mktemp(suffix='.mp3')
             
             # Use FFmpeg to crop audio to exact duration
