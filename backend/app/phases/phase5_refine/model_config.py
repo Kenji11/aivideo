@@ -12,11 +12,10 @@ Available Models:
 
 Model Config Fields:
 - name: Model identifier
-- replicate_model: Replicate API model name or version hash
+- replicate_model: Replicate API model identifier (can be model:version format, replicate.run() handles it automatically)
 - cost_per_generation: Cost per 30s generation
 - max_duration: Maximum duration the model can generate in one call
 - input_params: Required input parameters for the model
-- use_version_hash: Whether to use version hash instead of model name
 
 Usage:
     from app.phases.phase5_refine.model_config import get_default_music_model, get_music_model_config
@@ -45,23 +44,21 @@ DEFAULT_MUSIC_MODEL = 'musicgen'
 MUSIC_MODEL_CONFIGS: Dict[str, Dict] = {
     'musicgen': {
         'name': 'musicgen',
-        'replicate_model': 'meta/musicgen',  # Stable model identifier
+        'replicate_model': 'meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb',  # replicate.run() handles model:version format
         'cost_per_generation': COST_MUSICGEN,  # $0.15 per 30s
         'max_duration': 30,  # MusicGen supports up to 30s per generation
-        'use_version_hash': False,  # Use model name directly
         'input_params': {
-            'model_version': 'melody-large',  # Best quality version
+            'model_version': 'stereo-large',  # Best quality version (stereo-large or melody-large)
             'output_format': 'mp3',
-            'normalization_strategy': 'loudness',
+            'normalization_strategy': 'peak',  # 'peak' or 'loudness'
         },
         'description': 'Meta MusicGen - reliable, clean instrumentals, best for most ad music',
     },
     'stable_audio': {
         'name': 'stable_audio',
-        'replicate_model': 'stackadoc/stable-audio-open-1.0:2cd7d762d12df80757b18439c8fcd0ac3311251eb94ac6bdc026bb4ce4540868',  # Version hash (Nov 2025)
+        'replicate_model': 'stackadoc/stable-audio-open-1.0:2cd7d762d12df80757b18439c8fcd0ac3311251eb94ac6bdc026bb4ce4540868',  # replicate.run() handles model:version format
         'cost_per_generation': COST_STABLE_AUDIO,  # $0.10 per 30s
         'max_duration': 47,  # Stable Audio Open supports up to 47s
-        'use_version_hash': True,  # Must use version hash (model name broken)
         'input_params': {
             'sample_rate': 44100,
             'output_format': 'mp3',

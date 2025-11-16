@@ -2,10 +2,8 @@
 import os
 import tempfile
 import requests
-import subprocess
 from typing import Dict, Tuple, Optional
 from app.services.s3 import s3_client
-from app.services.ffmpeg import ffmpeg_service
 from app.services.replicate import replicate_client
 from app.common.exceptions import PhaseException
 from app.common.constants import COST_AUDIO_CROP
@@ -18,7 +16,7 @@ class RefinementService:
     Phase 5 scope (MVP):
     - Generate background music using configured model (default: meta/musicgen)
     - Supports multiple models via model_config.py (musicgen, stable_audio)
-    - Crop music to exact video duration using FFmpeg
+    - Crop music to exact video duration using moviepy (Python-native)
     - Combine video + music using moviepy
     - Set music volume to 70% for balanced audio
     
@@ -89,9 +87,12 @@ class RefinementService:
                         print(f"   ✅ Video and audio combined successfully")
                     else:
                         print(f"   ⚠️  Audio combination returned no file, using video without music")
+                        final_path = stitched_path  # Use original video
                 except Exception as e:
-                    print(f"   ⚠️  Audio combination failed: {str(e)}, using video without music")
-                    # Don't upload failed merge - use original stitched video
+                    error_msg = str(e)
+                    print(f"   ❌ Audio combination failed: {error_msg}")
+                    print(f"   ⚠️  Using video without music (original stitched video)")
+                    final_path = stitched_path  # Use original video
             else:
                 # No music - use video as-is
                 print("   ⚠️  No music available, using video without audio")
@@ -157,64 +158,55 @@ class RefinementService:
             
             # Build input parameters based on model
             if model_name == 'musicgen':
-                # MusicGen uses 'duration' parameter
+                # MusicGen uses 'duration' parameter (in seconds, should be integer)
                 input_params['prompt'] = prompt
-                input_params['duration'] = music_duration
+                input_params['duration'] = int(music_duration)  # Ensure integer
             elif model_name == 'stable_audio':
                 # Stable Audio uses 'seconds_total' parameter
                 input_params['prompt'] = prompt
                 input_params['seconds_total'] = music_duration
             
             # Use configured model via Replicate
-            # If use_version_hash is True, extract version hash from replicate_model
-            if model_config.get('use_version_hash', False) and ':' in replicate_model:
-                # Extract version hash (part after colon)
-                version_hash = replicate_model.split(':', 1)[1]
-                # Use version parameter directly via replicate client
-                output = replicate_client.client.predictions.create(
-                    version=version_hash,
-                    input=input_params
-                )
-                # Poll for completion (same logic as replicate_client.run)
-                import time
-                start_time = time.time()
-                while output.status not in ["succeeded", "failed", "canceled"]:
-                    if time.time() - start_time > 180:
-                        raise TimeoutError("Music generation timed out after 180 seconds")
-                    time.sleep(1)
-                    output.reload()
-                
-                if output.status == "failed":
-                    error_msg = getattr(output, 'error', 'Unknown error')
-                    raise Exception(f"Music generation failed: {error_msg}")
-                
-                if output.status == "canceled":
-                    raise Exception("Music generation was canceled")
-                
-                output = output.output
-            else:
-                # Use regular model name (musicgen uses model name)
-                output = replicate_client.run(
-                    replicate_model,
-                    input=input_params,
-                    timeout=180  # 3 minutes for music generation
-                )
+            # replicate.run() handles model name and version resolution automatically
+            from app.config import get_settings
+            import replicate as replicate_lib
             
-            # Download music file (output is URL)
-            music_url = output if isinstance(output, str) else (output[0] if isinstance(output, list) else output.get('audio'))
-            if not music_url:
-                print(f"   ⚠️  Music generation returned no URL")
-                return None
+            settings = get_settings()
+            client = replicate_lib.Client(api_token=settings.replicate_api_token)
             
+            print(f"   🔧 Calling Replicate with model: {replicate_model}")
+            print(f"   🔧 Input params: {input_params}")
+            
+            # Use replicate.run() which handles model name/version automatically
+            output = client.run(
+                replicate_model,
+                input=input_params
+            )
+            
+            # Output from replicate.run() is a file-like object
+            # It has .url() method for URL and .read() method for bytes
             raw_music_path = tempfile.mktemp(suffix='.mp3')
             
-            print(f"   📥 Downloading music from: {music_url[:80]}...")
-            response = requests.get(music_url, stream=True, timeout=60)
-            response.raise_for_status()
-            
-            with open(raw_music_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
+            try:
+                # Try to get URL first (for logging)
+                music_url = output.url() if hasattr(output, 'url') else None
+                if music_url:
+                    print(f"   📥 Downloading music from: {music_url[:80]}...")
+                
+                # Write file directly from output
+                print(f"   💾 Writing music to: {raw_music_path}")
+                with open(raw_music_path, 'wb') as f:
+                    if hasattr(output, 'read'):
+                        # File-like object with .read() method
+                        f.write(output.read())
+                    elif isinstance(output, (str, bytes)):
+                        # Direct string/bytes
+                        f.write(output if isinstance(output, bytes) else output.encode())
+                    else:
+                        raise Exception(f"Unexpected output type: {type(output)}")
+            except Exception as e:
+                print(f"   ⚠️  Failed to save music file: {str(e)}")
+                return None
             
             self.total_cost += cost
             print(f"   ✅ Music generated: {raw_music_path} (${cost:.4f})")
@@ -279,7 +271,7 @@ class RefinementService:
         return prompt
     
     def _crop_audio(self, audio_path: str, target_duration: int) -> str:
-        """Crop audio to exact target duration using FFmpeg.
+        """Crop audio to exact target duration using moviepy (Python-native).
         
         Args:
             audio_path: Path to input audio file
@@ -289,27 +281,39 @@ class RefinementService:
             Path to cropped audio file
         """
         try:
+            # MoviePy 2.x uses direct imports (no .editor module)
+            from moviepy import AudioFileClip
+            
+            # Load audio and crop to target duration
+            audio = AudioFileClip(audio_path)
+            cropped_audio = audio.subclip(0, target_duration)
+            
+            # Export cropped audio
             output_path = tempfile.mktemp(suffix='.mp3')
+            cropped_audio.write_audiofile(
+                output_path,
+                codec='libmp3lame',
+                verbose=False,
+                logger=None
+            )
             
-            # Use FFmpeg to crop audio to exact duration
-            command = [
-                'ffmpeg',
-                '-i', audio_path,
-                '-t', str(target_duration),  # Crop to target duration
-                '-c:a', 'libmp3lame',
-                '-y',
-                output_path
-            ]
+            # Cleanup
+            audio.close()
+            cropped_audio.close()
             
-            ffmpeg_service.run_command(command)
             return output_path
             
+        except ImportError:
+            raise ImportError(
+                "moviepy is not installed. Install it with: pip install moviepy\n"
+                "It should be in requirements.txt for deployment."
+            )
         except Exception as e:
             print(f"   ⚠️  Audio cropping failed: {str(e)}, using original audio")
             return audio_path
     
     def _combine_video_audio(self, video_path: str, music_path: str) -> str:
-        """Combine video with music using moviepy.
+        """Combine video with music using moviepy (Python-native).
         
         Sets music volume to 0.7 (70%) for balanced audio.
         
@@ -319,10 +323,21 @@ class RefinementService:
             
         Returns:
             Path to combined video file
+            
+        Raises:
+            ImportError: If moviepy is not installed (should be in requirements.txt)
+            Exception: If video/audio combination fails
         """
         try:
-            from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
-            
+            # MoviePy 2.x uses direct imports (no .editor module)
+            from moviepy import VideoFileClip, AudioFileClip, CompositeAudioClip
+        except ImportError:
+            raise ImportError(
+                "moviepy is not installed. Install it with: pip install moviepy\n"
+                "It should be in requirements.txt for deployment."
+            )
+        
+        try:
             # Load video and audio
             video = VideoFileClip(video_path)
             music = AudioFileClip(music_path)
@@ -360,70 +375,6 @@ class RefinementService:
             
             return output_path
             
-        except ImportError:
-            # Fallback to FFmpeg if moviepy not available
-            print("   ⚠️  moviepy not available, using FFmpeg fallback")
-            return self._combine_video_audio_ffmpeg(video_path, music_path)
         except Exception as e:
-            print(f"   ⚠️  moviepy combination failed: {str(e)}, using FFmpeg fallback")
-            return self._combine_video_audio_ffmpeg(video_path, music_path)
+            raise Exception(f"moviepy video/audio combination failed: {str(e)}")
     
-    def _combine_video_audio_ffmpeg(self, video_path: str, music_path: str) -> str:
-        """Fallback: Combine video with music using FFmpeg.
-        
-        Sets music volume to 0.7 (70%) for balanced audio.
-        """
-        output_path = tempfile.mktemp(suffix='.mp4')
-        
-        # Check if video has audio
-        try:
-            probe_command = [
-                'ffprobe',
-                '-v', 'error',
-                '-select_streams', 'a:0',
-                '-show_entries', 'stream=codec_type',
-                '-of', 'csv=p=0',
-                video_path
-            ]
-            result = subprocess.run(probe_command, capture_output=True, text=True, timeout=10)
-            has_audio = 'audio' in result.stdout.lower()
-        except Exception:
-            has_audio = False
-        
-        if has_audio:
-            # Mix video audio (100%) with music (70%)
-            command = [
-                'ffmpeg',
-                '-i', video_path,
-                '-i', music_path,
-                '-filter_complex', '[1:a]volume=0.7[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=2',
-                '-c:v', 'copy',
-                '-c:a', 'aac',
-                '-b:a', '192k',
-                '-shortest',
-                '-y',
-                output_path
-            ]
-        else:
-            # No video audio, just add music at 70% volume
-            command = [
-                'ffmpeg',
-                '-i', video_path,
-                '-i', music_path,
-                '-filter_complex', '[1:a]volume=0.7[music]',
-                '-map', '0:v',
-                '-map', '[music]',
-                '-c:v', 'copy',
-                '-c:a', 'aac',
-                '-b:a', '192k',
-                '-shortest',
-                '-y',
-                output_path
-            ]
-        
-        try:
-            ffmpeg_service.run_command(command)
-            return output_path
-        except Exception as e:
-            print(f"   ⚠️  FFmpeg combination failed: {str(e)}, using video without music")
-            return video_path
