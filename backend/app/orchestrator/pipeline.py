@@ -9,6 +9,7 @@ from app.phases.phase5_refine.task import refine_video
 from app.orchestrator.progress import update_progress, update_cost
 from app.database import SessionLocal
 from app.common.models import VideoGeneration, VideoStatus
+from app.services.s3 import s3_client
 
 
 @celery_app.task
@@ -43,8 +44,12 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         result1_obj = validate_prompt.apply(args=[video_id, prompt, assets])
         result1 = result1_obj.result  # Get actual result from EagerResult
         
+        # Check if result1 is an exception/error
+        if isinstance(result1, Exception):
+            raise result1
+        
         # Check Phase 1 success
-        if result1['status'] != "success":
+        if result1.get('status') != "success":
             raise Exception(f"Phase 1 failed: {result1.get('error_message', 'Unknown error')}")
         
         # Update cost tracking
@@ -112,33 +117,86 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
         animatic_urls = []
         
         # ============ PHASE 3: GENERATE REFERENCE ASSETS ============
-        # Phase 2 is skipped, but Phase 3 is enabled for reference assets (style guide, product refs)
-        update_progress(video_id, "generating_references", 30, current_phase="phase3_references")
+        # Skip Phase 3 if user uploaded images - use them directly instead of generating references
+        has_uploaded_assets = assets and len(assets) > 0
         
-        # Run Phase 3 task synchronously (using apply instead of delay().get())
-        result3_obj = generate_references.apply(args=[video_id, spec])
-        result3 = result3_obj.result  # Get actual result from EagerResult
+        print(f"🔍 Phase 3 Skip Check:")
+        print(f"   - assets type: {type(assets)}")
+        print(f"   - assets value: {assets}")
+        print(f"   - assets length: {len(assets) if assets else 0}")
+        print(f"   - has_uploaded_assets: {has_uploaded_assets}")
         
-        # Check Phase 3 success
-        if result3['status'] != "success":
-            raise Exception(f"Phase 3 failed: {result3.get('error_message', 'Unknown error')}")
+        if has_uploaded_assets:
+            # User uploaded images - skip Phase 3 generation, use uploaded assets directly
+            print(f"📸 User uploaded {len(assets)} image(s) - skipping Phase 3 reference generation")
+            print(f"   Will use uploaded images directly for video generation")
+            
+            # Create reference_urls dict with uploaded assets
+            # Format: {uploaded_assets: [{s3_key: ..., asset_id: ...}, ...]}
+            uploaded_assets_list = []
+            for asset in assets:
+                uploaded_assets_list.append({
+                    's3_key': asset.get('s3_key'),
+                    's3_url': f"s3://{s3_client.bucket}/{asset.get('s3_key')}" if asset.get('s3_key') else None,
+                    'asset_id': asset.get('asset_id')
+                })
+            
+            reference_urls = {
+                'uploaded_assets': uploaded_assets_list,
+                'style_guide_url': None,
+                'product_reference_url': None
+            }
+            
+            # Update progress to show we're using uploaded assets
+            update_progress(
+                video_id,
+                "using_uploaded_assets",
+                30,
+                current_phase="phase3_references",
+                total_cost=total_cost
+            )
+            print(f"✅ Using {len(uploaded_assets_list)} uploaded image(s) as reference assets")
+            
+        else:
+            # No uploaded assets - generate reference images in Phase 3
+            update_progress(video_id, "generating_references", 30, current_phase="phase3_references")
+            
+            # Run Phase 3 task synchronously (using apply instead of delay().get())
+            result3_obj = generate_references.apply(args=[video_id, spec])
+            result3 = result3_obj.result  # Get actual result from EagerResult
+            
+            # Check Phase 3 success
+            if result3['status'] != "success":
+                raise Exception(f"Phase 3 failed: {result3.get('error_message', 'Unknown error')}")
+            
+            # Update cost tracking
+            total_cost += result3['cost_usd']
+            update_cost(video_id, "phase3", result3['cost_usd'])
+            print(f"💰 Phase 3 Cost: ${result3['cost_usd']:.4f} | Total: ${total_cost:.4f}")
+            
+            # Extract reference URLs from Phase 3
+            reference_urls = result3['output_data']
         
-        # Update cost tracking
-        total_cost += result3['cost_usd']
-        update_cost(video_id, "phase3", result3['cost_usd'])
-        print(f"💰 Phase 3 Cost: ${result3['cost_usd']:.4f} | Total: ${total_cost:.4f}")
-        
-        # Extract reference URLs from Phase 3
-        reference_urls = result3['output_data']
-        
-        # Store Phase 3 output in database
+        # Store Phase 3 output in database (or uploaded assets info)
         db = SessionLocal()
         try:
             video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
             if video:
                 if video.phase_outputs is None:
                     video.phase_outputs = {}
-                video.phase_outputs['phase3_references'] = result3
+                
+                if has_uploaded_assets:
+                    # Store uploaded assets info instead of Phase 3 output
+                    video.phase_outputs['phase3_references'] = {
+                        'status': 'skipped',
+                        'reason': 'user_uploaded_assets',
+                        'uploaded_assets_count': len(uploaded_assets_list)
+                    }
+                else:
+                    # Store Phase 3 output
+                    video.phase_outputs['phase3_references'] = result3
+                
+                video.reference_assets = reference_urls
                 # Mark JSON column as modified so SQLAlchemy detects the change
                 from sqlalchemy.orm.attributes import flag_modified
                 flag_modified(video, 'phase_outputs')
@@ -147,9 +205,10 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None):
             db.close()
         
         # Update progress
+        phase3_status = "using_uploaded_assets" if has_uploaded_assets else "generating_references"
         update_progress(
             video_id,
-            "generating_references",
+            phase3_status,
             40,
             current_phase="phase3_references",
             total_cost=total_cost
