@@ -44,11 +44,12 @@ DEFAULT_MUSIC_MODEL = 'musicgen'
 MUSIC_MODEL_CONFIGS: Dict[str, Dict] = {
     'musicgen': {
         'name': 'musicgen',
-        'replicate_model': 'meta/musicgen:671ac645ce5e552cc63a54a2bbff63fcf798043055d2dac5fc9e36a837eedcfb',  # replicate.run() handles model:version format
+        'replicate_model': 'facebookresearch/musicgen:7a76a8258b23fae65c5a22debb8841d1d7e816b75c2f24218cd2bd8573787906',  # Version hash for stable access
         'cost_per_generation': COST_MUSICGEN,  # $0.15 per 30s
         'max_duration': 30,  # MusicGen supports up to 30s per generation
+        'use_version_hash': True,  # Must use version hash (model name doesn't work)
         'input_params': {
-            'model_version': 'stereo-large',  # Best quality version (stereo-large or melody-large)
+            'model_version': 'large',  # Best quality version (options: "melody", "large", "encode-decode")
             'output_format': 'mp3',
             'normalization_strategy': 'peak',  # 'peak' or 'loudness'
         },

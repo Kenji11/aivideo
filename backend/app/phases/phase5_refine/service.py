@@ -142,9 +142,16 @@ class RefinementService:
             
             # Extract audio specs from template
             audio_spec = spec.get('audio', {})
+            if not audio_spec:
+                print(f"   ⚠️  WARNING: No audio spec found in video spec! Using defaults.")
+                print(f"   📋 Spec keys: {list(spec.keys())}")
+                audio_spec = {}
+            
             music_style = audio_spec.get('music_style', 'orchestral')
             tempo = audio_spec.get('tempo', 'moderate')
             mood = audio_spec.get('mood', 'sophisticated')
+            
+            print(f"   🎵 Audio spec: style={music_style}, tempo={tempo}, mood={mood}")
             
             # Build music prompt from template specs
             prompt = self._build_music_prompt(music_style, tempo, mood)
@@ -167,24 +174,42 @@ class RefinementService:
                 input_params['seconds_total'] = music_duration
             
             # Use configured model via Replicate
-            # replicate.run() handles model name and version resolution automatically
-            from app.config import get_settings
-            import replicate as replicate_lib
+            print(f"   🔧 Model: {replicate_model}")
+            print(f"   🔧 Input params: {list(input_params.keys())}")
+            print(f"   🔧 Prompt length: {len(input_params.get('prompt', ''))}")
             
-            settings = get_settings()
-            client = replicate_lib.Client(api_token=settings.replicate_api_token)
+            # Use replicate_client.run() which handles both model names and version hashes
+            # The run() method automatically handles the correct API call format
+            try:
+                print(f"   🔧 Calling Replicate API...")
+                output = replicate_client.run(
+                    replicate_model,  # Can be model name or version hash
+                    input=input_params,
+                    timeout=180  # 3 minutes for music generation
+                )
+                print(f"   ✅ Music generation completed")
+            except Exception as e:
+                print(f"   ❌ Error during music generation: {str(e)}")
+                raise
             
-            print(f"   🔧 Calling Replicate with model: {replicate_model}")
-            print(f"   🔧 Input params: {input_params}")
+            # Download music file (output is URL)
+            # Replicate returns either a string URL or a list/iterator
+            if isinstance(output, str):
+                music_url = output
+            elif hasattr(output, '__iter__') and not isinstance(output, (str, bytes)):
+                # If it's an iterator/list, get first item
+                music_list = list(output) if hasattr(output, '__iter__') else [output]
+                music_url = music_list[0] if music_list else None
+            elif isinstance(output, dict):
+                # Try common keys for audio output
+                music_url = output.get('audio') or output.get('output') or output.get('url')
+            else:
+                music_url = str(output) if output else None
             
-            # Use replicate.run() which handles model name/version automatically
-            output = client.run(
-                replicate_model,
-                input=input_params
-            )
+            if not music_url:
+                print(f"   ⚠️  Music generation returned no URL (output type: {type(output)})")
+                return None
             
-            # Output from replicate.run() is a file-like object
-            # It has .url() method for URL and .read() method for bytes
             raw_music_path = tempfile.mktemp(suffix='.mp3')
             
             try:
