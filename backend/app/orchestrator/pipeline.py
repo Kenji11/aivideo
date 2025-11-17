@@ -5,7 +5,8 @@ from app.phases.phase1_validate.task import validate_prompt
 from app.phases.phase2_animatic.task import generate_animatic
 from app.phases.phase2_storyboard.task import generate_storyboard
 from app.phases.phase3_references.task import generate_references
-from app.phases.phase4_chunks.task import generate_chunks
+from app.phases.phase4_chunks.task import generate_chunks as generate_chunks_old
+from app.phases.phase4_chunks_storyboard.task import generate_chunks as generate_chunks_storyboard
 from app.phases.phase5_refine.task import refine_video
 from app.orchestrator.progress import update_progress, update_cost
 from app.database import SessionLocal
@@ -290,10 +291,19 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
         # Progress: Phase 1 ends at 20%, Phase 3 ends at 40%, Phase 4 starts at 50% (skipping Phase 2)
         update_progress(video_id, "generating_chunks", 50, current_phase="phase4_chunks")
         
-        # Run Phase 4 task synchronously
-        # Phase 2 is skipped (empty animatic_urls), but Phase 3 reference_urls are passed
-        # Pass user_id for new S3 path structure
-        result4_obj = generate_chunks.apply(args=[video_id, spec, animatic_urls, reference_urls, user_id])
+        # Decide which Phase 4 implementation to use based on storyboard images
+        beats = spec.get('beats', [])
+        storyboard_images_count = sum(1 for beat in beats if beat.get('image_url'))
+        
+        if storyboard_images_count > 1:
+            # Use storyboard-aware logic
+            print(f"📊 Phase 4 Decision: Using storyboard logic ({storyboard_images_count} storyboard images found)")
+            result4_obj = generate_chunks_storyboard.apply(args=[video_id, spec, animatic_urls, reference_urls, user_id])
+        else:
+            # Fallback to old logic
+            print(f"📊 Phase 4 Decision: Using fallback logic (only {storyboard_images_count} storyboard images, need > 1)")
+            result4_obj = generate_chunks_old.apply(args=[video_id, spec, animatic_urls, reference_urls, user_id])
+        
         result4 = result4_obj.result
         
         # Check Phase 4 success
