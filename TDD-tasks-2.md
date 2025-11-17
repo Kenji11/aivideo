@@ -181,13 +181,13 @@
 - Use last-frame continuation within beats
 
 **Changes:**
-- [ ] Read `storyboard_images` from Phase 2 output (stored in DB or passed in)
-- [ ] Calculate beat boundaries → chunk mapping
-- [ ] For each chunk:
-  - [ ] Check if chunk starts a new beat
-  - [ ] If yes: Use corresponding storyboard image as init_image
-  - [ ] If no: Use last frame from previous chunk (existing logic)
-- [ ] Log which init_image source is used for each chunk
+- [x] Read `storyboard_images` from Phase 2 output (stored in DB or passed in)
+- [x] Calculate beat boundaries → chunk mapping
+- [x] For each chunk:
+  - [x] Check if chunk starts a new beat
+  - [x] If yes: Use corresponding storyboard image as init_image
+  - [x] If no: Use last frame from previous chunk (existing logic)
+- [x] Log which init_image source is used for each chunk
 
 **Algorithm for Beat-to-Chunk Mapping:**
 ```python
@@ -208,12 +208,12 @@ for beat_idx, beat in enumerate(beats):
 
 **File:** `backend/app/phases/phase4_chunks/service.py` (or wherever generate_single_chunk is)
 
-- [ ] Add `storyboard_images` parameter to chunk generation function
-- [ ] Add `beat_to_chunk_map` parameter
-- [ ] Check if current chunk_idx is in beat_to_chunk_map
-- [ ] If yes: Get storyboard_images[beat_idx]['image_url'] as init_image
-- [ ] If no: Use last_frame from previous chunk (existing logic)
-- [ ] Log: "Chunk {idx} - Using storyboard from beat {beat_idx}" or "Chunk {idx} - Using last frame continuation"
+- [x] Add `storyboard_images` parameter to chunk generation function
+- [x] Add `beat_to_chunk_map` parameter
+- [x] Check if current chunk_idx is in beat_to_chunk_map
+- [x] If yes: Get storyboard_images[beat_idx]['image_url'] as init_image
+- [x] If no: Use last_frame from previous chunk (existing logic)
+- [x] Log: "Chunk {idx} - Using storyboard from beat {beat_idx}" or "Chunk {idx} - Using last frame continuation"
 
 ---
 
@@ -228,12 +228,12 @@ Before merging:
 - [x] Cost calculation is accurate
 - [x] Test script created and working
 
-## ✅ PR #5 Checklist (Phase 4 Integration - TODO)
+## ✅ PR #5 Checklist (Phase 4 Integration)
 
 Before merging:
-- [ ] Phase 4 calculates beat-to-chunk mapping correctly
-- [ ] Phase 4 uses storyboard images at beat boundaries
-- [ ] Phase 4 uses last-frame continuation within beats
+- [x] Phase 4 calculates beat-to-chunk mapping correctly
+- [x] Phase 4 uses storyboard images at beat boundaries
+- [x] Phase 4 uses last-frame continuation within beats
 
 **Next:** Move to `TDD-tasks-3.md` for Phase 4 refinement and end-to-end testing
 
@@ -245,23 +245,23 @@ Before merging:
 
 **Goal:** Separate storyboard-aware logic from old logic to avoid antipattern
 
-- [ ] Create directory `backend/app/phases/phase4_chunks_storyboard/`
-- [ ] Create `__init__.py` in phase4_chunks_storyboard
-- [ ] Create `chunk_generator.py` in phase4_chunks_storyboard
-- [ ] Create `service.py` in phase4_chunks_storyboard
-- [ ] Create `task.py` in phase4_chunks_storyboard
+- [x] Create directory `backend/app/phases/phase4_chunks_storyboard/`
+- [x] Create `__init__.py` in phase4_chunks_storyboard
+- [x] Create `chunk_generator.py` in phase4_chunks_storyboard
+- [x] Create `service.py` in phase4_chunks_storyboard
+- [x] Create `task.py` in phase4_chunks_storyboard
 
 ### Task 6.2: Move Storyboard Logic to New Directory
 
 **Files:** Move from `phase4_chunks/` to `phase4_chunks_storyboard/`
 
-- [ ] Move `calculate_beat_to_chunk_mapping()` to `phase4_chunks_storyboard/chunk_generator.py`
-- [ ] Move `build_chunk_specs_with_storyboard()` to `phase4_chunks_storyboard/chunk_generator.py`
-- [ ] Move `_generate_single_chunk_with_storyboard_impl()` to `phase4_chunks_storyboard/chunk_generator.py`
-- [ ] Move `generate_single_chunk_with_storyboard()` Celery task to `phase4_chunks_storyboard/task.py`
-- [ ] Create new `ChunkGenerationService` in `phase4_chunks_storyboard/service.py` with storyboard-aware logic
-- [ ] Remove storyboard logic from `phase4_chunks/chunk_generator.py` (keep old logic only)
-- [ ] Remove storyboard logic from `phase4_chunks/service.py` (keep old logic only)
+- [x] Move `calculate_beat_to_chunk_mapping()` to `phase4_chunks_storyboard/chunk_generator.py`
+- [x] Move `build_chunk_specs_with_storyboard()` to `phase4_chunks_storyboard/chunk_generator.py`
+- [x] Move `_generate_single_chunk_with_storyboard_impl()` to `phase4_chunks_storyboard/chunk_generator.py`
+- [x] Move `generate_single_chunk_with_storyboard()` Celery task to `phase4_chunks_storyboard/task.py`
+- [x] Create new `ChunkGenerationService` in `phase4_chunks_storyboard/service.py` with storyboard-aware logic
+- [x] Remove storyboard logic from `phase4_chunks/chunk_generator.py` (keep old logic only)
+- [x] Remove storyboard logic from `phase4_chunks/service.py` (keep old logic only)
 
 ### Task 6.3: Update Pipeline to Choose Flow
 
@@ -269,35 +269,35 @@ Before merging:
 
 **Goal:** Decision happens at pipeline level, not in phase itself
 
-- [ ] After Phase 2 storyboard generation, check if storyboard images exist
-- [ ] If storyboard images count > 1:
-  - [ ] Call `phase4_chunks_storyboard` service/task
-- [ ] Else (fallback):
-  - [ ] Call `phase4_chunks` service/task (old logic)
-- [ ] Remove storyboard detection logic from `phase4_chunks/service.py`
-- [ ] Remove `use_storyboard_logic` flag from `phase4_chunks/service.py`
+- [x] After Phase 2 storyboard generation, check if storyboard images exist
+- [x] If storyboard images count > 1:
+  - [x] Call `phase4_chunks_storyboard` service/task
+- [x] Else (fallback):
+  - [x] Call `phase4_chunks` service/task (old logic)
+- [x] Remove storyboard detection logic from `phase4_chunks/service.py`
+- [x] Remove `use_storyboard_logic` flag from `phase4_chunks/service.py`
 
 ### Task 6.4: Update Imports and Dependencies
 
-- [ ] Update `phase4_chunks_storyboard` imports to reference shared utilities
-- [ ] Ensure both `phase4_chunks` and `phase4_chunks_storyboard` can import from:
-  - [ ] `app.phases.phase4_chunks.schemas` (ChunkSpec)
-  - [ ] `app.phases.phase4_chunks.stitcher` (VideoStitcher)
-  - [ ] `app.phases.phase4_chunks.model_config` (model configs)
-- [ ] Update pipeline imports to include both phase4_chunks and phase4_chunks_storyboard
+- [x] Update `phase4_chunks_storyboard` imports to reference shared utilities
+- [x] Ensure both `phase4_chunks` and `phase4_chunks_storyboard` can import from:
+  - [x] `app.phases.phase4_chunks.schemas` (ChunkSpec)
+  - [x] `app.phases.phase4_chunks.stitcher` (VideoStitcher)
+  - [x] `app.phases.phase4_chunks.model_config` (model configs)
+- [x] Update pipeline imports to include both phase4_chunks and phase4_chunks_storyboard
 
 ### Task 6.5: Clean Up Old Code
 
-- [ ] Remove `build_chunk_specs_with_storyboard` from `phase4_chunks/chunk_generator.py`
-- [ ] Remove `generate_single_chunk_with_storyboard` from `phase4_chunks/chunk_generator.py`
-- [ ] Remove `_generate_single_chunk_with_storyboard_impl` from `phase4_chunks/chunk_generator.py`
-- [ ] Remove storyboard-related imports from `phase4_chunks/service.py`
-- [ ] Remove storyboard detection logic from `phase4_chunks/service.py`
-- [ ] Keep old `build_chunk_specs()` and `generate_single_chunk()` in `phase4_chunks/` unchanged
+- [x] Remove `build_chunk_specs_with_storyboard` from `phase4_chunks/chunk_generator.py`
+- [x] Remove `generate_single_chunk_with_storyboard` from `phase4_chunks/chunk_generator.py`
+- [x] Remove `_generate_single_chunk_with_storyboard_impl` from `phase4_chunks/chunk_generator.py`
+- [x] Remove storyboard-related imports from `phase4_chunks/service.py`
+- [x] Remove storyboard detection logic from `phase4_chunks/service.py`
+- [x] Keep old `build_chunk_specs()` and `generate_single_chunk()` in `phase4_chunks/` unchanged
 
 ### Task 6.6: Testing
 
-- [ ] Test pipeline with storyboard images (should use phase4_chunks_storyboard)
-- [ ] Test pipeline without storyboard images (should use phase4_chunks fallback)
-- [ ] Verify both flows generate chunks correctly
-- [ ] Verify stitching works for both flows
+- [x] Test pipeline with storyboard images (should use phase4_chunks_storyboard)
+- [x] Test pipeline without storyboard images (should use phase4_chunks fallback)
+- [x] Verify both flows generate chunks correctly
+- [x] Verify stitching works for both flows
