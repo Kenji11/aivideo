@@ -74,6 +74,13 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       'Allow PostgreSQL access from ECS'
     );
 
+    // Allow PostgreSQL access from all IPs (for external connections)
+    auroraSecurityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(),
+      ec2.Port.tcp(5432),
+      'Allow PostgreSQL access from all IPs'
+    );
+
     // Load DB credentials from .env
     const dbUsername = process.env.DB_USERNAME || 'aivideo';
     const dbPassword = process.env.DB_PASSWORD;
