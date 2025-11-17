@@ -46,31 +46,43 @@ Storage (S3) + Database (RDS Postgres)
 
 Each video generation flows through 6 sequential phases:
 
-**Phase 1: Validation & Spec Extraction**
-- Input: Natural language prompt
-- Process: GPT-4 extracts structured specification
-- Output: JSON spec with template, beats, style, audio
-- Cost: $0.01 | Time: 2s
+**Phase 1: Intelligent Planning (TDD v2.0)**
+- Input: Natural language prompt + creativity level (0.0-1.0)
+- Process: Single GPT-4 call performs:
+  1. Analyze user intent
+  2. Select archetype from library (5 options)
+  3. Compose beat sequence from beat library (15 beats)
+  4. Build style specification
+- Output: Complete spec with beats, each beat 5/10/15s duration
+- Cost: $0.02 | Time: 5-10s
+- Key Change: LLM composes custom sequences, not just template selection
 
-**Phase 2: Animatic Generation**
-- Input: Spec from Phase 1
-- Process: Generate 15 low-fidelity reference frames (SDXL)
-- Output: Structural guides for temporal consistency
-- Cost: $0.08 | Time: 30s
-- Note: User never sees animatic (internal reference only)
+**Phase 2: Storyboard Generation (TDD v2.0)** ✅ ACTIVE
+- Input: Spec with beats from Phase 1
+- Process: Generate 1 SDXL image per beat (1:1 mapping)
+- Output: N storyboard images (N = number of beats)
+- Cost: $0.0055 per image | Time: ~8s per image
+- Key Change: REPLACES Phase 3 reference generation
+- Images used at beat boundaries in Phase 4
+- Example: 3 beats = 3 images, 6 beats = 6 images
 
-**Phase 3: Reference Assets**
-- Input: Spec from Phase 1
-- Process: Generate style guide + product references (SDXL)
-- Output: Canonical visual references
-- Cost: $0.02 | Time: 15s
+**Phase 3: Reference Assets** ❌ DISABLED (TDD v2.0)
+- Status: Explicitly disabled, kept in codebase for backward compatibility
+- OLD: Generated 1 reference image per video
+- NEW: Phase 2 storyboard images replace this functionality
+- Function returns "skipped" status immediately
+- May be removed entirely in future refactor
 
-**Phase 4: Chunked Video Generation**
-- Input: Spec + Animatic + References
-- Process: Generate 15 × 2s video chunks in parallel (Zeroscope/AnimateDiff)
-- Output: 15 video chunks
-- Cost: $1.50-$3.00 | Time: 5-8 minutes
-- Pattern: Parallel execution using Celery groups
+**Phase 4: Chunked Video Generation (TDD v2.0)** ✅ UPDATED
+- Input: Spec + Storyboard Images (from Phase 2)
+- Process: Generate video chunks with beat-boundary mapping
+- Init Image Strategy (Option C):
+  - Chunks at beat boundaries: Use storyboard image from Phase 2
+  - Chunks within beats: Use last-frame continuation
+  - Example: Beat 1 (10s) = Chunk 0 (storyboard) + Chunk 1 (last-frame)
+- Output: N video chunks (depends on total duration and model)
+- Cost: $0.45 per 5s chunk (wan model) | Time: ~45s per chunk
+- Pattern: Sequential generation for temporal coherence
 
 **Phase 5: Refinement**
 - Input: Stitched video
@@ -83,39 +95,78 @@ Each video generation flows through 6 sequential phases:
 - Process: Upload to S3, generate pre-signed URLs
 - Output: Downloadable video
 
-### 2. Template System Pattern
+### 2. Beat Library System Pattern (TDD v2.0)
 
-**Template-Driven Generation**
-- Templates define beats (timed action sequences)
-- Each beat specifies: start time, duration, shot type, action, camera movement
-- Prompts are dynamically constructed from template + user spec
-- Transitions are deterministic (no AI involvement)
+**Beat-Based Composition Architecture**
+- **15-Beat Library**: Reusable shot types organized by position (opening/middle/closing)
+- **LLM Composer**: GPT-4 selects archetype and composes custom beat sequences
+- **Strict Duration Constraint**: All beats must be 5s, 10s, or 15s (no exceptions)
+- **1:1 Beat-to-Storyboard Mapping**: Each beat = 1 SDXL-generated storyboard image
 
-**Template Structure**:
-```json
+**OLD System (Deprecated):**
+- JSON template files with embedded beats
+- Template selection (choose from 3 templates)
+- Arbitrary beat durations (3s, 5s, 7s, 10s)
+- Duration optimization logic in service layer
+
+**NEW System (TDD v2.0):**
+```python
+# Beat Library Structure
 {
-  "name": "product_showcase",
-  "beats": [...],
-  "transitions": [...],
-  "audio": {...},
-  "color_grading": {...}
+    "beat_id": "hero_shot",
+    "duration": 5,  # MUST be 5, 10, or 15
+    "shot_type": "close_up",
+    "action": "product_reveal",
+    "prompt_template": "Cinematic close-up of {product_name}...",
+    "camera_movement": "slow_dolly_in",
+    "typical_position": "opening",
+    "compatible_products": ["all"],
+    "energy_level": "medium"
+}
+
+# Template Archetypes (High-Level Guides)
+{
+    "archetype_id": "luxury_showcase",
+    "suggested_beat_sequence": ["hero_shot", "detail_showcase", ...],
+    "typical_duration_range": (15, 30),
+    "energy_curve": "steady",
+    "narrative_structure": "reveal → appreciate → aspire → desire"
 }
 ```
 
+**Key Differences:**
+- Templates are now **guides**, not rigid structures
+- LLM **composes** beat sequences, doesn't just fill in placeholders
+- Beats are **reusable** across different video types
+- All durations conform to 5/10/15s constraint for chunk alignment
+
 ### 3. Temporal Consistency Pattern
 
-**Last-Frame Continuation (PR #8)** ✅ ACTIVE
-- **Chunk 0**: Uses Phase 3 reference image as init_image
-- **Chunks 1+**: Use last frame from previous chunk as init_image
-- Creates temporal coherence and motion continuity
-- Result: "One continuous take" feel, eliminates visual resets
-- Trade-off: Requires sequential generation (slower but better quality)
+**Beat Boundary Images + Last-Frame Continuation (TDD v2.0)** ✅ ACTIVE
+- **Beat Boundaries**: Use storyboard images from Phase 2
+  - Each beat starts with its corresponding storyboard image
+  - Provides visual refresh at narrative transitions
+  - Example: Chunk 0 (beat 1), Chunk 2 (beat 2), Chunk 3 (beat 3)
+- **Within Beats**: Use last-frame continuation
+  - Maintains temporal coherence during the beat
+  - Smooth motion within narrative segment
+  - Example: Beat 1 (10s) = Chunk 0 (storyboard) + Chunk 1 (last-frame)
+- **Algorithm**: 
+  ```python
+  beat_to_chunk = {}
+  current_time = 0
+  for beat_idx, beat in enumerate(beats):
+      chunk_idx = current_time // actual_chunk_duration
+      beat_to_chunk[chunk_idx] = beat_idx
+      current_time += beat['duration']
+  ```
+- Result: Narrative structure + temporal coherence
+- Trade-off: Sequential generation required (slower but better)
 
-**Animatic-as-Reference** (DISABLED FOR MVP)
-- Generate cheap, low-detail structural frames
-- Use as ControlNet inputs for video generation
-- Ensures character/object consistency across clips
-- May re-enable post-MVP for multi-image workflows
+**OLD: Phase 3 Single Reference (PR #8)** ❌ DEPRECATED
+- Chunk 0: Uses Phase 3 reference image
+- Chunks 1+: Use last frame continuation
+- Replaced by beat boundary system (more dynamic)
 
 ### 4. Processing Pattern Evolution
 
