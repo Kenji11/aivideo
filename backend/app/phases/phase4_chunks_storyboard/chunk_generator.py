@@ -430,7 +430,7 @@ def generate_single_chunk_continuous(chunk_spec_obj: ChunkSpec) -> dict:
 
 @celery_app.task(bind=True, name="app.phases.phase4_chunks_storyboard.chunk_generator.generate_single_chunk_with_storyboard")
 def generate_single_chunk_with_storyboard(
-    self, 
+    self,
     chunk_spec: dict, 
     beat_to_chunk_map: dict = None
 ) -> dict:

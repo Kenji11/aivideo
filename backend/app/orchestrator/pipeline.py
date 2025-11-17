@@ -89,48 +89,6 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
             total_cost=total_cost
         )
         
-        # ============================================================================
-        # Phase 2 & 3 temporarily disabled for MVP
-        # Phase 2 (Animatic) and Phase 3 (References) are commented out to simplify
-        # the pipeline for MVP. Phase 1 output goes directly to Phase 4 (Chunks).
-        # To re-enable: uncomment Phase 2 & 3 sections below and update Phase 4 call.
-        # ============================================================================
-        
-        # ============ PHASE 2: GENERATE ANIMATIC ============
-        # Phase 2 & 3 temporarily disabled for MVP
-        # update_progress(video_id, "generating_animatic", 25, current_phase="phase2_animatic")
-        # 
-        # # Run Phase 2 task synchronously
-        # result2_obj = generate_animatic.apply(args=[video_id, spec])
-        # result2 = result2_obj.result
-        # 
-        # # Check Phase 2 success
-        # if result2['status'] != "success":
-        #     raise Exception(f"Phase 2 failed: {result2.get('error_message', 'Unknown error')}")
-        # 
-        # # Update cost tracking
-        # total_cost += result2['cost_usd']
-        # update_cost(video_id, "phase2", result2['cost_usd'])
-        # print(f"💰 Phase 2 Cost: ${result2['cost_usd']:.4f} | Total: ${total_cost:.4f}")
-        # 
-        # # Extract animatic URLs from Phase 2
-        # animatic_urls = result2['output_data'].get('animatic_urls', [])
-        # 
-        # # Store Phase 2 output in database
-        # db = SessionLocal()
-        # try:
-        #     video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
-        #     if video:
-        #         if video.phase_outputs is None:
-        #             video.phase_outputs = {}
-        #         video.phase_outputs['phase2_animatic'] = result2
-        #         video.animatic_urls = animatic_urls
-        #         # Mark JSON column as modified so SQLAlchemy detects the change
-        #         from sqlalchemy.orm.attributes import flag_modified
-        #         flag_modified(video, 'phase_outputs')
-        #         db.commit()
-        # finally:
-        #     db.close()
         
         # Set empty animatic_urls for Phase 4 (since Phase 2 animatic is disabled)
         animatic_urls = []
@@ -173,61 +131,34 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
         print(f"✅ Phase 2 Storyboard: Generated {len(storyboard_images)} storyboard images")
         
         # ============ PHASE 3: GENERATE REFERENCE ASSETS ============
-        # Skip Phase 3 if user uploaded images - use them directly instead of generating references
-        # Check both assets parameter and spec['uploaded_assets'] (Phase 1 adds assets to spec)
-        spec_uploaded_assets = spec.get('uploaded_assets', [])
-        has_uploaded_assets = (assets and len(assets) > 0) or (spec_uploaded_assets and len(spec_uploaded_assets) > 0)
-        
-        # Use assets from spec if available (more reliable), otherwise use assets parameter
-        assets_to_use = spec_uploaded_assets if spec_uploaded_assets else (assets or [])
+        # Skip Phase 3 if storyboard images exist - storyboard mode uses Phase 2 images only
+        has_storyboard_images = len(storyboard_images) > 0
         
         print(f"🔍 Phase 3 Skip Check:")
-        print(f"   - assets parameter: {len(assets) if assets else 0} items")
-        print(f"   - spec['uploaded_assets']: {len(spec_uploaded_assets) if spec_uploaded_assets else 0} items")
-        print(f"   - has_uploaded_assets: {has_uploaded_assets}")
-        print(f"   - Will use: {len(assets_to_use)} uploaded asset(s)")
+        print(f"   - Storyboard images: {len(storyboard_images)}")
+        print(f"   - Has storyboard images: {has_storyboard_images}")
         
-        if has_uploaded_assets:
-            # User uploaded images - skip Phase 3 generation, use uploaded assets directly
-            print(f"📸 User uploaded {len(assets_to_use)} image(s) - skipping Phase 3 reference generation")
-            print(f"   Will use uploaded images directly for video generation")
-            print(f"   ❌ DO NOT GENERATE NEW REFERENCE IMAGES - using uploaded images only")
+        if has_storyboard_images:
+            # Storyboard images exist - skip Phase 3 entirely, use storyboard images from Phase 2
+            print(f"🎨 Storyboard images detected ({len(storyboard_images)}) - skipping Phase 3 reference generation")
+            print(f"   Phase 4 will use storyboard images from Phase 2 at beat boundaries")
+            print(f"   ❌ Phase 3 SKIPPED - not needed for storyboard mode")
             
-            # Create reference_urls dict with uploaded assets
-            # Format: {uploaded_assets: [{s3_key: ..., asset_id: ...}, ...]}
-            uploaded_assets_list = []
-            for asset in assets_to_use:
-                # Handle both dict format (from API) and direct format (from spec)
-                if isinstance(asset, dict):
-                    s3_key = asset.get('s3_key')
-                    asset_id = asset.get('asset_id')
-                else:
-                    # Fallback if asset is in different format
-                    s3_key = getattr(asset, 's3_key', None) if hasattr(asset, 's3_key') else None
-                    asset_id = getattr(asset, 'asset_id', None) if hasattr(asset, 'asset_id') else None
-                
-                if s3_key:
-                    uploaded_assets_list.append({
-                        's3_key': s3_key,
-                        's3_url': f"s3://{s3_client.bucket}/{s3_key}",
-                        'asset_id': asset_id
-                    })
-            
+            # Create minimal reference_urls dict (not used in storyboard mode)
             reference_urls = {
-                'uploaded_assets': uploaded_assets_list,
                 'style_guide_url': None,
                 'product_reference_url': None
             }
             
-            # Update progress to show we're using uploaded assets
+            # Update progress to show Phase 3 is skipped
             update_progress(
                 video_id,
-                "using_uploaded_assets",
-                30,
+                "skipped_phase3_storyboard_mode",
+                40,
                 current_phase="phase3_references",
                 total_cost=total_cost
             )
-            print(f"✅ Using {len(uploaded_assets_list)} uploaded image(s) as reference assets")
+            print(f"✅ Phase 3 skipped - using {len(storyboard_images)} storyboard image(s) from Phase 2")
             
         else:
             # No uploaded assets - generate reference images in Phase 3
@@ -250,7 +181,7 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
             # Extract reference URLs from Phase 3
             reference_urls = result3['output_data']
         
-        # Store Phase 3 output in database (or uploaded assets info)
+        # Store Phase 3 output in database (or skip info)
         db = SessionLocal()
         try:
             video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
@@ -258,12 +189,12 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
                 if video.phase_outputs is None:
                     video.phase_outputs = {}
                 
-                if has_uploaded_assets:
-                    # Store uploaded assets info instead of Phase 3 output
+                if has_storyboard_images:
+                    # Store skip info - Phase 3 skipped due to storyboard mode
                     video.phase_outputs['phase3_references'] = {
                         'status': 'skipped',
-                        'reason': 'user_uploaded_assets',
-                        'uploaded_assets_count': len(uploaded_assets_list)
+                        'reason': 'storyboard_mode',
+                        'storyboard_images_count': len(storyboard_images)
                     }
                 else:
                     # Store Phase 3 output
@@ -276,16 +207,6 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
                 db.commit()
         finally:
             db.close()
-        
-        # Update progress
-        phase3_status = "using_uploaded_assets" if has_uploaded_assets else "generating_references"
-        update_progress(
-            video_id,
-            phase3_status,
-            40,
-            current_phase="phase3_references",
-            total_cost=total_cost
-        )
         
         # ============ PHASE 4: GENERATE VIDEO CHUNKS ============
         # Progress: Phase 1 ends at 20%, Phase 3 ends at 40%, Phase 4 starts at 50% (skipping Phase 2)
@@ -432,7 +353,9 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
         print(f"💰 TOTAL COST: ${total_cost:.4f} USD")
         print(f"   - Phase 1 (Validate): ${result1['cost_usd']:.4f}")
         print(f"   - Phase 2 (Storyboard): ${result2_storyboard['cost_usd']:.4f}")
-        if 'result3' in locals() and result3.get('status') != 'skipped':
+        if has_storyboard_images:
+            print(f"   - Phase 3 (References): SKIPPED (storyboard mode)")
+        elif 'result3' in locals() and result3.get('status') != 'skipped':
             print(f"   - Phase 3 (References): ${result3.get('cost_usd', 0.0):.4f}")
         print(f"   - Phase 4 (Chunks): ${result4['cost_usd']:.4f}")
         if 'result5' in locals() and result5.get('status') == 'success':
