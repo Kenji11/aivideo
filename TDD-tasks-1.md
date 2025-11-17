@@ -10,90 +10,102 @@
 
 **File:** `backend/app/common/beat_library.py`
 
-- [ ] Create `beat_library.py` file
-- [ ] Define `OPENING_BEATS` dictionary with 5 beats:
-  - [ ] `hero_shot` (5s, close_up, product_reveal)
-  - [ ] `ambient_lifestyle` (5s, wide, establish_environment)
-  - [ ] `teaser_reveal` (5s, extreme_close_up, mysterious_preview)
-  - [ ] `dynamic_intro` (5s, dynamic, energetic_opening)
-  - [ ] `atmospheric_setup` (5s, wide, mood_establishment)
-- [ ] Define `MIDDLE_PRODUCT_BEATS` dictionary with 5 beats:
-  - [ ] `detail_showcase` (5s, macro, feature_highlight)
-  - [ ] `product_in_motion` (5s, tracking, dynamic_product)
-  - [ ] `usage_scenario` (10s, medium, person_using_product)
-  - [ ] `lifestyle_context` (10s, medium, aspirational_lifestyle)
-  - [ ] `feature_highlight_sequence` (10s, medium_close_up, multiple_features)
-- [ ] Define `MIDDLE_DYNAMIC_BEATS` dictionary with 3 beats:
-  - [ ] `action_montage` (5s, dynamic_multi, fast_energy)
-  - [ ] `benefit_showcase` (5s, medium, demonstrate_benefit)
-  - [ ] `transformation_moment` (10s, medium_wide, before_after)
-- [ ] Define `CLOSING_BEATS` dictionary with 2 beats:
-  - [ ] `call_to_action` (5s, close_up, final_impression)
-  - [ ] `brand_moment` (10s, wide_cinematic, brand_story)
-- [ ] Create `BEAT_LIBRARY` by merging all beat dictionaries
-- [ ] Verify total of 15 beats in library
+- [x] Create `beat_library.py` file
+- [x] Define `OPENING_BEATS` dictionary with 5 beats:
+  - [x] `hero_shot` (5s, close_up, product_reveal)
+  - [x] `ambient_lifestyle` (5s, wide, establish_environment)
+  - [x] `teaser_reveal` (5s, extreme_close_up, mysterious_preview)
+  - [x] `dynamic_intro` (5s, dynamic, energetic_opening)
+  - [x] `atmospheric_setup` (5s, wide, mood_establishment)
+- [x] Define `MIDDLE_PRODUCT_BEATS` dictionary with 5 beats:
+  - [x] `detail_showcase` (5s, macro, feature_highlight)
+  - [x] `product_in_motion` (5s, tracking, dynamic_product)
+  - [x] `usage_scenario` (10s, medium, person_using_product)
+  - [x] `lifestyle_context` (10s, medium, aspirational_lifestyle)
+  - [x] `feature_highlight_sequence` (10s, medium_close_up, multiple_features)
+- [x] Define `MIDDLE_DYNAMIC_BEATS` dictionary with 3 beats:
+  - [x] `action_montage` (5s, dynamic_multi, fast_energy)
+  - [x] `benefit_showcase` (5s, medium, demonstrate_benefit)
+  - [x] `transformation_moment` (10s, medium_wide, before_after)
+- [x] Define `CLOSING_BEATS` dictionary with 2 beats:
+  - [x] `call_to_action` (5s, close_up, final_impression)
+  - [x] `brand_moment` (10s, wide_cinematic, brand_story)
+- [x] Create `BEAT_LIBRARY` by merging all beat dictionaries
+- [x] Verify total of 15 beats in library
 
 ### Task 1.2: Create Template Archetypes Module
 
 **File:** `backend/app/common/template_archetypes.py`
 
-- [ ] Create `template_archetypes.py` file
-- [ ] Define `luxury_showcase` archetype:
-  - [ ] Set typical_duration_range: (15, 30)
-  - [ ] Set suggested_beat_sequence: hero_shot, detail_showcase, lifestyle_context, call_to_action
-  - [ ] Set typical_products: watches, jewelry, luxury_cars, high_end_fashion, premium_tech
-  - [ ] Set style_hints: elegant, sophisticated, premium, minimalist, cinematic
-  - [ ] Set energy_curve: "steady"
-  - [ ] Set narrative_structure: "reveal → appreciate → aspire → desire"
-- [ ] Define `energetic_lifestyle` archetype:
-  - [ ] Set typical_duration_range: (10, 20)
-  - [ ] Set suggested_beat_sequence: dynamic_intro, action_montage, product_in_motion, call_to_action
-  - [ ] Set typical_products: sportswear, sneakers, fitness_equipment, energy_drinks, outdoor_gear
-  - [ ] Set style_hints: energetic, vibrant, dynamic, authentic, motivational
-  - [ ] Set energy_curve: "building"
-  - [ ] Set narrative_structure: "excite → engage → empower → inspire"
-- [ ] Define `minimalist_reveal` archetype:
-  - [ ] Set typical_duration_range: (10, 20)
-  - [ ] Set suggested_beat_sequence: hero_shot, detail_showcase, call_to_action
-  - [ ] Set typical_products: tech_gadgets, design_objects, skincare, minimal_fashion, smart_devices
-  - [ ] Set style_hints: minimalist, clean, modern, simple, focused
-  - [ ] Set energy_curve: "steady"
-  - [ ] Set narrative_structure: "reveal → appreciate → conclude"
-- [ ] Define `emotional_storytelling` archetype:
-  - [ ] Set typical_duration_range: (20, 30)
-  - [ ] Set suggested_beat_sequence: atmospheric_setup, usage_scenario, transformation_moment, call_to_action
-  - [ ] Set typical_products: family_products, healthcare, home_goods, insurance, nonprofits
-  - [ ] Set style_hints: emotional, authentic, warm, human, heartfelt
-  - [ ] Set energy_curve: "building"
-  - [ ] Set narrative_structure: "relate → connect → transform → remember"
-- [ ] Define `feature_demo` archetype:
-  - [ ] Set typical_duration_range: (15, 30)
-  - [ ] Set suggested_beat_sequence: hero_shot, feature_highlight_sequence, benefit_showcase, call_to_action
-  - [ ] Set typical_products: tech_products, appliances, software, tools, automotive
-  - [ ] Set style_hints: informative, clear, professional, modern, benefit-driven
-  - [ ] Set energy_curve: "steady"
-  - [ ] Set narrative_structure: "introduce → demonstrate → explain → convince"
-- [ ] Create `TEMPLATE_ARCHETYPES` dictionary with all 5 archetypes
+- [x] Create `template_archetypes.py` file
+- [x] Define `luxury_showcase` archetype:
+  - [x] Set typical_duration_range: (15, 30)
+  - [x] Set suggested_beat_sequence: hero_shot, detail_showcase, lifestyle_context, call_to_action
+  - [x] Set typical_products: watches, jewelry, luxury_cars, high_end_fashion, premium_tech
+  - [x] Set style_hints: elegant, sophisticated, premium, minimalist, cinematic
+  - [x] Set energy_curve: "steady"
+  - [x] Set narrative_structure: "reveal → appreciate → aspire → desire"
+- [x] Define `energetic_lifestyle` archetype:
+  - [x] Set typical_duration_range: (10, 20)
+  - [x] Set suggested_beat_sequence: dynamic_intro, action_montage, product_in_motion, call_to_action
+  - [x] Set typical_products: sportswear, sneakers, fitness_equipment, energy_drinks, outdoor_gear
+  - [x] Set style_hints: energetic, vibrant, dynamic, authentic, motivational
+  - [x] Set energy_curve: "building"
+  - [x] Set narrative_structure: "excite → engage → empower → inspire"
+- [x] Define `minimalist_reveal` archetype:
+  - [x] Set typical_duration_range: (10, 20)
+  - [x] Set suggested_beat_sequence: hero_shot, detail_showcase, call_to_action
+  - [x] Set typical_products: tech_gadgets, design_objects, skincare, minimal_fashion, smart_devices
+  - [x] Set style_hints: minimalist, clean, modern, simple, focused
+  - [x] Set energy_curve: "steady"
+  - [x] Set narrative_structure: "reveal → appreciate → conclude"
+- [x] Define `emotional_storytelling` archetype:
+  - [x] Set typical_duration_range: (20, 30)
+  - [x] Set suggested_beat_sequence: atmospheric_setup, usage_scenario, transformation_moment, call_to_action
+  - [x] Set typical_products: family_products, healthcare, home_goods, insurance, nonprofits
+  - [x] Set style_hints: emotional, authentic, warm, human, heartfelt
+  - [x] Set energy_curve: "building"
+  - [x] Set narrative_structure: "relate → connect → transform → remember"
+- [x] Define `feature_demo` archetype:
+  - [x] Set typical_duration_range: (15, 30)
+  - [x] Set suggested_beat_sequence: hero_shot, feature_highlight_sequence, benefit_showcase, call_to_action
+  - [x] Set typical_products: tech_products, appliances, software, tools, automotive
+  - [x] Set style_hints: informative, clear, professional, modern, benefit-driven
+  - [x] Set energy_curve: "steady"
+  - [x] Set narrative_structure: "introduce → demonstrate → explain → convince"
+- [x] Create `TEMPLATE_ARCHETYPES` dictionary with all 5 archetypes
 
 ### Task 1.3: Update Constants
 
 **File:** `backend/app/common/constants.py`
 
-- [ ] Add `BEAT_COMPOSITION_CREATIVITY` constant (default 0.5, from env var)
-- [ ] Add `get_planning_temperature(creativity: float) -> float` function
-- [ ] Implement temperature mapping: 0.2 + (creativity * 0.6)
-- [ ] Add comment explaining temperature ranges:
-  - [ ] 0.0 → 0.2 (strict template adherence)
-  - [ ] 0.5 → 0.5 (balanced adaptation)
-  - [ ] 1.0 → 0.8 (creative reinterpretation)
+- [x] Add `BEAT_COMPOSITION_CREATIVITY` constant (default 0.5, from env var)
+- [x] Add `get_planning_temperature(creativity: float) -> float` function
+- [x] Implement temperature mapping: 0.2 + (creativity * 0.6)
+- [x] Add comment explaining temperature ranges:
+  - [x] 0.0 → 0.2 (strict template adherence)
+  - [x] 0.5 → 0.5 (balanced adaptation)
+  - [x] 1.0 → 0.8 (creative reinterpretation)
 
 ### Task 1.4: Update Database Models
 
 **File:** `backend/app/common/models.py`
 
-- [ ] Add `storyboard_images` column (JSON, default list)
-- [ ] Note: `creativity_level`, `selected_archetype`, `num_beats`, `num_chunks` stored in `spec` JSON
-- [ ] Note: Keep existing `VideoStatus` enum unchanged (out of scope)
+- [x] Add `storyboard_images` column (JSON, default list)
+- [x] Note: `creativity_level`, `selected_archetype`, `num_beats`, `num_chunks` stored in `spec` JSON
+- [x] Note: Keep existing `VideoStatus` enum unchanged (out of scope)
+
+### Task 1.5: Create Database Migration
+
+**File:** `backend/alembic/versions/003_add_storyboard_images.py`
+
+- [x] Create new migration file `003_add_storyboard_images.py`
+- [x] Set revision ID: `003_add_storyboard_images`
+- [x] Set down_revision: `002_add_final_music_url`
+- [x] In `upgrade()`: Add `storyboard_images` column (JSON, nullable=True, default=list)
+- [x] In `downgrade()`: Remove `storyboard_images` column
+- [x] Test migration: `alembic upgrade head`
+- [x] Verify column exists in database
 
 ---
 
@@ -241,17 +253,19 @@
 
 ---
 
-## ✅ PR #1, #2, #3 Checklist
+## ✅ PR #1 Checklist
 
 Before merging:
-- [ ] Beat library has exactly 15 beats
-- [ ] All beat durations are 5, 10, or 15 seconds
-- [ ] Template archetypes has exactly 5 archetypes
-- [ ] Database migration plan documented (not executed yet)
-- [ ] Phase 1 task imports without errors
-- [ ] System prompt generates without errors
-- [ ] Spec validation catches invalid durations
-- [ ] Spec validation catches unknown beat_ids
+- [x] Beat library has exactly 15 beats
+- [x] All beat durations are 5, 10, or 15 seconds
+- [x] Template archetypes has exactly 5 archetypes
+- [x] Creativity constants added to constants.py
+- [x] Database model updated with storyboard_images
+- [x] Migration created and executed successfully
+- [ ] Phase 1 task imports without errors (PR #2, #3)
+- [ ] System prompt generates without errors (PR #2, #3)
+- [ ] Spec validation catches invalid durations (PR #2, #3)
+- [ ] Spec validation catches unknown beat_ids (PR #2, #3)
 
 ---
 
