@@ -22,7 +22,7 @@
 
 **File:** `backend/app/phases/phase3_references/task.py`
 
-- [ ] Add large comment block at top of file:
+- [x] Add large comment block at top of file:
   ```python
   # ============================================================================
   # PHASE 3 DISABLED - REPLACED BY PHASE 2 STORYBOARD GENERATION (TDD v2.0)
@@ -36,8 +36,8 @@
   # DO NOT DELETE - May be needed for legacy video playback/debugging
   # ============================================================================
   ```
-- [ ] Comment out the entire `generate_references` task function body
-- [ ] Keep function signature but return error immediately:
+- [x] Comment out the entire `generate_references` task function body
+- [x] Keep function signature but return error immediately:
   ```python
   return PhaseOutput(
       video_id=video_id,
@@ -52,116 +52,114 @@
 
 ### Task 4.1: Create Phase 2 Directory Structure
 
-- [ ] Create directory `backend/app/phases/phase2_storyboard/`
-- [ ] Create `__init__.py` in phase2_storyboard
-- [ ] Create `task.py` in phase2_storyboard
-- [ ] Create `image_generation.py` in phase2_storyboard
+- [x] Create directory `backend/app/phases/phase2_storyboard/`
+- [x] Create `__init__.py` in phase2_storyboard
+- [x] Create `task.py` in phase2_storyboard
+- [x] Create `image_generation.py` in phase2_storyboard
 
 ### Task 4.2: Implement Image Generation Helper
 
 **File:** `backend/app/phases/phase2_storyboard/image_generation.py`
 
-- [ ] Import replicate_client, s3_client
-- [ ] Import COST_SDXL_IMAGE from constants
-- [ ] Import tempfile, requests, logging
-- [ ] Create logger instance
-- [ ] Create `generate_beat_image(video_id, beat_index, beat, style, product, user_id) -> dict` function
-- [ ] Add docstring explaining:
-  - [ ] Returns dict with: beat_id, beat_index, start, duration, image_url, shot_type, prompt_used
-  - [ ] beat_index used for determining which chunk this starts
-- [ ] Extract base_prompt from beat['prompt_template']
-- [ ] Fill in {product_name} placeholder in prompt
-- [ ] Extract colors from style['color_palette'], join with commas
-- [ ] Extract lighting from style['lighting']
-- [ ] Compose full_prompt with:
-  - [ ] base_prompt (with product filled in)
-  - [ ] color palette
-  - [ ] lighting
-  - [ ] "cinematic composition"
-  - [ ] "high quality professional photography"
-  - [ ] "1280x720 aspect ratio"
-  - [ ] shot_type framing
-- [ ] Create negative_prompt with:
-  - [ ] "blurry, low quality, distorted, deformed, ugly, amateur"
-  - [ ] "watermark, text, signature, letters, words"
-  - [ ] "multiple subjects, cluttered, busy, messy, chaotic"
-- [ ] Log prompt (first 100 chars)
+- [x] Import replicate_client, s3_client
+- [x] Import COST_SDXL_IMAGE from constants
+- [x] Import tempfile, requests, logging
+- [x] Create logger instance
+- [x] Create `generate_beat_image(video_id, beat_index, beat, style, product, user_id) -> dict` function
+- [x] Add docstring explaining:
+  - [x] Returns dict with: beat_id, beat_index, start, duration, image_url, shot_type, prompt_used
+  - [x] beat_index used for determining which chunk this starts
+- [x] Extract base_prompt from beat['prompt_template']
+- [x] Fill in {product_name} placeholder in prompt
+- [x] Extract colors from style['color_palette'], join with commas
+- [x] Extract lighting from style['lighting']
+- [x] Compose full_prompt with:
+  - [x] base_prompt (with product filled in)
+  - [x] color palette
+  - [x] lighting
+  - [x] "cinematic composition"
+  - [x] "high quality professional photography"
+  - [x] "1280x720 aspect ratio"
+  - [x] shot_type framing
+- [x] Create negative_prompt with:
+  - [x] "blurry, low quality, distorted, deformed, ugly, amateur"
+  - [x] "watermark, text, signature, letters, words"
+  - [x] "multiple subjects, cluttered, busy, messy, chaotic"
+- [x] Log prompt (first 100 chars)
 
 ### Task 4.3: Implement SDXL Generation Call
 
 **File:** `backend/app/phases/phase2_storyboard/image_generation.py` (continued)
 
-- [ ] Call replicate_client.run with:
-  - [ ] model="stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b"
-  - [ ] input.prompt = full_prompt
-  - [ ] input.negative_prompt = negative_prompt
-  - [ ] input.width = 1280
-  - [ ] input.height = 720
-  - [ ] input.num_inference_steps = 30
-  - [ ] input.guidance_scale = 7.5
-  - [ ] input.scheduler = "K_EULER"
-- [ ] Extract image_url from output[0]
-- [ ] Download image with requests.get
-- [ ] Save to temp file with .png suffix
-- [ ] Construct s3_key using get_video_s3_key helper: `users/{user_id}/videos/{video_id}/storyboard/beat_{beat_index:02d}.png`
-- [ ] Upload to S3 with s3_client.upload_file
-- [ ] Log upload success
-- [ ] Return dict with:
-  - [ ] beat_id, beat_index, start, duration
-  - [ ] image_url (S3 URL)
-  - [ ] shot_type
-  - [ ] prompt_used (full_prompt)
+- [x] Call replicate_client.run with:
+  - [x] model="black-forest-labs/flux-dev" (same as Phase 3)
+  - [x] input.prompt = full_prompt
+  - [x] input.aspect_ratio = "16:9"
+  - [x] input.output_format = "png"
+  - [x] input.output_quality = 90
+- [x] Extract image_url from output
+- [x] Download image with requests.get
+- [x] Save to temp file with .png suffix
+- [x] Construct s3_key using get_video_s3_key helper: `users/{user_id}/videos/{video_id}/beat_{beat_index:02d}.png`
+- [x] Upload to S3 with s3_client.upload_file
+- [x] Log upload success
+- [x] Return dict with:
+  - [x] beat_id, beat_index, start, duration
+  - [x] image_url (S3 URL)
+  - [x] shot_type
+  - [x] prompt_used (full_prompt)
 
 ### Task 4.4: Implement Phase 2 Task
 
 **File:** `backend/app/phases/phase2_storyboard/task.py`
 
-- [ ] Import celery_app
-- [ ] Import PhaseOutput from common.schemas
-- [ ] Import generate_beat_image from .image_generation
-- [ ] Import COST_SDXL_IMAGE from constants
-- [ ] Import time, logging
-- [ ] Create logger instance
-- [ ] Create `@celery_app.task(bind=True)` decorator
-- [ ] Define `generate_storyboard(self, video_id, spec, user_id)` function
-- [ ] Add docstring with Args and Returns
-- [ ] Record start_time
-- [ ] Extract beats, style, product from spec
-- [ ] Log start message with video_id and beat count
+- [x] Import celery_app
+- [x] Import PhaseOutput from common.schemas
+- [x] Import generate_beat_image from .image_generation
+- [x] Import COST_FLUX_DEV_IMAGE from constants
+- [x] Import time, logging
+- [x] Create logger instance
+- [x] Create `@celery_app.task(bind=True)` decorator
+- [x] Define `generate_storyboard(self, video_id, spec, user_id)` function
+- [x] Add docstring with Args and Returns
+- [x] Record start_time
+- [x] Extract beats, style, product from spec
+- [x] Log start message with video_id and beat count
 
 ### Task 4.5: Implement Storyboard Generation Loop
 
 **File:** `backend/app/phases/phase2_storyboard/task.py` (continued)
 
-- [ ] Wrap in try/except block
-- [ ] Initialize empty storyboard_images list
-- [ ] Initialize total_cost = 0.0
-- [ ] Loop through beats with enumerate:
-  - [ ] Log progress (i+1/total, beat_id)
-  - [ ] Call generate_beat_image(video_id, i, beat, style, product, user_id)
-  - [ ] Append returned dict to storyboard_images
-  - [ ] Add COST_SDXL_IMAGE to total_cost
-- [ ] Log completion with count and cost
+- [x] Wrap in try/except block
+- [x] Initialize empty storyboard_images list
+- [x] Initialize total_cost = 0.0
+- [x] Loop through beats with enumerate:
+  - [x] Log progress (i+1/total, beat_id)
+  - [x] Call generate_beat_image(video_id, i, beat, style, product, user_id)
+  - [x] Append returned dict to storyboard_images
+  - [x] Add image_url to beat in spec
+  - [x] Add COST_FLUX_DEV_IMAGE to total_cost
+- [x] Log completion with count and cost
 
 ### Task 4.6: Implement Success/Failure Paths
 
 **File:** `backend/app/phases/phase2_storyboard/task.py` (continued)
 
-- [ ] Create PhaseOutput with:
-  - [ ] video_id
-  - [ ] phase="phase2_storyboard"
-  - [ ] status="success"
-  - [ ] output_data={"storyboard_images": storyboard_images}
-  - [ ] cost_usd=total_cost
-  - [ ] duration_seconds
-  - [ ] error_message=None
-- [ ] Return output.dict()
-- [ ] In except block:
-  - [ ] Log error
-  - [ ] Create PhaseOutput with status="failed"
-  - [ ] Set error_message
-  - [ ] cost_usd=0.0
-  - [ ] Return output.dict()
+- [x] Create PhaseOutput with:
+  - [x] video_id
+  - [x] phase="phase2_storyboard"
+  - [x] status="success"
+  - [x] output_data={"storyboard_images": storyboard_images, "spec": spec}
+  - [x] cost_usd=total_cost
+  - [x] duration_seconds
+  - [x] error_message=None
+- [x] Return output.dict()
+- [x] In except block:
+  - [x] Log error
+  - [x] Create PhaseOutput with status="failed"
+  - [x] Set error_message
+  - [x] cost_usd=0.0
+  - [x] Return output.dict()
 
 ---
 
@@ -219,16 +217,22 @@ for beat_idx, beat in enumerate(beats):
 
 ---
 
-## ✅ PR #4 & #5 Checklist
+## ✅ PR #4 Checklist
 
 Before merging:
-- [ ] Phase 3 explicitly disabled with clear comments
-- [ ] Phase 2 generates N storyboard images (1 per beat)
-- [ ] Storyboard images stored in database
+- [x] Phase 3 explicitly disabled with clear comments
+- [x] Phase 2 generates N storyboard images (1 per beat)
+- [x] Storyboard images saved to S3 (directly in video_id folder)
+- [x] Image URLs added to each beat in spec
+- [x] All S3 uploads work correctly
+- [x] Cost calculation is accurate
+- [x] Test script created and working
+
+## ✅ PR #5 Checklist (Phase 4 Integration - TODO)
+
+Before merging:
 - [ ] Phase 4 calculates beat-to-chunk mapping correctly
 - [ ] Phase 4 uses storyboard images at beat boundaries
 - [ ] Phase 4 uses last-frame continuation within beats
-- [ ] All S3 uploads work correctly
-- [ ] Cost calculation is accurate
 
 **Next:** Move to `TDD-tasks-3.md` for Phase 4 refinement and end-to-end testing

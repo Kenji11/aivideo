@@ -3,6 +3,7 @@ import time
 from app.orchestrator.celery_app import celery_app
 from app.phases.phase1_validate.task import validate_prompt
 from app.phases.phase2_animatic.task import generate_animatic
+from app.phases.phase2_storyboard.task import generate_storyboard
 from app.phases.phase3_references.task import generate_references
 from app.phases.phase4_chunks.task import generate_chunks
 from app.phases.phase5_refine.task import refine_video
@@ -130,8 +131,45 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
         # finally:
         #     db.close()
         
-        # Set empty animatic_urls for Phase 4 (since Phase 2 is disabled)
+        # Set empty animatic_urls for Phase 4 (since Phase 2 animatic is disabled)
         animatic_urls = []
+        
+        # ============ PHASE 2: GENERATE STORYBOARD (TDD v2.0) ============
+        update_progress(video_id, "generating_storyboard", 25, current_phase="phase2_storyboard")
+        
+        # Run Phase 2 storyboard task synchronously
+        result2_storyboard_obj = generate_storyboard.apply(args=[video_id, spec, user_id])
+        result2_storyboard = result2_storyboard_obj.result
+        
+        # Check Phase 2 storyboard success
+        if result2_storyboard['status'] != "success":
+            raise Exception(f"Phase 2 storyboard failed: {result2_storyboard.get('error_message', 'Unknown error')}")
+        
+        # Update cost tracking
+        total_cost += result2_storyboard['cost_usd']
+        update_cost(video_id, "phase2_storyboard", result2_storyboard['cost_usd'])
+        print(f"💰 Phase 2 Storyboard Cost: ${result2_storyboard['cost_usd']:.4f} | Total: ${total_cost:.4f}")
+        
+        # Extract updated spec with storyboard image URLs in beats
+        spec = result2_storyboard['output_data']['spec']
+        storyboard_images = result2_storyboard['output_data'].get('storyboard_images', [])
+        
+        # Store Phase 2 storyboard output in database
+        db = SessionLocal()
+        try:
+            video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+            if video:
+                if video.phase_outputs is None:
+                    video.phase_outputs = {}
+                video.phase_outputs['phase2_storyboard'] = result2_storyboard
+                # Mark JSON column as modified so SQLAlchemy detects the change
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(video, 'phase_outputs')
+                db.commit()
+        finally:
+            db.close()
+        
+        print(f"✅ Phase 2 Storyboard: Generated {len(storyboard_images)} storyboard images")
         
         # ============ PHASE 3: GENERATE REFERENCE ASSETS ============
         # Skip Phase 3 if user uploaded images - use them directly instead of generating references
@@ -383,9 +421,11 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
         print("="*70)
         print(f"💰 TOTAL COST: ${total_cost:.4f} USD")
         print(f"   - Phase 1 (Validate): ${result1['cost_usd']:.4f}")
-        print(f"   - Phase 3 (References): ${result3['cost_usd']:.4f}")
+        print(f"   - Phase 2 (Storyboard): ${result2_storyboard['cost_usd']:.4f}")
+        if 'result3' in locals() and result3.get('status') != 'skipped':
+            print(f"   - Phase 3 (References): ${result3.get('cost_usd', 0.0):.4f}")
         print(f"   - Phase 4 (Chunks): ${result4['cost_usd']:.4f}")
-        if 'cost_usd' in result5 and result5.get('status') == 'success':
+        if 'result5' in locals() and result5.get('status') == 'success':
             print(f"   - Phase 5 (Refine): ${result5['cost_usd']:.4f}")
         print(f"⏱️  Generation Time: {generation_time:.1f} seconds ({generation_time/60:.1f} minutes)")
         print(f"📹 Video URL: {stitched_video_url}")
