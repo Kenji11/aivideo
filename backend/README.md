@@ -1,5 +1,9 @@
 # Backend README
 
+## Recent Changes
+
+**November 17, 2025**: Migrated from Alembic to raw SQL migrations for better control and to eliminate race conditions in multi-container setups. All migrations are now in `migrations/*.sql` and run via `python migrate.py`.
+
 ## Environment Variables
 
 Create a `.env` file in the `backend/` directory with the following variables:
