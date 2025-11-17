@@ -5,6 +5,9 @@ OpenRouter provides access to multiple LLMs (GPT-4, Claude, etc.) through a sing
 import requests
 from app.config import get_settings
 from typing import Dict, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -194,5 +197,15 @@ class OpenRouterClient:
         except Exception:
             return []
 
-openrouter_client = OpenRouterClient()
+# Initialize with error handling - don't crash on import
+try:
+    openrouter_client = OpenRouterClient()
+    logger.debug("OpenRouter client initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize OpenRouter client: {e}", exc_info=True)
+    # Create a placeholder that will fail on use, but allow import to succeed
+    class FailedClient:
+        def __getattr__(self, name):
+            raise RuntimeError(f"OpenRouter client initialization failed: {e}")
+    openrouter_client = FailedClient()
 

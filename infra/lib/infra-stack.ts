@@ -291,15 +291,18 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     apiService.node.addDependency(redisService);
 
     // Worker Service
+    // Increased memory to 4GB to handle video processing workloads
+    // Video processing (image downloads, PIL operations, video generation, frame extraction)
+    // with 2 concurrent workers requires significant memory
     const workerTaskDefinition = new ecs.FargateTaskDefinition(this, 'WorkerTaskDefinition', {
-      memoryLimitMiB: 512,
-      cpu: 256,
+      memoryLimitMiB: 4096,  // 4GB - increased from 512MB to prevent OOM kills
+      cpu: 1024,  // 1 vCPU - increased to match memory (Fargate requires CPU:Memory ratio)
       executionRole: taskExecutionRole,
     });
 
     const workerContainer = workerTaskDefinition.addContainer('WorkerContainer', {
       image: ecs.ContainerImage.fromRegistry(imageUri),
-      memoryLimitMiB: 512,
+      memoryLimitMiB: 4096,  // 4GB - increased from 512MB
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'worker',
         logGroup,
@@ -311,7 +314,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         'app.orchestrator.celery_app',
         'worker',
         '--loglevel=info',
-        '--concurrency=4',
+        '--concurrency=2',  // Reduced from 4 to 2 to reduce memory pressure per worker
       ],
 
       // MERGED environment block (only one allowed)
