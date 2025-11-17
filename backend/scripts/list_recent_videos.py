@@ -9,6 +9,7 @@ Usage:
 """
 import sys
 import os
+from pathlib import Path
 
 # Add parent directory (backend) to path
 backend_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -17,11 +18,29 @@ sys.path.insert(0, backend_path)
 from sqlalchemy import desc, create_engine, Column, String, Float, DateTime, JSON, Enum as SQLEnum, Integer
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.sql import func
+from dotenv import load_dotenv
 import enum
 import json
 
-# Hardcoded database URL for local testing (Docker postgres exposed on port 5433)
-DATABASE_URL = "postgresql://dev:devpass@localhost:5433/videogen"
+# Load .env file from backend directory
+env_path = Path(__file__).parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+else:
+    # Try loading from current directory as fallback
+    load_dotenv()
+
+# Get database URL from environment variable
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    print("="*70)
+    print("❌ ERROR: DATABASE_URL environment variable not set")
+    print("="*70)
+    print("Please set DATABASE_URL in your .env file or as an environment variable.")
+    print(f"Expected .env file location: {env_path}")
+    print("Example: DATABASE_URL=postgresql://dev:devpass@localhost:5432/videogen")
+    print("="*70)
+    sys.exit(1)
 
 # Create Base without importing from app.database (which requires full config)
 Base = declarative_base()
@@ -147,9 +166,10 @@ def list_recent_videos(limit=5):
         print(f"Error: {str(e)}")
         print("")
         print("💡 TROUBLESHOOTING:")
-        print("   1. Make sure Docker postgres container is running:")
+        print("   1. Make sure DATABASE_URL environment variable is set correctly")
+        print("   2. Make sure Docker postgres container is running:")
         print("      docker-compose up -d postgres")
-        print("   2. Check that database is accessible on localhost:5433")
+        print("   3. Check that database is accessible at the URL specified in DATABASE_URL")
         print("="*70)
     finally:
         db.close()
