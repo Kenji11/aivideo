@@ -1,0 +1,71 @@
+graph TB
+    subgraph "User Interface"
+        User[User]
+        Frontend[React Frontend<br/>Vite + TypeScript<br/>TailwindCSS]
+    end
+
+    subgraph "API Layer"
+        API[FastAPI Server<br/>Port 8000]
+        Routes["/api/generate<br/>/api/status/:id<br/>/api/video/:id<br/>/api/upload"]
+    end
+
+    subgraph "Job Queue"
+        Redis[(Redis<br/>ElastiCache<br/>Job Queue + Results)]
+    end
+
+    subgraph "Worker Tier"
+        Worker[Celery Worker<br/>Pipeline Orchestrator]
+    end
+
+    subgraph "Pipeline Phases"
+        P1[Phase 1: Validation<br/>GPT-4]
+        P2[Phase 2: Storyboard<br/>FLUX Dev]
+        P4[Phase 4: Chunks<br/>Hailuo/Veo]
+        P5[Phase 5: Refine<br/>MusicGen]
+    end
+
+    subgraph "External Services"
+        OpenAI[OpenAI API<br/>GPT-4 Turbo]
+        Replicate[Replicate API<br/>FLUX Dev<br/>Hailuo/Veo<br/>MusicGen]
+    end
+
+    subgraph "Storage"
+        S3[(AWS S3<br/>Storyboard Images<br/>Video Chunks<br/>Final Videos)]
+        DB[(PostgreSQL<br/>Video Metadata<br/>Status & Progress)]
+    end
+
+    User -->|HTTP| Frontend
+    Frontend -->|POST /api/generate| API
+    Frontend -->|GET /api/status/:id| API
+    API -->|Enqueue Task| Redis
+    API -->|Read Status| DB
+    Redis -->|Pull Task| Worker
+    Worker -->|Execute| P1
+    P1 -->|Next| P2
+    P2 -->|Next| P4
+    P4 -->|Next| P5
+    P1 -->|API Call| OpenAI
+    P2 -->|API Call| Replicate
+    P4 -->|API Call| Replicate
+    P5 -->|API Call| Replicate
+    P2 -->|Upload| S3
+    P4 -->|Upload| S3
+    P5 -->|Upload| S3
+    Worker -->|Update Status| DB
+    Worker -->|Store Results| Redis
+    API -->|Presigned URLs| S3
+
+    style User fill:#e1f5ff
+    style Frontend fill:#61dafb
+    style API fill:#009688
+    style Redis fill:#dc382d
+    style Worker fill:#ff9900
+    style P1 fill:#fff3cd
+    style P2 fill:#fff3cd
+    style P4 fill:#fff3cd
+    style P5 fill:#fff3cd
+    style OpenAI fill:#10a37f
+    style Replicate fill:#6366f1
+    style S3 fill:#ff9900
+    style DB fill:#336791
+

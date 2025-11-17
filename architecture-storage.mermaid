@@ -1,0 +1,48 @@
+graph TB
+    subgraph "S3 Bucket Structure"
+        Bucket[s3://ai-video-assets-prod/]
+        
+        subgraph "User Organization"
+            UserID[{user_id}/]
+            
+            subgraph "Video Directory"
+                VideoID[videos/{video_id}/]
+                
+                Storyboard[storyboard/<br/>beat_00.png<br/>beat_01.png<br/>...<br/>beat_NN.png]
+                
+                Chunks[chunks/<br/>chunk_00.mp4<br/>chunk_00_last_frame.png<br/>chunk_01.mp4<br/>chunk_01_last_frame.png<br/>...<br/>chunk_NN.mp4<br/>chunk_NN_last_frame.png]
+                
+                Stitched[stitched.mp4<br/>Phase 4 Output]
+                
+                Final[final.mp4<br/>Phase 5 Output<br/>With Audio]
+            end
+        end
+    end
+    
+    subgraph "Database Schema"
+        VideoGen[(video_generations)]
+        Assets[(assets)]
+        
+        VideoFields["VideoGeneration Fields:<br/>- id (UUID)<br/>- user_id<br/>- prompt, title<br/>- status, progress<br/>- current_phase<br/>- spec (JSON)<br/>- phase_outputs (JSON)<br/>- stitched_url<br/>- final_video_url<br/>- cost_usd<br/>- generation_time_seconds"]
+        
+        AssetFields["Asset Fields:<br/>- id (UUID)<br/>- user_id<br/>- s3_key<br/>- asset_type<br/>- source"]
+    end
+    
+    Bucket --> UserID
+    UserID --> VideoID
+    VideoID --> Storyboard
+    VideoID --> Chunks
+    VideoID --> Stitched
+    VideoID --> Final
+    
+    VideoGen --> VideoFields
+    Assets --> AssetFields
+    
+    style Bucket fill:#ff9900
+    style Storyboard fill:#d1ecf1
+    style Chunks fill:#d1ecf1
+    style Stitched fill:#fff3cd
+    style Final fill:#d4edda
+    style VideoGen fill:#336791
+    style Assets fill:#336791
+

@@ -62,10 +62,17 @@ async def get_video(video_id: str, db: Session = Depends(get_db)) -> VideoRespon
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
     
+    # Convert S3 URL to presigned URL if needed
+    final_video_url = video.final_video_url
+    if final_video_url and final_video_url.startswith('s3://'):
+        from app.services.s3 import s3_client
+        s3_path = final_video_url.replace(f's3://{s3_client.bucket}/', '')
+        final_video_url = s3_client.generate_presigned_url(s3_path, expiration=3600 * 24 * 7)  # 7 days
+    
     return VideoResponse(
         video_id=video.id,
         status=video.status.value,
-        final_video_url=video.final_video_url,
+        final_video_url=final_video_url,
         cost_usd=video.cost_usd,
         generation_time_seconds=video.generation_time_seconds,
         created_at=video.created_at,

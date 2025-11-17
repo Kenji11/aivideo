@@ -1,0 +1,113 @@
+graph TB
+    subgraph "Frontend Layer"
+        App[App.tsx<br/>Main Application]
+        Components[Components/<br/>Header, StepIndicator<br/>UploadZone, etc.]
+        Pages[Pages/<br/>Dashboard, VideoLibrary<br/>Settings, etc.]
+        API_Client[lib/api.ts<br/>API Client Functions]
+    end
+
+    subgraph "Backend API Layer"
+        Main[main.py<br/>FastAPI App]
+        Generate[api/generate.py<br/>POST /api/generate]
+        Status[api/status.py<br/>GET /api/status/:id]
+        Video[api/video.py<br/>GET /api/video/:id]
+        Upload[api/upload.py<br/>POST /api/upload]
+    end
+
+    subgraph "Orchestration Layer"
+        Pipeline[orchestrator/pipeline.py<br/>run_pipeline Task]
+        Progress[orchestrator/progress.py<br/>update_progress]
+        Cost[orchestrator/cost_tracker.py<br/>update_cost]
+        Celery[orchestrator/celery_app.py<br/>Celery Configuration]
+    end
+
+    subgraph "Phase Implementations"
+        P1[phase1_validate/<br/>GPT-4 Validation<br/>Beat Composition]
+        P2[phase2_storyboard/<br/>FLUX Dev Images<br/>1 per beat]
+        P4[phase4_chunks_storyboard/<br/>Video Chunk Generation<br/>Dynamic Mapping]
+        P5[phase5_refine/<br/>Music Generation<br/>Audio Integration]
+    end
+
+    subgraph "Service Layer"
+        OpenAI_Service[services/openai.py<br/>GPT-4 Client]
+        Replicate_Service[services/replicate.py<br/>Replicate API Client]
+        S3_Service[services/s3.py<br/>AWS S3 Client]
+        FFmpeg_Service[services/ffmpeg.py<br/>FFmpeg Utilities]
+    end
+
+    subgraph "Common Layer"
+        Models[common/models.py<br/>VideoGeneration<br/>Asset]
+        Schemas[common/schemas.py<br/>PhaseOutput<br/>StatusResponse]
+        Constants[common/constants.py<br/>Costs, Configs]
+        BeatLibrary[common/beat_library.py<br/>15-Beat Library]
+    end
+
+    subgraph "Data Layer"
+        Database[database.py<br/>SQLAlchemy<br/>Session Management]
+        PostgreSQL[(PostgreSQL<br/>Video Metadata)]
+        Redis[(Redis<br/>Job Queue)]
+    end
+
+    App --> Components
+    App --> Pages
+    App --> API_Client
+    API_Client --> Generate
+    API_Client --> Status
+    API_Client --> Video
+    API_Client --> Upload
+    
+    Generate --> Pipeline
+    Status --> Database
+    Video --> Database
+    Upload --> S3_Service
+    
+    Main --> Generate
+    Main --> Status
+    Main --> Video
+    Main --> Upload
+    
+    Pipeline --> Celery
+    Pipeline --> P1
+    Pipeline --> P2
+    Pipeline --> P4
+    Pipeline --> P5
+    Pipeline --> Progress
+    Pipeline --> Cost
+    
+    P1 --> OpenAI_Service
+    P1 --> Models
+    P1 --> BeatLibrary
+    P1 --> Schemas
+    
+    P2 --> Replicate_Service
+    P2 --> S3_Service
+    P2 --> Schemas
+    
+    P4 --> Replicate_Service
+    P4 --> S3_Service
+    P4 --> FFmpeg_Service
+    P4 --> Constants
+    P4 --> Schemas
+    
+    P5 --> Replicate_Service
+    P5 --> S3_Service
+    P5 --> FFmpeg_Service
+    P5 --> Schemas
+    
+    Progress --> Database
+    Cost --> Database
+    Pipeline --> Database
+    
+    Database --> PostgreSQL
+    Celery --> Redis
+    
+    style App fill:#61dafb
+    style Main fill:#009688
+    style Pipeline fill:#ff9900
+    style P1 fill:#fff3cd
+    style P2 fill:#fff3cd
+    style P4 fill:#fff3cd
+    style P5 fill:#fff3cd
+    style PostgreSQL fill:#336791
+    style Redis fill:#dc382d
+

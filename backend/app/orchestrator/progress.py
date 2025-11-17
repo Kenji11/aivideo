@@ -81,6 +81,18 @@ def update_progress(
         if "generation_time" in kwargs:
             video.generation_time_seconds = kwargs["generation_time"]
         
+        # Store current chunk index for Phase 4 progress tracking
+        if "current_chunk_index" in kwargs:
+            if video.phase_outputs is None:
+                video.phase_outputs = {}
+            if "phase4_chunks" not in video.phase_outputs:
+                video.phase_outputs["phase4_chunks"] = {}
+            video.phase_outputs["phase4_chunks"]["current_chunk_index"] = kwargs["current_chunk_index"]
+            video.phase_outputs["phase4_chunks"]["total_chunks"] = kwargs.get("total_chunks")
+            # Mark JSON column as modified so SQLAlchemy detects the change
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(video, 'phase_outputs')
+        
         # Set completed_at if status is complete
         if status == "complete" and video.completed_at is None:
             video.completed_at = datetime.utcnow()

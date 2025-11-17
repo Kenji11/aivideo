@@ -97,6 +97,8 @@ def calculate_beat_to_chunk_mapping(
     Calculate which chunks start at beat boundaries.
     
     Maps chunk indices to beat indices for chunks that start a new beat.
+    Uses actual beat['start'] values from Phase 1 to ensure accuracy.
+    
     Example: 3 beats (10s + 5s + 5s) with 5s chunks = 4 chunks
     - Beat 0 starts at 0s → Chunk 0
     - Beat 1 starts at 10s → Chunk 2 (10s / 5s per chunk)
@@ -110,13 +112,21 @@ def calculate_beat_to_chunk_mapping(
         Dictionary mapping chunk_idx -> beat_idx for chunks that start a beat
     """
     beat_to_chunk = {}
-    current_time = 0.0
     
     for beat_idx, beat in enumerate(beats):
+        # Use actual beat start time from Phase 1 (more reliable than recalculating)
+        beat_start = beat.get('start', 0.0)
+        
         # Calculate which chunk this beat starts at
-        chunk_idx = int(current_time // actual_chunk_duration)
-        beat_to_chunk[chunk_idx] = beat_idx
-        current_time += beat.get('duration', 5.0)
+        # Account for chunk overlap (25% overlap means chunks are spaced at 75% of duration)
+        chunk_spacing = actual_chunk_duration * 0.75  # 25% overlap
+        chunk_idx = int(beat_start // chunk_spacing) if chunk_spacing > 0 else 0
+        
+        # Only map if this chunk actually starts at or very close to the beat start
+        # (within 0.5 seconds tolerance to handle floating point precision)
+        chunk_start_time = chunk_idx * chunk_spacing
+        if abs(chunk_start_time - beat_start) < 0.5:
+            beat_to_chunk[chunk_idx] = beat_idx
     
     return beat_to_chunk
 
@@ -221,7 +231,7 @@ def build_chunk_specs_with_storyboard(
         uses_storyboard = False
         
         if chunk_num in beat_to_chunk_map:
-            # This chunk starts a new beat - use storyboard image
+            # This chunk starts a new beat - try to use storyboard image
             beat_idx_for_storyboard = beat_to_chunk_map[chunk_num]
             if beat_idx_for_storyboard < len(beats):
                 storyboard_beat = beats[beat_idx_for_storyboard]
@@ -230,7 +240,13 @@ def build_chunk_specs_with_storyboard(
                     uses_storyboard = True
                     print(f"   🎨 Chunk {chunk_num}: Using storyboard image from Beat {beat_idx_for_storyboard}")
                 else:
-                    print(f"   ⚠️  Chunk {chunk_num}: Beat {beat_idx_for_storyboard} has no image_url, will use fallback")
+                    # Beat exists but has no image_url - will use last-frame continuation instead
+                    print(f"   ⚠️  Chunk {chunk_num}: Beat {beat_idx_for_storyboard} has no image_url, will use last-frame continuation")
+                    uses_storyboard = False
+            else:
+                # Beat index out of range - will use last-frame continuation
+                print(f"   ⚠️  Chunk {chunk_num}: Beat index {beat_idx_for_storyboard} out of range ({len(beats)} beats), will use last-frame continuation")
+                uses_storyboard = False
         else:
             # This chunk does NOT start a beat - will use last-frame continuation
             print(f"   🔄 Chunk {chunk_num}: Will use last-frame continuation (does not start a beat)")

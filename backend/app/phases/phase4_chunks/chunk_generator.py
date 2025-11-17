@@ -183,36 +183,58 @@ def build_chunk_specs(
     duration = spec.get('duration', 30)  # Default 30 seconds
     beats = spec.get('beats', [])
     
-    # Get model from spec (or use default)
-    selected_model = spec.get('model', 'hailuo')
+    # Get model from spec (CRITICAL: must be set by pipeline, don't default to hailuo)
+    selected_model = spec.get('model')
+    if not selected_model:
+        raise PhaseException(
+            "Model not specified in spec! "
+            "The pipeline must set spec['model'] before calling Phase 4. "
+            "This is a critical error - model selection is required."
+        )
+    
+    print(f"   🎥 Model from spec: '{selected_model}'")
+    
     try:
         model_config = get_model_config(selected_model)
+        print(f"   ✅ Model config loaded: {model_config.get('name', 'unknown')}")
     except Exception as e:
         print(f"   ⚠️  Invalid model '{selected_model}', falling back to default: {str(e)}")
         model_config = get_default_model()
         selected_model = model_config.get('name', 'hailuo')
+        print(f"   ⚠️  Using fallback model: '{selected_model}'")
     
     # Get model's actual chunk duration (what the model really outputs)
     actual_chunk_duration = model_config.get('actual_chunk_duration', 5.0)  # Default to 5s if not found
     model_name = model_config.get('name', 'unknown')
     
-    # Calculate chunk count based on model's actual output duration
-    # This is the REALITY of what the model outputs, not what we request
-    chunk_count = math.ceil(duration / actual_chunk_duration)
-    chunk_duration = actual_chunk_duration
+    # Check if we have animatic URLs - if not, use text-to-video fallback
+    use_text_to_video = len(animatic_urls) == 0
+    
+    # CRITICAL: If we have storyboard images, use their count as chunk count
+    # Each storyboard image should generate exactly one chunk
+    if not use_text_to_video and len(animatic_urls) > 0:
+        # Use number of storyboard images as chunk count
+        chunk_count = len(animatic_urls)
+        chunk_duration = actual_chunk_duration
+        print(f"   📊 Chunk calculation (using storyboard images):")
+        print(f"      - Storyboard images: {len(animatic_urls)}")
+        print(f"      - Chunk count: {chunk_count} (one chunk per storyboard image)")
+        print(f"      - Model: {model_name}")
+        print(f"      - Model outputs: {actual_chunk_duration}s chunks")
+    else:
+        # Calculate chunk count based on model's actual output duration
+        # This is the REALITY of what the model outputs, not what we request
+        chunk_count = math.ceil(duration / actual_chunk_duration)
+        chunk_duration = actual_chunk_duration
+        print(f"   📊 Chunk calculation (based on duration):")
+        print(f"      - Video duration: {duration}s")
+        print(f"      - Model: {model_name}")
+        print(f"      - Model outputs: {actual_chunk_duration}s chunks")
+        print(f"      - Chunk count: ceil({duration}s / {actual_chunk_duration}s) = {chunk_count} chunks")
     
     # Overlap is 25% of actual chunk duration for smooth transitions
     chunk_overlap = actual_chunk_duration * 0.25
-    
-    print(f"   📊 Chunk calculation:")
-    print(f"      - Video duration: {duration}s")
-    print(f"      - Model: {model_name}")
-    print(f"      - Model outputs: {actual_chunk_duration}s chunks")
-    print(f"      - Chunk count: ceil({duration}s / {actual_chunk_duration}s) = {chunk_count} chunks")
     print(f"      - Overlap: {chunk_overlap:.2f}s (25% of chunk duration)")
-    
-    # Check if we have animatic URLs - if not, use text-to-video fallback
-    use_text_to_video = len(animatic_urls) == 0
     
     # Only validate animatic frames if we're using image-to-video mode
     if not use_text_to_video:
@@ -241,26 +263,56 @@ def build_chunk_specs(
         start_time = chunk_num * (chunk_duration - chunk_overlap)
         duration_actual = chunk_duration
         
-        # Map chunk to corresponding beat
-        # Find beat that covers this chunk's start time
-        beat_index = 0
-        for i, beat in enumerate(beats):
-            beat_start = beat.get('start', 0)
-            beat_duration = beat.get('duration', 5)
-            if start_time >= beat_start and start_time < beat_start + beat_duration:
-                beat_index = i
-                break
-        
-        # Use last beat if we've gone past all beats
-        if beat_index >= len(beats):
-            beat_index = len(beats) - 1
-        
-        beat = beats[beat_index]
-        
-        # Get animatic frame for this chunk (map to beat) - only if available
-        animatic_frame_url = None
-        if not use_text_to_video and animatic_urls:
-            animatic_frame_url = animatic_urls[beat_index] if beat_index < len(animatic_urls) else animatic_urls[-1]
+        # CRITICAL: When using storyboard images, map directly by index
+        # chunk_00 -> animatic_urls[0] (beat_00.png)
+        # chunk_01 -> animatic_urls[1] (beat_01.png)
+        # etc.
+        if not use_text_to_video and len(animatic_urls) > 0:
+            # Direct 1:1 mapping: chunk index = storyboard image index
+            storyboard_index = chunk_num
+            if storyboard_index >= len(animatic_urls):
+                storyboard_index = len(animatic_urls) - 1  # Use last image if out of range
+            
+            animatic_frame_url = animatic_urls[storyboard_index]
+            print(f"   📸 Chunk {chunk_num:02d} -> Storyboard {storyboard_index:02d} ({animatic_frame_url.split('/')[-1]})")
+            
+            # Get corresponding beat if available (for prompt, etc.)
+            beat_index = storyboard_index if storyboard_index < len(beats) else len(beats) - 1
+            beat = beats[beat_index] if beats else {}
+        else:
+            # Map chunk to corresponding beat (for text-to-video or when no storyboard)
+            # Find beat that covers this chunk's start time
+            beat_index = 0
+            for i, beat_item in enumerate(beats):
+                beat_start = beat_item.get('start', 0)
+                beat_duration = beat_item.get('duration', 5)
+                if start_time >= beat_start and start_time < beat_start + beat_duration:
+                    beat_index = i
+                    break
+            
+            # Use last beat if we've gone past all beats
+            if beat_index >= len(beats):
+                beat_index = len(beats) - 1
+            
+            beat = beats[beat_index] if beats else {}
+            
+            # Get storyboard image for this chunk (map to beat) - use beat['image_url'] from Phase 2
+            # Phase 2 stores storyboard images directly in beat['image_url']
+            animatic_frame_url = None
+            if not use_text_to_video:
+                # First try to get image_url from the beat (from Phase 2 storyboard)
+                beat_image_url = beat.get('image_url')
+                if beat_image_url:
+                    animatic_frame_url = beat_image_url
+                    print(f"   📸 Chunk {chunk_num}: Using storyboard image from beat {beat_index} (Phase 2)")
+                elif animatic_urls and beat_index < len(animatic_urls):
+                    # Fallback to animatic_urls list if beat doesn't have image_url
+                    animatic_frame_url = animatic_urls[beat_index]
+                    print(f"   📸 Chunk {chunk_num}: Using animatic URL from list (fallback)")
+                elif animatic_urls:
+                    # Use last animatic URL if beat_index is out of range
+                    animatic_frame_url = animatic_urls[-1]
+                    print(f"   📸 Chunk {chunk_num}: Using last animatic URL (fallback)")
         
         # Build prompt from beat (keep concise, ~50-100 words)
         prompt_template = beat.get('prompt_template', '')
@@ -348,14 +400,23 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
     chunk_start_time = time.time()
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # Get model configuration (from chunk spec or default)
-    selected_model = chunk_spec_obj.model or 'hailuo'
+    # Get model configuration (from chunk spec - CRITICAL: must be set, don't default)
+    selected_model = chunk_spec_obj.model
+    if not selected_model:
+        raise PhaseException(
+            f"Model not specified in chunk spec for chunk {chunk_num}! "
+            "This is a critical error - model selection is required."
+        )
+    
+    print(f"   🎥 Chunk {chunk_num} using model: '{selected_model}'")
+    
     try:
         model_config = get_model_config(selected_model)
     except Exception as e:
         print(f"   ⚠️  Invalid model '{selected_model}', falling back to default: {str(e)}")
         model_config = get_default_model()
         selected_model = model_config.get('name', 'hailuo')
+        print(f"   ⚠️  Using fallback model: '{selected_model}'")
     
     model_name = model_config['replicate_model']
     model_params = model_config['params']

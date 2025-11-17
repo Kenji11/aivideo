@@ -1,0 +1,51 @@
+graph TB
+    Start[Phase 4 Starts<br/>Spec with N storyboard images]
+    
+    subgraph "Dynamic Chunk Planning"
+        Count[Calculate Chunk Count<br/>ceil(duration / actual_chunk_duration)<br/>Example: ceil(30s / 5s) = 6 chunks]
+        Map[Calculate Beat-to-Chunk Mapping<br/>Uses actual beat['start'] values<br/>Accounts for 25% chunk overlap]
+        Validate[Validate Storyboard Images<br/>Count images in spec['beats']<br/>Works with 1, 3, 10, or any number]
+    end
+    
+    subgraph "Sequential Chunk Generation"
+        Loop[For each chunk 0 to N-1]
+        
+        Check{Chunk starts<br/>beat boundary?}
+        
+        Storyboard[Use Storyboard Image<br/>Download from S3<br/>beat['image_url']]
+        
+        LastFrame[Use Last Frame<br/>Download from S3<br/>chunk_{i-1}_last_frame.png]
+        
+        Generate[Generate Chunk<br/>Replicate API<br/>~45s per chunk]
+        
+        Extract[Extract Last Frame<br/>FFmpeg<br/>Upload to S3]
+        
+        Check -->|Yes| Storyboard
+        Check -->|No| LastFrame
+        Storyboard --> Generate
+        LastFrame --> Generate
+        Generate --> Extract
+        Extract -->|Next Chunk| Loop
+    end
+    
+    subgraph "Stitching"
+        Stitch[Stitch All Chunks<br/>FFmpeg concat<br/>With transitions]
+        Upload[Upload Stitched Video<br/>S3: stitched.mp4]
+    end
+    
+    Start --> Count
+    Count --> Map
+    Map --> Validate
+    Validate --> Loop
+    Loop -->|All Chunks| Stitch
+    Stitch --> Upload
+    Upload --> End[Phase 4 Complete<br/>Return stitched_video_url]
+    
+    style Start fill:#e1f5ff
+    style End fill:#d4edda
+    style Check fill:#fff3cd
+    style Storyboard fill:#d1ecf1
+    style LastFrame fill:#d1ecf1
+    style Generate fill:#f8d7da
+    style Stitch fill:#d4edda
+
