@@ -256,6 +256,9 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         // AWS Credentials - from environment variables (set by GitHub Actions)
         AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || '',
         AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || '',
+        // Application environment - explicitly set for production
+        ENVIRONMENT: 'production',
+        DEBUG: 'false',
       },
       portMappings: [
         {
@@ -324,6 +327,9 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         // AWS Credentials - from environment variables (set by GitHub Actions)
         AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || '',
         AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || '',
+        // Application environment - explicitly set for production
+        ENVIRONMENT: 'production',
+        DEBUG: 'false',
       },
 
       healthCheck: {
