@@ -4,7 +4,10 @@ import json
 from datetime import datetime
 from typing import List, Dict
 from celery import group
-from app.phases.phase4_chunks.chunk_generator import generate_single_chunk, build_chunk_specs
+from app.phases.phase4_chunks_storyboard.chunk_generator import (
+    generate_single_chunk_with_storyboard,
+    build_chunk_specs_with_storyboard
+)
 from app.common.exceptions import PhaseException
 
 
@@ -14,6 +17,64 @@ class ChunkGenerationService:
     def __init__(self):
         """Initialize the service with cost tracking"""
         self.total_cost = 0.0
+        self.beat_to_chunk_map = None
+        self.chunk_to_beat_map = None  # Reverse mapping: chunk_idx -> beat_idx for all chunks
+    
+    def _should_use_last_frame(self, chunk_idx: int, spec: Dict) -> bool:
+        """
+        Determine if a chunk should use last-frame continuation.
+        
+        Only use last-frame if:
+        1. Chunk does NOT start a new beat (not in beat_to_chunk_map)
+        2. Previous chunk is part of the same beat (beat spans multiple chunks)
+        
+        Args:
+            chunk_idx: Current chunk index
+            spec: Video specification with beats
+            
+        Returns:
+            True if should use last-frame continuation, False otherwise
+        """
+        if chunk_idx == 0:
+            # Chunk 0 never uses last-frame (it starts a beat or uses storyboard)
+            return False
+        
+        # If this chunk starts a beat, it uses storyboard image (no last-frame)
+        if chunk_idx in self.beat_to_chunk_map:
+            return False
+        
+        # Find which beat this chunk belongs to
+        beats = spec.get('beats', [])
+        if not self.chunk_to_beat_map:
+            # Build reverse mapping: chunk_idx -> beat_idx for all chunks
+            from app.phases.phase4_chunks_storyboard.model_config import get_default_model, get_model_config
+            selected_model = spec.get('model', 'hailuo')
+            try:
+                model_config = get_model_config(selected_model)
+            except Exception:
+                model_config = get_default_model()
+            actual_chunk_duration = model_config.get('actual_chunk_duration', 5.0)
+            
+            # Calculate which beat each chunk belongs to
+            self.chunk_to_beat_map = {}
+            current_time = 0.0
+            for beat_idx, beat in enumerate(beats):
+                beat_duration = beat.get('duration', 5.0)
+                beat_start_chunk = int(current_time // actual_chunk_duration)
+                beat_end_chunk = int((current_time + beat_duration) // actual_chunk_duration)
+                
+                # All chunks from beat_start_chunk to beat_end_chunk belong to this beat
+                for chunk_idx_in_beat in range(beat_start_chunk, beat_end_chunk + 1):
+                    self.chunk_to_beat_map[chunk_idx_in_beat] = beat_idx
+                
+                current_time += beat_duration
+        
+        # Check if current chunk and previous chunk are in the same beat
+        current_beat = self.chunk_to_beat_map.get(chunk_idx)
+        previous_beat = self.chunk_to_beat_map.get(chunk_idx - 1)
+        
+        # Use last-frame only if both chunks are in the same beat (beat spans multiple chunks)
+        return current_beat is not None and current_beat == previous_beat
     
     def generate_all_chunks(
         self,
@@ -71,16 +132,23 @@ class ChunkGenerationService:
             print(f"   Reference URLs: {json.dumps(reference_urls, indent=2) if reference_urls else '{}'}")
             print("="*70)
             
-            # Build chunk specifications
-            print(f"🔨 Building chunk specifications for {video_id}...")
-            chunk_specs = build_chunk_specs(video_id, spec, animatic_urls, reference_urls, user_id)
+            # Build chunk specifications using storyboard logic
+            print(f"🔨 Building chunk specifications for {video_id} (Storyboard Mode)...")
+            chunk_specs, beat_to_chunk_map = build_chunk_specs_with_storyboard(
+                video_id=video_id,
+                spec=spec,
+                reference_urls=reference_urls,
+                user_id=user_id
+            )
+            self.beat_to_chunk_map = beat_to_chunk_map  # Store for retry logic
             num_chunks = len(chunk_specs)
             
             print(f"Generating {num_chunks} chunks in parallel...")
             
-            # Generate chunks sequentially for now to ensure temporal consistency
-            # Chunk 0 can be generated immediately, but chunks 1+ need previous chunk's last frame
-            # TODO: Optimize to generate in batches (chunk 0 first, then 1+ in parallel)
+            # Generate chunks sequentially
+            # Only chunks within the same beat (beat spans multiple chunks) use last-frame continuation
+            # Chunks that start new beats use storyboard images
+            # Chunks that are the only chunk in a beat are independent
             chunk_urls = []
             last_frame_urls = []
             failed_chunks = []
@@ -100,12 +168,26 @@ class ChunkGenerationService:
                         current_phase="phase4_chunks"
                     )
                     
-                    # Update previous_chunk_last_frame if available
-                    if i > 0 and i - 1 < len(last_frame_urls) and last_frame_urls[i - 1]:
-                        chunk_spec.previous_chunk_last_frame = last_frame_urls[i - 1]
+                    # Update previous_chunk_last_frame only if this chunk is part of a beat that spans multiple chunks
+                    if self._should_use_last_frame(i, spec):
+                        if i - 1 < len(last_frame_urls) and last_frame_urls[i - 1]:
+                            chunk_spec.previous_chunk_last_frame = last_frame_urls[i - 1]
+                            print(f"   🔄 Chunk {i}: Using last-frame continuation (same beat as previous chunk)")
+                        else:
+                            print(f"   ⚠️  Warning: Chunk {i} should use last-frame but previous chunk's last frame not available")
+                    else:
+                        # Chunk is independent (starts new beat or beat only needs one chunk)
+                        chunk_spec.previous_chunk_last_frame = None
+                        if i in self.beat_to_chunk_map:
+                            print(f"   🎨 Chunk {i}: Using storyboard image (starts new beat)")
+                        else:
+                            print(f"   📸 Chunk {i}: Independent chunk (beat only needs one chunk)")
                     
                     # Generate chunk synchronously (using apply to get result immediately)
-                    result = generate_single_chunk.apply(args=[chunk_spec.dict()])
+                    # Use storyboard-aware function
+                    result = generate_single_chunk_with_storyboard.apply(
+                        args=[chunk_spec.dict(), self.beat_to_chunk_map]
+                    )
                     
                     # Accessing result.result may raise an exception if the task failed
                     try:
@@ -119,7 +201,13 @@ class ChunkGenerationService:
                     
                     if isinstance(chunk_result, dict) and 'chunk_url' in chunk_result:
                         chunk_urls.append(chunk_result['chunk_url'])
-                        last_frame_urls.append(chunk_result.get('last_frame_url'))
+                        # Only store last_frame_url if it will be used by next chunk
+                        # (i.e., if next chunk is part of same beat)
+                        if i + 1 < num_chunks and self._should_use_last_frame(i + 1, spec):
+                            last_frame_urls.append(chunk_result.get('last_frame_url'))
+                        else:
+                            # Next chunk is independent, don't need to store last frame
+                            last_frame_urls.append(None)
                         # Use cost from result (calculated using model config in chunk_generator)
                         self.total_cost += chunk_result.get('cost', 0.0)
                         print(f"   ✅ Chunk {i+1}/{num_chunks} generated successfully ({len(chunk_urls)}/{num_chunks} complete)")
@@ -137,7 +225,7 @@ class ChunkGenerationService:
                 print(f"Retrying {len(failed_chunks)} failed chunks...")
                 # Sort by chunk index to retry in order
                 failed_chunks.sort(key=lambda x: x[0])
-                retry_results = self._retry_failed_chunks(failed_chunks, last_frame_urls)
+                retry_results = self._retry_failed_chunks(failed_chunks, last_frame_urls, spec)
                 
                 # Add retry results (maintain order)
                 for i, retry_result in retry_results:
@@ -178,14 +266,15 @@ class ChunkGenerationService:
         except Exception as e:
             raise PhaseException(f"Failed to generate chunks: {str(e)}")
     
-    def _retry_failed_chunks(self, failed_chunks: List[tuple], last_frame_urls: List[str]) -> List[tuple]:
+    def _retry_failed_chunks(self, failed_chunks: List[tuple], last_frame_urls: List[str], spec: Dict) -> List[tuple]:
         """
         Retry failed chunks individually (not in parallel).
-        Maintains temporal consistency by setting previous_chunk_last_frame.
+        Maintains temporal consistency by setting previous_chunk_last_frame only when needed.
         
         Args:
             failed_chunks: List of (chunk_index, ChunkSpec) tuples for failed chunks (must be sorted by index)
             last_frame_urls: List of last_frame_urls from successfully generated chunks (for temporal consistency)
+            spec: Video specification with beats (needed to determine if last-frame should be used)
             
         Returns:
             List of (chunk_index, result) tuples
@@ -203,8 +292,8 @@ class ChunkGenerationService:
                 print(f"🔄 Retrying chunk {chunk_index} (attempt {retry_count}/{max_retries})...")
                 
                 try:
-                    # Update previous_chunk_last_frame if this chunk needs it
-                    if chunk_index > 0:
+                    # Update previous_chunk_last_frame only if this chunk is part of a beat that spans multiple chunks
+                    if self._should_use_last_frame(chunk_index, spec):
                         # Find previous chunk's last frame (from successful chunks or retried chunks)
                         prev_frame_url = None
                         if chunk_index - 1 < len(last_frame_urls):
@@ -218,12 +307,22 @@ class ChunkGenerationService:
                         
                         if prev_frame_url:
                             chunk_spec.previous_chunk_last_frame = prev_frame_url
-                            print(f"   Using previous chunk's last frame: {prev_frame_url[:60]}...")
+                            print(f"   🔄 Using previous chunk's last frame (same beat): {prev_frame_url[:60]}...")
                         else:
                             print(f"   ⚠️  Warning: Chunk {chunk_index} requires previous chunk's last frame, but it's not available")
+                    else:
+                        # Chunk is independent, don't use last-frame
+                        chunk_spec.previous_chunk_last_frame = None
+                        if chunk_index in self.beat_to_chunk_map:
+                            print(f"   🎨 Chunk {chunk_index}: Using storyboard image (starts new beat)")
+                        else:
+                            print(f"   📸 Chunk {chunk_index}: Independent chunk (beat only needs one chunk)")
                     
                     # Generate chunk synchronously (using apply to get result immediately)
-                    result = generate_single_chunk.apply(args=[chunk_spec.dict()])
+                    # Use storyboard-aware function
+                    result = generate_single_chunk_with_storyboard.apply(
+                        args=[chunk_spec.dict(), self.beat_to_chunk_map]
+                    )
                     
                     # Accessing result.result may raise an exception if the task failed
                     try:
@@ -240,13 +339,36 @@ class ChunkGenerationService:
                         retry_results.append((chunk_index, chunk_result))
                         success = True
                         print(f"   ✅ Chunk {chunk_index} retry {retry_count} succeeded!")
-                        # Update last_frame_urls for future chunks
-                        if chunk_index < len(last_frame_urls):
-                            last_frame_urls[chunk_index] = chunk_result.get('last_frame_url')
+                        # Only store last_frame_url if it will be used by next chunk
+                        # (i.e., if next chunk is part of same beat)
+                        # We need to determine the total number of chunks to check if there's a next chunk
+                        from app.phases.phase4_chunks_storyboard.model_config import get_default_model, get_model_config
+                        import math
+                        selected_model = spec.get('model', 'hailuo')
+                        try:
+                            model_config = get_model_config(selected_model)
+                        except Exception:
+                            model_config = get_default_model()
+                        actual_chunk_duration = model_config.get('actual_chunk_duration', 5.0)
+                        duration = spec.get('duration', 30)
+                        num_chunks = math.ceil(duration / actual_chunk_duration)
+                        
+                        if chunk_index + 1 < num_chunks and self._should_use_last_frame(chunk_index + 1, spec):
+                            # Next chunk will need this last frame
+                            if chunk_index < len(last_frame_urls):
+                                last_frame_urls[chunk_index] = chunk_result.get('last_frame_url')
+                            else:
+                                while len(last_frame_urls) <= chunk_index:
+                                    last_frame_urls.append(None)
+                                last_frame_urls[chunk_index] = chunk_result.get('last_frame_url')
                         else:
-                            while len(last_frame_urls) <= chunk_index:
-                                last_frame_urls.append(None)
-                            last_frame_urls[chunk_index] = chunk_result.get('last_frame_url')
+                            # Next chunk is independent, don't store last frame
+                            if chunk_index < len(last_frame_urls):
+                                last_frame_urls[chunk_index] = None
+                            else:
+                                while len(last_frame_urls) <= chunk_index:
+                                    last_frame_urls.append(None)
+                                last_frame_urls[chunk_index] = None
                     else:
                         # Task completed but returned invalid result
                         error_msg = chunk_result.get('error', str(chunk_result)) if isinstance(chunk_result, dict) else str(chunk_result)
