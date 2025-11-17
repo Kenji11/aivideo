@@ -1,6 +1,9 @@
 # Celery configuration
+import logging
 from celery import Celery
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -36,9 +39,47 @@ celery_app.conf.update(
 
 # Import tasks to register them with Celery
 # This ensures tasks are available when worker starts
-from app.orchestrator import pipeline  # noqa: F401
-from app.phases.phase1_validate import task as phase1_task  # noqa: F401
-from app.phases.phase2_animatic import task as phase2_task  # noqa: F401
-from app.phases.phase3_references import task as phase3_task  # noqa: F401
-from app.phases.phase4_chunks import task as phase4_task  # noqa: F401
-from app.phases.phase5_refine import task as phase5_task  # noqa: F401
+logger.info("Importing task modules...")
+try:
+    from app.orchestrator import pipeline  # noqa: F401
+    logger.info("✓ Imported app.orchestrator.pipeline")
+except Exception as e:
+    logger.error(f"✗ Failed to import app.orchestrator.pipeline: {e}", exc_info=True)
+    raise
+
+try:
+    from app.phases.phase1_validate import task as phase1_task  # noqa: F401
+    logger.info("✓ Imported app.phases.phase1_validate.task")
+except Exception as e:
+    logger.error(f"✗ Failed to import app.phases.phase1_validate.task: {e}", exc_info=True)
+    raise
+
+try:
+    from app.phases.phase2_animatic import task as phase2_task  # noqa: F401
+    logger.info("✓ Imported app.phases.phase2_animatic.task")
+except Exception as e:
+    logger.error(f"✗ Failed to import app.phases.phase2_animatic.task: {e}", exc_info=True)
+    raise
+
+try:
+    from app.phases.phase3_references import task as phase3_task  # noqa: F401
+    logger.info("✓ Imported app.phases.phase3_references.task")
+except Exception as e:
+    logger.error(f"✗ Failed to import app.phases.phase3_references.task: {e}", exc_info=True)
+    raise
+
+try:
+    from app.phases.phase4_chunks import task as phase4_task  # noqa: F401
+    logger.info("✓ Imported app.phases.phase4_chunks.task")
+except Exception as e:
+    logger.error(f"✗ Failed to import app.phases.phase4_chunks.task: {e}", exc_info=True)
+    raise
+
+try:
+    from app.phases.phase5_refine import task as phase5_task  # noqa: F401
+    logger.info("✓ Imported app.phases.phase5_refine.task")
+except Exception as e:
+    logger.error(f"✗ Failed to import app.phases.phase5_refine.task: {e}", exc_info=True)
+    raise
+
+logger.info("All task modules imported successfully")

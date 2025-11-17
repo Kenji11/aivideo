@@ -1,6 +1,9 @@
 import replicate
 from app.config import get_settings
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -76,4 +79,16 @@ class ReplicateClient:
                 )
             raise Exception(f"Replicate API error: {error_msg}")
 
-replicate_client = ReplicateClient()
+# Initialize with error handling - don't crash on import
+try:
+    replicate_client = ReplicateClient()
+    logger.debug("Replicate client initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize Replicate client: {e}", exc_info=True)
+    # Create a placeholder that will fail on use, but allow import to succeed
+    class FailedClient:
+        def __getattr__(self, name):
+            raise RuntimeError(f"Replicate client initialization failed: {e}")
+        def run(self, *args, **kwargs):
+            raise RuntimeError(f"Replicate client initialization failed: {e}")
+    replicate_client = FailedClient()

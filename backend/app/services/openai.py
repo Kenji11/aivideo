@@ -1,6 +1,9 @@
 from openai import OpenAI
 from app.config import get_settings
 import httpx
+import logging
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -28,4 +31,14 @@ class OpenAIClient:
     def chat(self):
         return self.client.chat
 
-openai_client = OpenAIClient()
+# Initialize with error handling - don't crash on import
+try:
+    openai_client = OpenAIClient()
+    logger.debug("OpenAI client initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize OpenAI client: {e}", exc_info=True)
+    # Create a placeholder that will fail on use, but allow import to succeed
+    class FailedClient:
+        def __getattr__(self, name):
+            raise RuntimeError(f"OpenAI client initialization failed: {e}")
+    openai_client = FailedClient()
