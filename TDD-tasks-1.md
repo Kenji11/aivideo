@@ -113,79 +113,78 @@
 
 ### Task 2.1: Create Phase 1 Directory Structure
 
-- [ ] Create directory `backend/app/phases/phase1_planning/`
-- [ ] Create `__init__.py` in phase1_planning
-- [ ] Create `task.py` in phase1_planning
-- [ ] Create `prompts.py` in phase1_planning (for system prompt)
-- [ ] Create `validation.py` in phase1_planning
+- [x] Use existing directory `backend/app/phases/phase1_validate/`
+- [x] Keep existing `__init__.py`, `task.py`, `service.py`, `schemas.py`
+- [x] Create `prompts.py` in phase1_validate (for system prompt)
+- [x] Create `validation.py` in phase1_validate
 
 ### Task 2.2: Implement System Prompt Builder
 
-**File:** `backend/app/phases/phase1_planning/prompts.py`
+**File:** `backend/app/phases/phase1_validate/prompts.py`
 
-- [ ] Import `BEAT_LIBRARY` from common
-- [ ] Import `TEMPLATE_ARCHETYPES` from common
-- [ ] Import `json` module
-- [ ] Create `build_planning_system_prompt() -> str` function
-- [ ] Add archetype description section in prompt
-- [ ] Add beat library description section in prompt
-- [ ] Add task instructions (4 steps: understand, select, compose, style)
-- [ ] Add critical constraints section:
-  - [ ] Total duration must equal user's request
-  - [ ] Each beat must be 5s, 10s, or 15s
-  - [ ] First beat from opening beats
-  - [ ] Last beat from closing beats
-  - [ ] Sum of durations must equal total
-- [ ] Add JSON output format specification
-- [ ] Add validation checklist section
-- [ ] Return complete system prompt string
+- [x] Import `BEAT_LIBRARY` from common
+- [x] Import `TEMPLATE_ARCHETYPES` from common
+- [x] Import `json` module
+- [x] Create `build_planning_system_prompt() -> str` function
+- [x] Add archetype description section in prompt
+- [x] Add beat library description section in prompt
+- [x] Add task instructions (4 steps: understand, select, compose, style)
+- [x] Add critical constraints section:
+  - [x] Total duration must equal user's request
+  - [x] Each beat must be 5s, 10s, or 15s
+  - [x] First beat from opening beats
+  - [x] Last beat from closing beats
+  - [x] Sum of durations must equal total
+- [x] Add JSON output format specification
+- [x] Add validation checklist section
+- [x] Return complete system prompt string
 
 ### Task 2.3: Implement Spec Validation
 
-**File:** `backend/app/phases/phase1_planning/validation.py`
+**File:** `backend/app/phases/phase1_validate/validation.py`
 
-- [ ] Import `BEAT_LIBRARY` from common
-- [ ] Import `logging`
-- [ ] Create logger instance
-- [ ] Create `validate_spec(spec: dict) -> None` function
-- [ ] Check beat durations sum to total duration
-- [ ] Raise ValueError if sum doesn't match
-- [ ] Check all beat durations are 5, 10, or 15 seconds
-- [ ] Raise ValueError if invalid duration found
-- [ ] Check all beat_ids exist in BEAT_LIBRARY
-- [ ] Raise ValueError if unknown beat_id found
-- [ ] Check at least one beat exists
-- [ ] Raise ValueError if no beats
-- [ ] Add warnings (not errors) for:
-  - [ ] First beat not from opening beats
-  - [ ] Last beat not from closing beats
-- [ ] Log success message when validation passes
+- [x] Import `BEAT_LIBRARY` from common
+- [x] Import `logging`
+- [x] Create logger instance
+- [x] Create `validate_spec(spec: dict) -> None` function
+- [x] Check beat durations sum to total duration
+- [x] Raise ValueError if sum doesn't match
+- [x] Check all beat durations are 5, 10, or 15 seconds
+- [x] Raise ValueError if invalid duration found
+- [x] Check all beat_ids exist in BEAT_LIBRARY
+- [x] Raise ValueError if unknown beat_id found
+- [x] Check at least one beat exists
+- [x] Raise ValueError if no beats
+- [x] Add warnings (not errors) for:
+  - [x] First beat not from opening beats
+  - [x] Last beat not from closing beats
+- [x] Log success message when validation passes
 
 ### Task 2.4: Implement Spec Builder
 
-**File:** `backend/app/phases/phase1_planning/validation.py` (continued)
+**File:** `backend/app/phases/phase1_validate/validation.py` (continued)
 
-- [ ] Create `build_full_spec(llm_output: dict, video_id: str) -> dict` function
-- [ ] Extract `intent_analysis` from LLM output
-- [ ] Extract `beat_sequence` from LLM output
-- [ ] Extract `style` from LLM output
-- [ ] Initialize `current_time = 0`
-- [ ] Initialize empty `full_beats` list
-- [ ] Loop through beat_sequence:
-  - [ ] Get beat_id and duration
-  - [ ] Validate beat_id exists in BEAT_LIBRARY
-  - [ ] Get beat_template from library
-  - [ ] Copy all fields from template
-  - [ ] Set `start` to current_time
-  - [ ] Set `duration` from beat_sequence
-  - [ ] Fill in prompt_template with product name and style
-  - [ ] Append to full_beats
-  - [ ] Increment current_time
-- [ ] Build final spec dictionary with:
-  - [ ] template, duration, fps, resolution
-  - [ ] product, style, beats
-  - [ ] llm_reasoning section
-- [ ] Return spec
+- [x] Create `build_full_spec(llm_output: dict, video_id: str) -> dict` function
+- [x] Extract `intent_analysis` from LLM output
+- [x] Extract `beat_sequence` from LLM output
+- [x] Extract `style` from LLM output
+- [x] Initialize `current_time = 0`
+- [x] Initialize empty `full_beats` list
+- [x] Loop through beat_sequence:
+  - [x] Get beat_id and duration
+  - [x] Validate beat_id exists in BEAT_LIBRARY
+  - [x] Get beat_template from library
+  - [x] Copy all fields from template
+  - [x] Set `start` to current_time
+  - [x] Set `duration` from beat_sequence
+  - [x] Fill in prompt_template with product name and style
+  - [x] Append to full_beats
+  - [x] Increment current_time
+- [x] Build final spec dictionary with:
+  - [x] template, duration, fps, resolution
+  - [x] product, style, beats
+  - [x] llm_reasoning section
+- [x] Return spec
 
 ---
 
@@ -193,63 +192,63 @@
 
 ### Task 3.1: Implement Main Phase 1 Task
 
-**File:** `backend/app/phases/phase1_planning/task.py`
+**File:** `backend/app/phases/phase1_validate/task_intelligent.py`
 
-- [ ] Import celery_app
-- [ ] Import PhaseOutput from common.schemas
-- [ ] Import openai_client from services
-- [ ] Import build_planning_system_prompt from .prompts
-- [ ] Import validate_spec, build_full_spec from .validation
-- [ ] Import BEAT_COMPOSITION_CREATIVITY, get_planning_temperature from constants
-- [ ] Import json, time, logging
-- [ ] Create logger instance
-- [ ] Create `@celery_app.task(bind=True)` decorator
-- [ ] Define `plan_video_intelligent(self, video_id, prompt, creativity_level=None)` function
-- [ ] Add docstring with Args and Returns
-- [ ] Record start_time
-- [ ] Set creativity_level to config default if None
-- [ ] Log start message with video_id, prompt, creativity_level
+- [x] Import celery_app
+- [x] Import PhaseOutput from common.schemas
+- [x] Import openai_client from services
+- [x] Import build_planning_system_prompt from .prompts
+- [x] Import validate_spec, build_full_spec from .validation
+- [x] Import BEAT_COMPOSITION_CREATIVITY, get_planning_temperature from constants
+- [x] Import json, time, logging
+- [x] Create logger instance
+- [x] Create `@celery_app.task(bind=True)` decorator
+- [x] Define `plan_video_intelligent(self, video_id, prompt, creativity_level=None)` function
+- [x] Add docstring with Args and Returns
+- [x] Record start_time
+- [x] Set creativity_level to config default if None
+- [x] Log start message with video_id, prompt, creativity_level
 
 ### Task 3.2: Implement LLM Call Logic
 
-**File:** `backend/app/phases/phase1_planning/task.py` (continued)
+**File:** `backend/app/phases/phase1_validate/task_intelligent.py` (continued)
 
-- [ ] Wrap main logic in try/except block
-- [ ] Call `build_planning_system_prompt()` to get system prompt
-- [ ] Build user_message: "Create a video advertisement: {prompt}"
-- [ ] Calculate temperature using `get_planning_temperature(creativity_level)`
-- [ ] Log temperature being used
-- [ ] Call `openai_client.chat.completions.create` with:
-  - [ ] model="gpt-4-turbo-preview"
-  - [ ] messages=[system, user]
-  - [ ] response_format={"type": "json_object"}
-  - [ ] temperature=calculated_temperature
-- [ ] Parse response as JSON
-- [ ] Log selected archetype
-- [ ] Log number of beats composed
+- [x] Wrap main logic in try/except block
+- [x] Call `build_planning_system_prompt()` to get system prompt
+- [x] Build user_message: "Create a video advertisement: {prompt}"
+- [x] Calculate temperature using `get_planning_temperature(creativity_level)`
+- [x] Log temperature being used
+- [x] Call `openai_client.chat.completions.create` with:
+  - [x] model="gpt-4-turbo-preview"
+  - [x] messages=[system, user]
+  - [x] response_format={"type": "json_object"}
+  - [x] temperature=calculated_temperature
+- [x] Parse response as JSON
+- [x] Log selected archetype
+- [x] Log number of beats composed
 
 ### Task 3.3: Implement Success/Failure Paths
 
-**File:** `backend/app/phases/phase1_planning/task.py` (continued)
+**File:** `backend/app/phases/phase1_validate/task_intelligent.py` (continued)
 
-- [ ] Call `build_full_spec(llm_output, video_id)`
-- [ ] Call `validate_spec(spec)`
-- [ ] Log completion message
-- [ ] Create PhaseOutput with:
-  - [ ] video_id
-  - [ ] phase="phase1_planning"
-  - [ ] status="success"
-  - [ ] output_data={"spec": spec}
-  - [ ] cost_usd=0.02
-  - [ ] duration_seconds
-  - [ ] error_message=None
-- [ ] Return output.dict()
-- [ ] In except block:
-  - [ ] Log error with video_id
-  - [ ] Create PhaseOutput with status="failed"
-  - [ ] Set error_message=str(e)
-  - [ ] cost_usd=0.0
-  - [ ] Return output.dict()
+- [x] Call `build_full_spec(llm_output, video_id)`
+- [x] Call `validate_spec(spec)`
+- [x] Log completion message
+- [x] Create PhaseOutput with:
+  - [x] video_id
+  - [x] phase="phase1_planning"
+  - [x] status="success"
+  - [x] output_data={"spec": spec}
+  - [x] cost_usd=0.02
+  - [x] duration_seconds
+  - [x] error_message=None
+- [x] Return output.dict()
+- [x] In except block:
+  - [x] Log error with video_id
+  - [x] Create PhaseOutput with status="failed"
+  - [x] Set error_message=str(e)
+  - [x] cost_usd=0.0
+  - [x] Return output.dict()
 
 ---
 
