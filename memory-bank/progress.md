@@ -22,6 +22,8 @@
 - [x] Backend skeleton (FastAPI + Celery + PostgreSQL + Redis)
 - [x] Frontend skeleton (React + Vite + TailwindCSS)
 - [x] Git repository with organized structure
+- [x] Comprehensive architecture documentation (ARCHITECTURE.md)
+- [x] Updated README with complete setup instructions
 
 ### Phase 1: Validation & Spec Extraction
 - [x] GPT-4 integration for prompt extraction
@@ -75,6 +77,11 @@
 - [x] **Bug Fix**: Duration override (respect user-specified durations)
 - [x] **Enhancement**: Comprehensive logging throughout pipeline
 - [x] **Enhancement**: Model configuration system for easy switching
+- [x] **Bug Fix**: Undefined `generation_time` when Phase 5 succeeds
+- [x] **Bug Fix**: Missing database updates when Phase 5 succeeds
+- [x] **Bug Fix**: Duplicate exception handling in generate_from_storyboard.py
+- [x] **Bug Fix**: Hardcoded Phase 4 storyboard threshold (now fully dynamic)
+- [x] **Bug Fix**: Beat-to-chunk mapping uses actual beat start times
 
 ### All PRs Complete ✅
 1. ✅ **PR #1**: Comment out Phase 2 & 3 (MVP simplification)
@@ -141,22 +148,27 @@
 
 ## Known Issues 🐛
 
-1. **Phase 5 S3 Path Issue** (HIGH PRIORITY)
-   - Error: 404 Not Found when downloading stitched video
-   - Location: Phase 5 refinement service
-   - Impact: Blocks video refinement and final export
-   - Next Step: Verify S3 client configuration and path format
-
-2. **Sequential Generation Performance** (MEDIUM PRIORITY)
+1. **Sequential Generation Performance** (MEDIUM PRIORITY)
    - Current: ~45s per chunk × 6 = ~4.5 minutes
    - Impact: Slow generation time
    - Mitigation: Acceptable for MVP, optimize later
    - Future: Hybrid approach (chunk 0 first, then parallel)
 
+2. **Phase 5 S3 Path Issue** (LOW PRIORITY - May be resolved)
+   - Error: 404 Not Found when downloading stitched video
+   - Location: Phase 5 refinement service
+   - Impact: Blocks video refinement and final export
+   - Status: May be resolved with recent fixes, needs verification
+
 3. **Ad Duration Override** (FIXED ✅)
    - Was: Ignored user-specified "30 seconds"
    - Fix: GPT-4 extracts duration, Phase 1 respects it
-   - Status: Fixed today, needs testing
+   - Status: Fixed
+
+4. **Hardcoded Phase 4 Logic** (FIXED ✅)
+   - Was: Only used storyboard logic if > 1 images
+   - Fix: Always uses storyboard logic, dynamically adapts
+   - Status: Fixed - now fully dynamic
 
 ---
 

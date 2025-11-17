@@ -78,7 +78,7 @@ class VideoGeneration(Base):
     
     # Phase Outputs
     animatic_urls = Column(JSON, default=list)
-    storyboard_images = Column(JSON, default=list)  # Phase 2: Storyboard image URLs (one per beat)
+    # storyboard_images removed - storyboard images are stored in phase_outputs['phase2_storyboard'] and spec['beats'][]['image_url']
     chunk_urls = Column(JSON, default=list)
     stitched_url = Column(String, nullable=True)
     refined_url = Column(String, nullable=True)

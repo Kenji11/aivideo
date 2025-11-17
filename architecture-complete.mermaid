@@ -1,0 +1,78 @@
+graph TB
+    subgraph "Client Layer"
+        User[User Browser]
+        React[React Frontend<br/>Vite + TypeScript]
+    end
+
+    subgraph "API Gateway"
+        CF[CloudFront CDN]
+        ALB[Application Load Balancer]
+    end
+
+    subgraph "Application Layer"
+        FastAPI[FastAPI Server<br/>Port 8000]
+        Endpoints["REST Endpoints<br/>/api/generate<br/>/api/status/:id<br/>/api/video/:id<br/>/api/upload"]
+    end
+
+    subgraph "Task Queue"
+        Redis[(Redis<br/>Job Queue<br/>Results Backend)]
+    end
+
+    subgraph "Worker Layer"
+        Celery[Celery Worker<br/>Pipeline Orchestrator]
+    end
+
+    subgraph "Pipeline Execution"
+        direction TB
+        P1[Phase 1<br/>Validation<br/>GPT-4<br/>~7s]
+        P2[Phase 2<br/>Storyboard<br/>FLUX Dev<br/>~32s]
+        P4[Phase 4<br/>Chunks<br/>Hailuo/Veo<br/>~5.5 min]
+        P5[Phase 5<br/>Refine<br/>MusicGen<br/>~2 min]
+    end
+
+    subgraph "External APIs"
+        OpenAI[OpenAI<br/>GPT-4 Turbo]
+        Replicate[Replicate<br/>FLUX Dev<br/>Hailuo/Veo<br/>MusicGen]
+    end
+
+    subgraph "Storage & Data"
+        S3[(AWS S3<br/>Images & Videos)]
+        DB[(PostgreSQL<br/>Metadata & Status)]
+    end
+
+    User -->|HTTPS| React
+    React -->|API Calls| CF
+    CF --> ALB
+    ALB --> FastAPI
+    FastAPI --> Endpoints
+    Endpoints -->|Enqueue| Redis
+    Endpoints -->|Query| DB
+    Redis -->|Pull Task| Celery
+    Celery --> P1
+    P1 -->|Next| P2
+    P2 -->|Next| P4
+    P4 -->|Next| P5
+    P1 -->|API| OpenAI
+    P2 -->|API| Replicate
+    P4 -->|API| Replicate
+    P5 -->|API| Replicate
+    P2 -->|Upload| S3
+    P4 -->|Upload| S3
+    P5 -->|Upload| S3
+    Celery -->|Update| DB
+    FastAPI -->|Presigned URLs| S3
+
+    style User fill:#e1f5ff
+    style React fill:#61dafb
+    style FastAPI fill:#009688
+    style Redis fill:#dc382d
+    style Celery fill:#ff9900
+    style P1 fill:#fff3cd
+    style P2 fill:#fff3cd
+    style P4 fill:#fff3cd
+    style P5 fill:#fff3cd
+    style OpenAI fill:#10a37f
+    style Replicate fill:#6366f1
+    style S3 fill:#ff9900
+    style DB fill:#336791
+

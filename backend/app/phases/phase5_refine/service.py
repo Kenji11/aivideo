@@ -57,6 +57,10 @@ class RefinementService:
         temp_files = []
         
         try:
+            # Check if model generates its own audio (Veo models have native audio)
+            video_model = spec.get('model', 'hailuo')
+            model_has_native_audio = video_model in ['veo_fast', 'veo']
+            
             # Step 1: Download stitched video from Phase 4
             print(f"📥 Downloading stitched video from: {stitched_url}")
             try:
@@ -66,78 +70,85 @@ class RefinementService:
             except Exception as e:
                 raise PhaseException(f"Failed to download stitched video from {stitched_url}: {str(e)}")
             
-            # Get actual video duration from the file (not from spec, as video might be longer)
-            print("⏱️  Detecting actual video duration...")
-            try:
-                video_clip = VideoFileClip(stitched_path)
-                actual_duration = video_clip.duration
-                video_clip.close()
-                print(f"   ✅ Actual video duration: {actual_duration:.2f}s (spec said: {spec.get('duration', 'unknown')}s)")
-            except Exception as e:
-                print(f"   ⚠️  Could not detect video duration: {str(e)}, using spec duration")
-                actual_duration = spec.get('duration', 30)
-            
-            # Step 2: Analyze video content for better audio matching
-            print("🔍 Analyzing video content for audio matching...")
-            video_analysis = None
-            try:
-                video_analysis = self._analyze_video_content(stitched_path, spec)
-                if video_analysis:
-                    print(f"   ✅ Video analyzed: {video_analysis.get('summary', 'N/A')[:100]}...")
-                else:
-                    print(f"   ⚠️  Video analysis failed, using spec-based audio prompt")
-            except Exception as e:
-                print(f"   ⚠️  Video analysis error: {str(e)}, using spec-based audio prompt")
-                import traceback
-                traceback.print_exc()
-            
-            # Step 3: Get music from library (skip AI generation)
-            print("🎵 Getting music from library...")
-            music_path = None
-            music_url = None
-            try:
-                # Use actual video duration (not spec duration) - keep as float for precision
-                duration = actual_duration
-                
-                # Try to get music from library first
-                music_path = self._get_music_from_library(spec, duration)
-                
-                if music_path and os.path.exists(music_path):
-                    temp_files.append(music_path)
-                    # Upload music to S3 using new user-scoped structure
-                    if not user_id:
-                        raise PhaseException("user_id is required for S3 uploads")
-                    music_key = get_video_s3_key(user_id, video_id, "background.mp3")
-                    music_url = s3_client.upload_file(music_path, music_key)
-                    print(f"   ✅ Music from library uploaded: {music_key}")
-                else:
-                    print(f"   ⚠️  No music found in library, video will have no audio")
-            except Exception as e:
-                print(f"   ⚠️  Music library access failed: {str(e)}, continuing without music")
-                import traceback
-                traceback.print_exc()
-            
-            # Step 4: Combine video + music
-            final_path = stitched_path  # Default to stitched video
-            if music_path and os.path.exists(music_path):
-                print("🎬 Combining video with music...")
-                try:
-                    combined_path = self._combine_video_audio(stitched_path, music_path)
-                    if combined_path and os.path.exists(combined_path):
-                        temp_files.append(combined_path)
-                        final_path = combined_path
-                        print(f"   ✅ Video and audio combined successfully")
-                    else:
-                        print(f"   ⚠️  Audio combination returned no file, using video without music")
-                        final_path = stitched_path  # Use original video
-                except Exception as e:
-                    error_msg = str(e)
-                    print(f"   ❌ Audio combination failed: {error_msg}")
-                    print(f"   ⚠️  Using video without music (original stitched video)")
-                    final_path = stitched_path  # Use original video
+            # For models with native audio (Veo), skip ALL music processing entirely
+            if model_has_native_audio:
+                print(f"🎵 Model '{video_model}' generates native audio - skipping ALL music processing")
+                print("   ✅ Using video with native audio as-is (no music library, no audio combination)")
+                final_path = stitched_path
+                music_url = None
             else:
-                # No music - use video as-is
-                print("   ⚠️  No music available, using video without audio")
+                # Get actual video duration from the file (not from spec, as video might be longer)
+                print("⏱️  Detecting actual video duration...")
+                try:
+                    video_clip = VideoFileClip(stitched_path)
+                    actual_duration = video_clip.duration
+                    video_clip.close()
+                    print(f"   ✅ Actual video duration: {actual_duration:.2f}s (spec said: {spec.get('duration', 'unknown')}s)")
+                except Exception as e:
+                    print(f"   ⚠️  Could not detect video duration: {str(e)}, using spec duration")
+                    actual_duration = spec.get('duration', 30)
+                
+                # Step 2: Analyze video content for better audio matching
+                print("🔍 Analyzing video content for audio matching...")
+                video_analysis = None
+                try:
+                    video_analysis = self._analyze_video_content(stitched_path, spec)
+                    if video_analysis:
+                        print(f"   ✅ Video analyzed: {video_analysis.get('summary', 'N/A')[:100]}...")
+                    else:
+                        print(f"   ⚠️  Video analysis failed, using spec-based audio prompt")
+                except Exception as e:
+                    print(f"   ⚠️  Video analysis error: {str(e)}, using spec-based audio prompt")
+                    import traceback
+                    traceback.print_exc()
+                
+                # Step 3: Get music from library (skip AI generation)
+                print("🎵 Getting music from library...")
+                music_path = None
+                music_url = None
+                try:
+                    # Use actual video duration (not spec duration) - keep as float for precision
+                    duration = actual_duration
+                    
+                    # Try to get music from library first
+                    music_path = self._get_music_from_library(spec, duration)
+                    
+                    if music_path and os.path.exists(music_path):
+                        temp_files.append(music_path)
+                        # Upload music to S3 using new user-scoped structure
+                        if not user_id:
+                            raise PhaseException("user_id is required for S3 uploads")
+                        music_key = get_video_s3_key(user_id, video_id, "background.mp3")
+                        music_url = s3_client.upload_file(music_path, music_key)
+                        print(f"   ✅ Music from library uploaded: {music_key}")
+                    else:
+                        print(f"   ⚠️  No music found in library, video will have no audio")
+                except Exception as e:
+                    print(f"   ⚠️  Music library access failed: {str(e)}, continuing without music")
+                    import traceback
+                    traceback.print_exc()
+                
+                # Step 4: Combine video + music
+                final_path = stitched_path  # Default to stitched video
+                if music_path and os.path.exists(music_path):
+                    print("🎬 Combining video with music...")
+                    try:
+                        combined_path = self._combine_video_audio(stitched_path, music_path)
+                        if combined_path and os.path.exists(combined_path):
+                            temp_files.append(combined_path)
+                            final_path = combined_path
+                            print(f"   ✅ Video and audio combined successfully")
+                        else:
+                            print(f"   ⚠️  Audio combination returned no file, using video without music")
+                            final_path = stitched_path  # Use original video
+                    except Exception as e:
+                        error_msg = str(e)
+                        print(f"   ❌ Audio combination failed: {error_msg}")
+                        print(f"   ⚠️  Using video without music (original stitched video)")
+                        final_path = stitched_path  # Use original video
+                else:
+                    # No music - use video as-is
+                    print("   ⚠️  No music available, using video without audio")
             
             # Step 5: Upload final video (only if we have a valid final_path)
             print("📤 Uploading final video...")

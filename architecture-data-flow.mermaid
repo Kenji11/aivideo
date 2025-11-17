@@ -1,0 +1,87 @@
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant API
+    participant Redis
+    participant Worker
+    participant Phase1
+    participant Phase2
+    participant Phase4
+    participant Phase5
+    participant OpenAI
+    participant Replicate
+    participant S3
+    participant DB
+
+    User->>Frontend: Submit prompt
+    Frontend->>API: POST /api/generate
+    API->>DB: Create VideoGeneration record
+    API->>Redis: Enqueue run_pipeline task
+    API-->>Frontend: Return video_id
+    
+    Frontend->>API: Poll GET /api/status/:id (every 2s)
+    
+    Redis->>Worker: Pull task
+    Worker->>DB: Update status=VALIDATING
+    
+    Worker->>Phase1: validate_prompt()
+    Phase1->>OpenAI: GPT-4 API call
+    OpenAI-->>Phase1: Structured spec
+    Phase1->>DB: Update spec, status=GENERATING_STORYBOARD
+    Phase1-->>Worker: Return spec
+    
+    Worker->>Phase2: generate_storyboard()
+    loop For each beat
+        Phase2->>Replicate: FLUX Dev image generation
+        Replicate-->>Phase2: Image URL
+        Phase2->>S3: Upload image
+        S3-->>Phase2: S3 URL
+        Phase2->>Phase2: Update beat['image_url']
+    end
+    Phase2->>DB: Update phase_outputs, status=GENERATING_CHUNKS
+    Phase2-->>Worker: Return spec with image_urls
+    
+    Worker->>Phase4: generate_chunks_storyboard()
+    Phase4->>Phase4: Calculate beat-to-chunk mapping
+    Phase4->>Phase4: Build chunk specs (dynamic)
+    
+    loop Sequential chunk generation
+        alt Chunk starts beat
+            Phase4->>S3: Download storyboard image
+            Phase4->>Replicate: Generate chunk (image-to-video)
+        else Chunk within beat
+            Phase4->>S3: Download last frame
+            Phase4->>Replicate: Generate chunk (last-frame continuation)
+        end
+        Replicate-->>Phase4: Chunk video URL
+        Phase4->>S3: Upload chunk
+        Phase4->>Phase4: Extract last frame
+        Phase4->>S3: Upload last frame
+    end
+    
+    Phase4->>Phase4: Stitch chunks (FFmpeg)
+    Phase4->>S3: Upload stitched video
+    Phase4->>DB: Update stitched_url, status=REFINING
+    Phase4-->>Worker: Return stitched_video_url
+    
+    alt Model has native audio (Veo)
+        Worker->>DB: Update status=COMPLETE (skip Phase 5)
+    else Model needs audio
+        Worker->>Phase5: refine_video()
+        Phase5->>S3: Download stitched video
+        Phase5->>Replicate: Generate music (MusicGen)
+        Replicate-->>Phase5: Music URL
+        Phase5->>Phase5: Combine video + audio
+        Phase5->>S3: Upload final video
+        Phase5->>DB: Update final_video_url, status=COMPLETE
+        Phase5-->>Worker: Return refined_video_url
+    end
+    
+    Worker->>DB: Update generation_time, cost_usd
+    
+    Frontend->>API: GET /api/status/:id
+    API->>DB: Query video status
+    API->>S3: Generate presigned URLs
+    API-->>Frontend: Return status with URLs
+    Frontend->>User: Display final video
+

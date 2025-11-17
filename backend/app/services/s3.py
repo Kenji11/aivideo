@@ -59,5 +59,41 @@ class S3Client:
             key_or_url: S3 key or S3 URL (e.g., 's3://bucket/key' or 'key')
         """
         return self.download_file(key_or_url)
+    
+    def list_files(self, prefix: str) -> list:
+        """List files in S3 with given prefix
+        
+        Args:
+            prefix: S3 key prefix (e.g., 'user123/videos/video456/')
+            
+        Returns:
+            List of S3 keys (full keys, not just filenames)
+        """
+        try:
+            response = self.client.list_objects_v2(
+                Bucket=self.bucket,
+                Prefix=prefix
+            )
+            
+            files = []
+            if 'Contents' in response:
+                for obj in response['Contents']:
+                    files.append(obj['Key'])
+            
+            # Handle pagination if there are more than 1000 objects
+            while response.get('IsTruncated'):
+                response = self.client.list_objects_v2(
+                    Bucket=self.bucket,
+                    Prefix=prefix,
+                    ContinuationToken=response.get('NextContinuationToken')
+                )
+                if 'Contents' in response:
+                    for obj in response['Contents']:
+                        files.append(obj['Key'])
+            
+            return files
+        except Exception as e:
+            print(f"⚠️  Error listing S3 files with prefix '{prefix}': {str(e)}")
+            return []
 
 s3_client = S3Client()

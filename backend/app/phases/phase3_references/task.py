@@ -36,15 +36,21 @@ def generate_references(self, video_id: str, spec: dict, user_id: str = None):
     start_time = time.time()
     duration_seconds = time.time() - start_time
     
-    # Return skipped status immediately - Phase 3 is disabled
+    # Return success status with empty references - Phase 3 is disabled but pipeline expects success
+    # Phase 2 storyboard images are used instead of Phase 3 references
     output = PhaseOutput(
         video_id=video_id,
         phase="phase3_references",
-        status="skipped",
-        output_data={"message": "Phase 3 disabled - using Phase 2 storyboard instead"},
+        status="success",
+        output_data={
+            "style_guide_url": None,
+            "product_reference_url": None,
+            "uploaded_assets": [],
+            "message": "Phase 3 disabled - using Phase 2 storyboard instead"
+        },
         cost_usd=0.0,
         duration_seconds=duration_seconds,
-        error_message="Phase 3 is disabled in TDD v2.0"
+        error_message=None
     )
     
     return output.dict()

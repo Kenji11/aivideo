@@ -1,0 +1,83 @@
+graph TB
+    subgraph "Internet"
+        Users[End Users<br/>Web Browsers]
+    end
+
+    subgraph "AWS Cloud - us-east-2"
+        subgraph "CDN Layer"
+            CF[CloudFront CDN<br/>Global Edge Locations<br/>Frontend + Video Delivery]
+        end
+
+        subgraph "Static Hosting"
+            S3Frontend[S3 Bucket<br/>ai-video-frontend<br/>React Build<br/>index.html, assets/]
+        end
+
+        subgraph "Load Balancing"
+            ALB[Application Load Balancer<br/>Port 80/443 → 8000<br/>Health Checks]
+        end
+
+        subgraph "Elastic Beanstalk - Web Tier"
+            EB_Web1[EC2 Instance<br/>t3.small 2GB RAM<br/>Docker: FastAPI<br/>Port 8000]
+            EB_Web2[EC2 Instance<br/>t3.small 2GB RAM<br/>Docker: FastAPI<br/>Port 8000<br/>Auto-scaling]
+        end
+
+        subgraph "Elastic Beanstalk - Worker Tier"
+            EB_Worker1[EC2 Instance<br/>t3.medium 4GB RAM<br/>Docker: Celery Worker<br/>Concurrency: 4]
+            EB_Worker2[EC2 Instance<br/>t3.medium 4GB RAM<br/>Docker: Celery Worker<br/>Concurrency: 4<br/>Auto-scaling]
+        end
+
+        subgraph "Data Layer"
+            Redis[(ElastiCache Redis<br/>t4g.micro<br/>Job Queue + Results<br/>0.5 GB Memory)]
+            Postgres[(RDS PostgreSQL<br/>db.t4g.micro<br/>Video Metadata<br/>40 Connections)]
+        end
+
+        subgraph "Storage Layer"
+            S3Videos[S3 Bucket<br/>ai-video-assets-prod<br/>Storyboard Images<br/>Video Chunks<br/>Final Videos<br/>Region: us-east-2]
+        end
+    end
+
+    subgraph "External APIs"
+        OpenAI[OpenAI API<br/>GPT-4 Turbo<br/>Prompt Validation]
+        Replicate[Replicate API<br/>FLUX Dev: Images<br/>Hailuo/Veo: Video<br/>MusicGen: Audio]
+    end
+
+    Users -->|HTTPS| CF
+    CF -->|Static Assets| S3Frontend
+    CF -->|API Calls| ALB
+    ALB -->|Round Robin| EB_Web1
+    ALB -->|Round Robin| EB_Web2
+    
+    EB_Web1 -->|Enqueue Jobs| Redis
+    EB_Web2 -->|Enqueue Jobs| Redis
+    EB_Web1 -->|Read/Write| Postgres
+    EB_Web2 -->|Read/Write| Postgres
+    
+    Redis -->|Pull Jobs| EB_Worker1
+    Redis -->|Pull Jobs| EB_Worker2
+    
+    EB_Worker1 -->|Store Results| Redis
+    EB_Worker2 -->|Store Results| Redis
+    EB_Worker1 -->|Upload/Download| S3Videos
+    EB_Worker2 -->|Upload/Download| S3Videos
+    EB_Worker1 -->|Update Status| Postgres
+    EB_Worker2 -->|Update Status| Postgres
+    
+    EB_Worker1 -->|API Calls| OpenAI
+    EB_Worker2 -->|API Calls| OpenAI
+    EB_Worker1 -->|API Calls| Replicate
+    EB_Worker2 -->|API Calls| Replicate
+
+    style Users fill:#e1f5ff
+    style CF fill:#ff9900
+    style S3Frontend fill:#ff9900
+    style ALB fill:#ff9900
+    style EB_Web1 fill:#ff9900
+    style EB_Web2 fill:#ff9900
+    style EB_Worker1 fill:#ff9900
+    style EB_Worker2 fill:#ff9900
+    style Redis fill:#dc382d
+    style Postgres fill:#336791
+    style S3Videos fill:#ff9900
+    style OpenAI fill:#10a37f
+    style Replicate fill:#6366f1
+
