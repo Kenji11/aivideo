@@ -359,7 +359,7 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
     
     model_name = model_config['replicate_model']
     model_params = model_config['params']
-    cost_per_second = model_config['cost_per_generation']
+    cost_per_chunk = model_config['cost_per_generation']  # Cost is per chunk, not per second
     
     # Get parameter name mappings (some models use different parameter names)
     param_names = model_config.get('param_names', {})
@@ -667,8 +667,8 @@ def generate_single_chunk(self, chunk_spec: dict) -> dict:
                     pass  # Ignore cleanup errors
         
         # Calculate actual cost using model config
-        chunk_duration = chunk_spec_obj.duration
-        chunk_cost = chunk_duration * cost_per_second
+        # Cost is per chunk generation, not per second
+        chunk_cost = cost_per_chunk
         generation_time = time.time() - chunk_start_time
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         

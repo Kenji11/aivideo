@@ -9,22 +9,25 @@ COST_SDXL_IMAGE = 0.0055  # Legacy, not used anymore
 COST_FLUX_SCHNELL_IMAGE = 0.003  # Phase 2: Animatic frames (cheapest)
 COST_FLUX_DEV_IMAGE = 0.025  # Phase 3: Reference assets (better quality)
 COST_FLUX_PRO_IMAGE = 0.04  # Phase 3: Reference assets (best quality, for final)
-# Phase 4: Video generation model costs (per second of video)
-COST_WAN = 0.09  # Wan 2.1 (480p) - Default model
-COST_ZEROSCOPE = 0.10  # Zeroscope v2 XL
-COST_ANIMATEDIFF = 0.20  # AnimateDiff
-COST_RUNWAY = 0.25  # Runway Gen-2 (estimated)
-COST_HAILUO = 0.04  # Hailuo 2.3 (fast)
-COST_SEEDANCE = 0.06  # Seedance 1.0 Pro Fast (estimated, 2-12s clips, 60% cheaper than Pro)
+# Phase 4: Video generation model costs (per chunk generation, typically 5 seconds)
+# NOTE: Costs are per chunk, not per second. Multiply by chunk count for total video cost.
+# Verified pricing marked with [VERIFIED], others are estimates based on model tiers
+COST_WAN = 0.09  # Wan 2.1 (480p) - Estimated
+COST_ZEROSCOPE = 0.10  # Zeroscope v2 XL - Estimated
+COST_ANIMATEDIFF = 0.20  # AnimateDiff - Estimated
+COST_RUNWAY = 0.25  # Runway Gen-2 - Estimated
+COST_HAILUO = 0.19  # Hailuo 2.3 Fast [VERIFIED] - $0.19 per 6s chunk at 768p, ~$0.19 per 5s at 720p
+COST_SEEDANCE = 0.06  # Seedance 1.0 Pro Fast - Estimated (claimed 60% cheaper than Pro)
 # New models
-COST_KLING = 0.08  # Kling v2.5 Turbo Pro (estimated)
-COST_PIXVERSE = 0.07  # Pixverse v5 (estimated)
-COST_WAN_25_T2V = 0.10  # Wan 2.5 T2V (estimated)
-COST_WAN_25_I2V = 0.09  # Wan 2.5 I2V Fast (estimated)
-COST_VEO_FAST = 0.12  # Google Veo 3.1 Fast (estimated)
-COST_VEO = 0.15  # Google Veo 3.1 (estimated)
-COST_HAILUO_23 = 0.05  # Minimax Hailuo 2.3 (standard, not fast)
-COST_SORA = 0.20  # OpenAI Sora 2 (estimated)
+COST_KLING = 0.08  # Kling v2.5 Turbo Pro - Estimated (mid-tier pricing)
+COST_PIXVERSE = 0.07  # Pixverse v5 - Estimated (mid-tier pricing)
+COST_WAN_25_T2V = 0.10  # Wan 2.5 T2V - Estimated (similar to Wan 2.1)
+COST_WAN_25_I2V = 0.09  # Wan 2.5 I2V Fast - Estimated (similar to Wan 2.1)
+COST_VEO_FAST = 0.12  # Google Veo 3.1 Fast - Estimated (premium model, fast tier)
+COST_VEO = 0.15  # Google Veo 3.1 - Estimated (premium model, standard tier)
+COST_HAILUO_23 = 0.28  # Minimax Hailuo 2.3 (standard, not fast) - Estimated (~$0.28 per 6s at 768p based on 50% more than fast)
+COST_SORA = 0.20  # OpenAI Sora 2 - Estimated (premium model)
+COST_RUNWAY_GEN4_TURBO = 0.60  # Runway Gen-4 Turbo - Estimated ($0.12/sec * 5s = $0.60 per chunk)
 
 # Legacy constants (kept for backwards compatibility)
 COST_ZEROSCOPE_VIDEO = COST_ZEROSCOPE
