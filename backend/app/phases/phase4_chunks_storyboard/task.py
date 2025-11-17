@@ -2,12 +2,12 @@
 import time
 from app.orchestrator.celery_app import celery_app
 from app.common.schemas import PhaseOutput
-from app.phases.phase4_chunks.service import ChunkGenerationService
-from app.phases.phase4_chunks.stitcher import VideoStitcher
+from app.phases.phase4_chunks_storyboard.service import ChunkGenerationService
+from app.phases.phase4_chunks_storyboard.stitcher import VideoStitcher
 from app.common.exceptions import PhaseException
 
 
-@celery_app.task(bind=True, name="app.phases.phase4_chunks.task.generate_chunks")
+@celery_app.task(bind=True, name="app.phases.phase4_chunks_storyboard.task.generate_chunks")
 def generate_chunks(
     self,
     video_id: str,
@@ -37,12 +37,12 @@ def generate_chunks(
         chunk_service = ChunkGenerationService()
         stitcher = VideoStitcher()
         
-        # Generate all chunks in parallel
-        print(f"🚀 Phase 4 (Chunks) starting for video {video_id}")
+        # Generate all chunks using storyboard logic
+        print(f"🚀 Phase 4 (Chunks - Storyboard Mode) starting for video {video_id}")
         chunk_results = chunk_service.generate_all_chunks(
             video_id=video_id,
             spec=spec,
-            animatic_urls=animatic_urls,
+            animatic_urls=animatic_urls,  # Not used in storyboard mode, but kept for compatibility
             reference_urls=reference_urls,
             user_id=user_id
         )
@@ -83,7 +83,7 @@ def generate_chunks(
         # Create success output
         output = PhaseOutput(
             video_id=video_id,
-            phase="phase4_chunks",
+            phase="phase4_chunks_storyboard",
             status="success",
             output_data={
                 'stitched_video_url': stitched_video_url,
@@ -109,7 +109,7 @@ def generate_chunks(
         
         output = PhaseOutput(
             video_id=video_id,
-            phase="phase4_chunks",
+            phase="phase4_chunks_storyboard",
             status="failed",
             output_data={},
             cost_usd=0.0,
@@ -126,7 +126,7 @@ def generate_chunks(
         
         output = PhaseOutput(
             video_id=video_id,
-            phase="phase4_chunks",
+            phase="phase4_chunks_storyboard",
             status="failed",
             output_data={},
             cost_usd=0.0,
