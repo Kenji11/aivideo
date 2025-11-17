@@ -25,3 +25,4 @@ python-multipart==0.0.6
 requests>=2.31.0
 Pillow>=10.0.0
 moviepy==1.0.3  # Phase 5: Video/audio processing (pinned to 1.x for API stability)
+mutagen>=1.47.0  # Read MP3 metadata (ID3 tags) for genre detection
