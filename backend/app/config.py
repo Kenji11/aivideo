@@ -38,7 +38,8 @@ class Settings(BaseSettings):
     debug: bool = True
     
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # .env file is optional - if it exists, use it (dev), otherwise use environment variables (prod)
+        env_file=".env" if os.path.exists(".env") else None,
         case_sensitive=False,
         extra="ignore"  # Ignore extra environment variables (e.g., typos, old variable names)
     )
@@ -56,7 +57,7 @@ class Settings(BaseSettings):
         # Check if .env file exists
         env_file = ".env"
         env_exists = os.path.exists(env_file)
-        logger.info(f"Environment file (.env): {'Found' if env_exists else 'NOT FOUND'}")
+        logger.info(f"Configuration source: {'.env file' if env_exists else 'Environment variables'}")
         
         # Log non-sensitive settings
         logger.info(f"Environment: {self.environment}")
