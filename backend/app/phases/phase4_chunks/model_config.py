@@ -25,6 +25,7 @@ Available Models:
 - 'veo': Google Veo 3.1 (google/veo-3.1) - Standard Google Veo model
 - 'hailuo_23': Minimax Hailuo 2.3 (minimax/hailuo-2.3) - Standard Hailuo (not fast)
 - 'sora': OpenAI Sora 2 (openai/sora-2) - OpenAI's latest video model
+- 'runway_gen4_turbo': Runway Gen-4 Turbo (runwayml/gen4-turbo) - Fast, high-quality video generation
 
 Model Config Fields:
 - name: Model identifier
@@ -64,6 +65,7 @@ from app.common.constants import (
     COST_VEO,
     COST_HAILUO_23,
     COST_SORA,
+    COST_RUNWAY_GEN4_TURBO,
 )
 
 # Default model (currently used model)
@@ -141,8 +143,8 @@ MODEL_CONFIGS: Dict[str, Dict] = {
     },
     'hailuo': {
         'name': 'hailuo',
-        'replicate_model': 'minimax/hailuo-2.3-fast',  # Official, fastest, cheapest high-quality version
-        'cost_per_generation': COST_HAILUO,  # $0.04 per 5s chunk ($0.008/second)
+        'replicate_model': 'minimax/hailuo-2.3-fast',  # Official fast version (NOT the cheapest - see actual pricing)
+        'cost_per_generation': COST_HAILUO,  # $0.19 per 5-6s chunk at 720p (actual Replicate pricing)
         'params': {
             'num_frames': 151,      # 151 frames @ 30fps = ~5.03s (max reliable)
             'fps': 30,              # Native 30fps, smoother motion
@@ -339,7 +341,7 @@ MODEL_CONFIGS: Dict[str, Dict] = {
     'hailuo_23': {
         'name': 'hailuo_23',
         'replicate_model': 'minimax/hailuo-2.3',
-        'cost_per_generation': COST_HAILUO_23,
+        'cost_per_generation': COST_HAILUO_23,  # Standard version (~50% more expensive than fast)
         'params': {
             'num_frames': 151,
             'fps': 30,
@@ -365,6 +367,31 @@ MODEL_CONFIGS: Dict[str, Dict] = {
         'name': 'sora',
         'replicate_model': 'openai/sora-2',
         'cost_per_generation': COST_SORA,
+        'params': {
+            'num_frames': 120,
+            'fps': 24,
+            'width': 1280,
+            'height': 720,
+        },
+        'param_names': {
+            'image': 'image',
+            'prompt': 'prompt',
+            'num_frames': 'num_frames',
+            'fps': 'fps',
+            'width': 'width',
+            'height': 'height',
+        },
+        'actual_chunk_duration': 5.0,
+        'duration_controllable': True,
+        'supports_multi_image': False,
+        'max_reference_assets': 0,
+        'supports_text_to_video': True,
+        'supports_image_to_video': True,
+    },
+    'runway_gen4_turbo': {
+        'name': 'runway_gen4_turbo',
+        'replicate_model': 'runwayml/gen4-turbo',
+        'cost_per_generation': COST_RUNWAY_GEN4_TURBO,  # Estimated: $0.12/sec * 5s = $0.60 per chunk
         'params': {
             'num_frames': 120,
             'fps': 24,
