@@ -9,25 +9,26 @@
 **Region**: AWS us-east-2 (Ohio)
 
 ## What Just Happened
-1. ✅ **TDD Created**: New beat-based architecture design complete
-2. ✅ **Implementation Strategy Defined**: Complete replacement of Phase 1
-3. 🔄 **Starting TDD-tasks-1.md**: PR #1 - Beat Library & Template Archetypes
-4. ⏸️ **Previous MVP Paused**: Refactoring to beat-based system
-5. ⏸️ **Testing Postponed**: Will resume after TDD implementation
+1. ✅ **TDD-tasks-1.md PR #1 Complete**: Beat Library & Template Archetypes implemented
+2. ✅ **Phase 2 Architecture Defined**: Storyboard generation replaces Phase 3 references
+3. ✅ **TDD-tasks-2.md Updated**: Removed PR #4 (testing), clarified Phase 2→3 replacement
+4. 🔄 **Starting TDD-tasks-2.md**: PR #4 & PR #5 - Phase 2 Storyboard + Phase 4 Integration
+5. ⏸️ **Full Testing Postponed**: Will add comprehensive tests after core implementation
 
 ## Current Focus
-**Implementing TDD-tasks-1.md PR #1: Beat Library & Template Archetypes**
+**Planning TDD-tasks-2.md PRs #4 & #5: Phase 2 Storyboard Generation**
 
-### Immediate Tasks (TDD PR #1)
-1. ✅ Review TDD and align on implementation strategy
-2. 🔄 Create beat library module (`beat_library.py`) - 15 beats
-3. 🔄 Create template archetypes module (`template_archetypes.py`) - 5 archetypes
-4. 🔄 Update constants for creativity control
-5. 🔄 Plan database migration (execute last)
+### Immediate Tasks (TDD PRs #4-5)
+1. ✅ Define Phase 2 architecture (Option C: beat boundary images)
+2. ✅ Update TDD-tasks-2.md with detailed implementation plan
+3. 🔄 Disable Phase 3 explicitly (keep code, mark as disabled)
+4. 🔄 Implement Phase 2 storyboard generation (1 image per beat)
+5. 🔄 Update Phase 4 to use storyboard images at beat boundaries
+6. 🔄 Update memory bank with architectural decisions
 
 ## Recent Decisions
 
-### TDD Architecture Decisions (November 16, 2025)
+### TDD Architecture Decisions (November 17, 2025)
 
 1. **Complete Phase 1 Replacement** ✅
    - DELETE old template JSON files (product_showcase.json, lifestyle_ad.json, announcement.json)
@@ -54,10 +55,26 @@
    - No code to support old format generation
    - Clean break for forward progress
 
-5. **Phase Integration Deferred** ✅
-   - Don't worry about Phases 2-6 integration yet
-   - Focus on Phase 1 correctness first
-   - Other phases will adapt to new spec format later
+5. **Phase 2 Replaces Phase 3** ✅ NEW
+   - OLD: Phase 3 generates 1 reference image per video
+   - NEW: Phase 2 generates N storyboard images (1 per beat)
+   - Phase 3 explicitly disabled but kept in codebase
+   - Storyboard images stored in database `storyboard_images` field
+
+6. **Beat-to-Chunk Mapping (Option C)** ✅ NEW
+   - Storyboard images used at **beat boundaries only**
+   - Within a beat: use last-frame continuation
+   - Example: Beat 1 (10s) = Chunk 0 (storyboard) + Chunk 1 (last-frame)
+   - Example: Beat 2 (5s) = Chunk 2 (storyboard from beat 2)
+   - Algorithm: `chunk_idx = beat_start_time // actual_chunk_duration`
+   - Maintains temporal coherence within beats
+   - Provides visual reset at narrative boundaries
+
+7. **Testing Strategy** ✅ NEW
+   - Comprehensive testing deferred until after core implementation
+   - Focus on getting system working end-to-end first
+   - Will add full test suite after PRs #4-5 complete
+   - Integration testing with real APIs as primary validation
 
 ### Key Implementation Decisions (November 15, 2025)
 
@@ -115,26 +132,26 @@
 
 ## Next Steps
 
-### Immediate (TDD PR #1)
-1. 🔄 Create `beat_library.py` with 15 beats
-2. 🔄 Create `template_archetypes.py` with 5 archetypes
-3. 🔄 Update `constants.py` with creativity controls
-4. 🔄 Plan database migration (fields list)
-5. 🔄 Update memory bank with decisions
+### Immediate (TDD PRs #4-5) - CURRENT
+1. 🔄 Disable Phase 3 explicitly (add comments, return skipped status)
+2. 🔄 Create Phase 2 directory structure
+3. 🔄 Implement Phase 2 storyboard generation (1 image per beat)
+4. 🔄 Update Phase 4 to calculate beat-to-chunk mapping
+5. 🔄 Update Phase 4 to use storyboard images at beat boundaries
 
-### Short Term (TDD PRs #2-3)
-1. Phase 1 structure & validation (PR #2)
-2. Phase 1 LLM agent implementation (PR #3)
-3. System prompt builder
-4. Spec validation & builder
-5. Test with multiple prompts
+### Short Term (After PRs #4-5)
+1. Test Phase 1 → Phase 2 → Phase 4 pipeline
+2. Verify beat boundary images working correctly
+3. Verify last-frame continuation within beats
+4. Update orchestrator/pipeline to call Phase 2 (not Phase 3)
+5. End-to-end test with various beat sequences
 
-### Medium Term (After TDD)
-1. Update Phases 2-6 to work with new spec format
+### Medium Term (TDD Completion)
+1. Add comprehensive test suite
 2. Execute database migration
-3. Resume testing with new system
-4. Performance optimization (parallel generation)
-5. Fix Phase 5 S3 path issue
+3. Update frontend to show storyboard images
+4. Performance optimization (parallel generation within beats)
+5. Fix any remaining Phase 5 S3 path issues
 
 ### Known Issues to Address
 1. **Phase 5 S3 Path**: Stitched video not found (404 error)

@@ -1,109 +1,63 @@
-# TDD Implementation Tasks - Part 2: Phase 1 Testing & Phase 2
+# TDD Implementation Tasks - Part 2: Phase 2 Storyboard (Replaces Phase 3 References)
 
-**Goal:** Test Phase 1 thoroughly and implement Phase 2 storyboard generation
+**Goal:** Implement Phase 2 storyboard generation with beat-to-image mapping
 
----
+**Architecture Decision:** Phase 2 storyboard images REPLACE Phase 3 reference generation. 
+- OLD: Phase 3 generates 1 reference image per video
+- NEW: Phase 2 generates 1 storyboard image per beat (N beats = N images)
+- Phase 3 will be **explicitly disabled** but kept in codebase
 
-## PR #4: Phase 1 Unit Tests
-
-### Task 4.1: Create Test Fixtures
-
-**File:** `backend/app/tests/fixtures/test_prompts.py`
-
-- [ ] Create file `test_prompts.py`
-- [ ] Define `TEST_PROMPTS` list with 5 test cases:
-  - [ ] TP1: "15s Nike sneakers energetic urban"
-  - [ ] TP2: "30s luxury watch elegant sophisticated"
-  - [ ] TP3: "20s iPhone minimalist clean modern"
-  - [ ] TP4: "Create an ad for family car with emotional story"
-  - [ ] TP5: "Smart thermostat features demo 25 seconds"
-- [ ] Each test case should have:
-  - [ ] id, prompt, expected_archetype, expected_duration, expected_beats (range)
-
-### Task 4.2: Create Validation Tests
-
-**File:** `backend/app/tests/test_phase1/test_validation.py`
-
-- [ ] Import pytest
-- [ ] Import validate_spec, build_full_spec from phase1_planning
-- [ ] Import BEAT_LIBRARY from common
-- [ ] Create `test_validate_spec_correct_sum()`:
-  - [ ] Create valid spec with 3 beats (5+5+5=15)
-  - [ ] Call validate_spec
-  - [ ] Assert no exception raised
-- [ ] Create `test_validate_spec_incorrect_sum()`:
-  - [ ] Create spec with beats summing to 20 but duration=15
-  - [ ] Assert ValueError raised with "sum" in message
-- [ ] Create `test_validate_spec_invalid_duration()`:
-  - [ ] Create spec with beat duration of 7 seconds
-  - [ ] Assert ValueError raised with "5, 10, or 15" in message
-- [ ] Create `test_validate_spec_unknown_beat_id()`:
-  - [ ] Create spec with beat_id="fake_beat"
-  - [ ] Assert ValueError raised with "Unknown beat_id" in message
-- [ ] Create `test_validate_spec_no_beats()`:
-  - [ ] Create spec with empty beats list
-  - [ ] Assert ValueError raised with "at least one beat" in message
-
-### Task 4.3: Create Beat Library Tests
-
-**File:** `backend/app/tests/test_common/test_beat_library.py`
-
-- [ ] Import BEAT_LIBRARY, OPENING_BEATS, MIDDLE_PRODUCT_BEATS, MIDDLE_DYNAMIC_BEATS, CLOSING_BEATS
-- [ ] Create `test_beat_library_size()`:
-  - [ ] Assert len(BEAT_LIBRARY) == 15
-- [ ] Create `test_all_beats_have_required_fields()`:
-  - [ ] Loop through BEAT_LIBRARY.values()
-  - [ ] Assert each has: beat_id, duration, shot_type, action, prompt_template, camera_movement, typical_position, compatible_products, energy_level
-- [ ] Create `test_all_beat_durations_valid()`:
-  - [ ] Loop through BEAT_LIBRARY.values()
-  - [ ] Assert duration in [5, 10, 15]
-- [ ] Create `test_opening_beats_count()`:
-  - [ ] Assert len(OPENING_BEATS) == 5
-- [ ] Create `test_middle_product_beats_count()`:
-  - [ ] Assert len(MIDDLE_PRODUCT_BEATS) == 5
-- [ ] Create `test_middle_dynamic_beats_count()`:
-  - [ ] Assert len(MIDDLE_DYNAMIC_BEATS) == 3
-- [ ] Create `test_closing_beats_count()`:
-  - [ ] Assert len(CLOSING_BEATS) == 2
-
-### Task 4.4: Create Integration Test (with LLM)
-
-**File:** `backend/app/tests/test_phase1/test_integration.py`
-
-- [ ] Import pytest, os
-- [ ] Import plan_video_intelligent from phase1_planning.task
-- [ ] Import TEST_PROMPTS from fixtures
-- [ ] Create `@pytest.mark.integration` decorator
-- [ ] Create `@pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"))` decorator
-- [ ] Create `test_plan_video_with_llm()`:
-  - [ ] Use TP1 from TEST_PROMPTS
-  - [ ] Call plan_video_intelligent with test video_id, prompt, creativity=0.5
-  - [ ] Assert result['status'] == 'success'
-  - [ ] Assert 'spec' in result['output_data']
-  - [ ] Extract spec
-  - [ ] Assert spec['duration'] == 15
-  - [ ] Assert len(spec['beats']) >= 3
-  - [ ] Assert spec['template'] in TEMPLATE_ARCHETYPES
-  - [ ] Assert sum of beat durations == 15
-- [ ] Create `test_plan_video_strict_mode()`:
-  - [ ] Use TP2 with creativity=0.0
-  - [ ] Verify beat sequence closely matches archetype template
-- [ ] Create `test_plan_video_creative_mode()`:
-  - [ ] Use TP2 with creativity=1.0
-  - [ ] Verify beat sequence may differ from template
+**Beat-to-Chunk Mapping (Option C):**
+- Storyboard images are used at **beat boundaries**
+- Beat 1 (10s) = Chunk 0 (storyboard) + Chunk 1 (last-frame continuation)
+- Beat 2 (5s) = Chunk 2 (storyboard from beat 2)
+- Beat 3 (5s) = Chunk 3 (storyboard from beat 3)
+- Example: 3 beats (10s + 5s + 5s) = 4 chunks, 3 storyboard images
 
 ---
 
-## PR #5: Phase 2 Structure & Implementation
+## PR #4: Phase 2 Structure & Implementation
 
-### Task 5.1: Create Phase 2 Directory Structure
+### Task 4.0: Disable Phase 3 Explicitly
+
+**File:** `backend/app/phases/phase3_references/task.py`
+
+- [ ] Add large comment block at top of file:
+  ```python
+  # ============================================================================
+  # PHASE 3 DISABLED - REPLACED BY PHASE 2 STORYBOARD GENERATION (TDD v2.0)
+  # ============================================================================
+  # This phase is kept in codebase for backward compatibility with old videos
+  # but is NOT used for new video generation.
+  # 
+  # OLD System: Phase 3 generated 1 reference image per video
+  # NEW System: Phase 2 generates N storyboard images (1 per beat)
+  # 
+  # DO NOT DELETE - May be needed for legacy video playback/debugging
+  # ============================================================================
+  ```
+- [ ] Comment out the entire `generate_references` task function body
+- [ ] Keep function signature but return error immediately:
+  ```python
+  return PhaseOutput(
+      video_id=video_id,
+      phase="phase3_references",
+      status="skipped",
+      output_data={"message": "Phase 3 disabled - using Phase 2 storyboard instead"},
+      cost_usd=0.0,
+      duration_seconds=0.0,
+      error_message="Phase 3 is disabled in TDD v2.0"
+  ).dict()
+  ```
+
+### Task 4.1: Create Phase 2 Directory Structure
 
 - [ ] Create directory `backend/app/phases/phase2_storyboard/`
 - [ ] Create `__init__.py` in phase2_storyboard
 - [ ] Create `task.py` in phase2_storyboard
 - [ ] Create `image_generation.py` in phase2_storyboard
 
-### Task 5.2: Implement Image Generation Helper
+### Task 4.2: Implement Image Generation Helper
 
 **File:** `backend/app/phases/phase2_storyboard/image_generation.py`
 
@@ -111,13 +65,16 @@
 - [ ] Import COST_SDXL_IMAGE from constants
 - [ ] Import tempfile, requests, logging
 - [ ] Create logger instance
-- [ ] Create `generate_beat_image(video_id, beat, style, product) -> tuple[str, str]` function
-- [ ] Add docstring explaining function returns (image_url, prompt_used)
+- [ ] Create `generate_beat_image(video_id, beat_index, beat, style, product, user_id) -> dict` function
+- [ ] Add docstring explaining:
+  - [ ] Returns dict with: beat_id, beat_index, start, duration, image_url, shot_type, prompt_used
+  - [ ] beat_index used for determining which chunk this starts
 - [ ] Extract base_prompt from beat['prompt_template']
+- [ ] Fill in {product_name} placeholder in prompt
 - [ ] Extract colors from style['color_palette'], join with commas
 - [ ] Extract lighting from style['lighting']
 - [ ] Compose full_prompt with:
-  - [ ] base_prompt
+  - [ ] base_prompt (with product filled in)
   - [ ] color palette
   - [ ] lighting
   - [ ] "cinematic composition"
@@ -130,7 +87,7 @@
   - [ ] "multiple subjects, cluttered, busy, messy, chaotic"
 - [ ] Log prompt (first 100 chars)
 
-### Task 5.3: Implement SDXL Generation Call
+### Task 4.3: Implement SDXL Generation Call
 
 **File:** `backend/app/phases/phase2_storyboard/image_generation.py` (continued)
 
@@ -146,12 +103,16 @@
 - [ ] Extract image_url from output[0]
 - [ ] Download image with requests.get
 - [ ] Save to temp file with .png suffix
-- [ ] Construct s3_key: `videos/{video_id}/storyboard/{beat['beat_id']}.png`
+- [ ] Construct s3_key using get_video_s3_key helper: `users/{user_id}/videos/{video_id}/storyboard/beat_{beat_index:02d}.png`
 - [ ] Upload to S3 with s3_client.upload_file
 - [ ] Log upload success
-- [ ] Return (s3_url, full_prompt)
+- [ ] Return dict with:
+  - [ ] beat_id, beat_index, start, duration
+  - [ ] image_url (S3 URL)
+  - [ ] shot_type
+  - [ ] prompt_used (full_prompt)
 
-### Task 5.4: Implement Phase 2 Task
+### Task 4.4: Implement Phase 2 Task
 
 **File:** `backend/app/phases/phase2_storyboard/task.py`
 
@@ -162,13 +123,13 @@
 - [ ] Import time, logging
 - [ ] Create logger instance
 - [ ] Create `@celery_app.task(bind=True)` decorator
-- [ ] Define `generate_storyboard(self, video_id, spec)` function
+- [ ] Define `generate_storyboard(self, video_id, spec, user_id)` function
 - [ ] Add docstring with Args and Returns
 - [ ] Record start_time
 - [ ] Extract beats, style, product from spec
 - [ ] Log start message with video_id and beat count
 
-### Task 5.5: Implement Storyboard Generation Loop
+### Task 4.5: Implement Storyboard Generation Loop
 
 **File:** `backend/app/phases/phase2_storyboard/task.py` (continued)
 
@@ -177,14 +138,12 @@
 - [ ] Initialize total_cost = 0.0
 - [ ] Loop through beats with enumerate:
   - [ ] Log progress (i+1/total, beat_id)
-  - [ ] Call generate_beat_image(video_id, beat, style, product)
-  - [ ] Append result to storyboard_images with:
-    - [ ] beat_id, beat_name, start, duration
-    - [ ] image_url, shot_type, prompt_used
+  - [ ] Call generate_beat_image(video_id, i, beat, style, product, user_id)
+  - [ ] Append returned dict to storyboard_images
   - [ ] Add COST_SDXL_IMAGE to total_cost
 - [ ] Log completion with count and cost
 
-### Task 5.6: Implement Success/Failure Paths
+### Task 4.6: Implement Success/Failure Paths
 
 **File:** `backend/app/phases/phase2_storyboard/task.py` (continued)
 
@@ -206,56 +165,70 @@
 
 ---
 
-## PR #6: Phase 2 Tests
+## PR #5: Phase 4 Integration (Use Storyboard Images at Beat Boundaries)
 
-### Task 6.1: Create Phase 2 Unit Tests
+### Task 5.1: Update Phase 4 Chunk Generation Logic
 
-**File:** `backend/app/tests/test_phase2/test_storyboard.py`
+**File:** `backend/app/phases/phase4_chunks/task.py`
 
-- [ ] Import pytest, os
-- [ ] Import generate_storyboard from phase2_storyboard.task
-- [ ] Create mock spec with 3 beats
-- [ ] Create `test_storyboard_structure()`:
-  - [ ] Call generate_storyboard with mock spec
-  - [ ] Assert 'storyboard_images' in output_data
-  - [ ] Assert len(storyboard_images) == 3
-  - [ ] Verify each has required fields
-- [ ] Create `test_storyboard_cost_calculation()`:
-  - [ ] Call with 3 beats
-  - [ ] Assert cost_usd == 3 * COST_SDXL_IMAGE
-- [ ] Create `@pytest.mark.integration` test with real SDXL call (if API key present):
-  - [ ] Generate 1 storyboard image
-  - [ ] Verify S3 URL returned
-  - [ ] Verify image is 1280x720
+**Goal:** Modify chunk generation to use storyboard images at beat boundaries
 
-### Task 6.2: Create Integration Test (Phase 1 + 2)
+**Current Logic:**
+- Chunk 0: Uses Phase 3 reference image
+- Chunks 1+: Use last-frame continuation
 
-**File:** `backend/app/tests/test_integration/test_phase1_and_2.py`
+**NEW Logic (Option C):**
+- Determine which chunks start new beats
+- Use storyboard image at beat boundaries
+- Use last-frame continuation within beats
 
-- [ ] Import pytest, os
-- [ ] Import plan_video_intelligent, generate_storyboard
-- [ ] Create `@pytest.mark.integration` decorator
-- [ ] Create `@pytest.mark.skipif` for API keys
-- [ ] Create `test_phase1_to_phase2()`:
-  - [ ] Call Phase 1 with "15s Nike sneakers energetic"
-  - [ ] Assert Phase 1 success
-  - [ ] Extract spec
-  - [ ] Call Phase 2 with spec
-  - [ ] Assert Phase 2 success
-  - [ ] Assert storyboard_images count == beat count
-  - [ ] Assert all images have S3 URLs
-  - [ ] Assert total cost = Phase1 cost + Phase2 cost
+**Changes:**
+- [ ] Read `storyboard_images` from Phase 2 output (stored in DB or passed in)
+- [ ] Calculate beat boundaries → chunk mapping
+- [ ] For each chunk:
+  - [ ] Check if chunk starts a new beat
+  - [ ] If yes: Use corresponding storyboard image as init_image
+  - [ ] If no: Use last frame from previous chunk (existing logic)
+- [ ] Log which init_image source is used for each chunk
+
+**Algorithm for Beat-to-Chunk Mapping:**
+```python
+# Example: 3 beats (10s + 5s + 5s) with 5s chunks = 4 chunks
+# Beat 0 starts at 0s → Chunk 0
+# Beat 1 starts at 10s → Chunk 2 (10s / 5s per chunk)
+# Beat 2 starts at 15s → Chunk 3 (15s / 5s per chunk)
+
+beat_to_chunk = {}
+current_time = 0
+for beat_idx, beat in enumerate(beats):
+    chunk_idx = current_time // actual_chunk_duration
+    beat_to_chunk[chunk_idx] = beat_idx  # This chunk starts a beat
+    current_time += beat['duration']
+```
+
+### Task 5.2: Update Chunk Generation Function
+
+**File:** `backend/app/phases/phase4_chunks/service.py` (or wherever generate_single_chunk is)
+
+- [ ] Add `storyboard_images` parameter to chunk generation function
+- [ ] Add `beat_to_chunk_map` parameter
+- [ ] Check if current chunk_idx is in beat_to_chunk_map
+- [ ] If yes: Get storyboard_images[beat_idx]['image_url'] as init_image
+- [ ] If no: Use last_frame from previous chunk (existing logic)
+- [ ] Log: "Chunk {idx} - Using storyboard from beat {beat_idx}" or "Chunk {idx} - Using last frame continuation"
 
 ---
 
-## ✅ PR #4, #5, #6 Checklist
+## ✅ PR #4 & #5 Checklist
 
 Before merging:
-- [ ] All Phase 1 unit tests pass
-- [ ] All Phase 2 unit tests pass
-- [ ] Integration test (Phase 1+2) passes with API keys
-- [ ] Storyboard images are 1280x720
-- [ ] S3 uploads work correctly
+- [ ] Phase 3 explicitly disabled with clear comments
+- [ ] Phase 2 generates N storyboard images (1 per beat)
+- [ ] Storyboard images stored in database
+- [ ] Phase 4 calculates beat-to-chunk mapping correctly
+- [ ] Phase 4 uses storyboard images at beat boundaries
+- [ ] Phase 4 uses last-frame continuation within beats
+- [ ] All S3 uploads work correctly
 - [ ] Cost calculation is accurate
 
-**Next:** Move to `TDD-tasks-3.md` for Phase 3 implementation
+**Next:** Move to `TDD-tasks-3.md` for Phase 4 refinement and end-to-end testing

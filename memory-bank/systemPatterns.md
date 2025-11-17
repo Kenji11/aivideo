@@ -57,26 +57,32 @@ Each video generation flows through 6 sequential phases:
 - Cost: $0.02 | Time: 5-10s
 - Key Change: LLM composes custom sequences, not just template selection
 
-**Phase 2: Storyboard Generation (TDD v2.0)**
+**Phase 2: Storyboard Generation (TDD v2.0)** ✅ ACTIVE
 - Input: Spec with beats from Phase 1
 - Process: Generate 1 SDXL image per beat (1:1 mapping)
 - Output: N storyboard images (N = number of beats)
 - Cost: $0.0055 per image | Time: ~8s per image
-- Key Change: One image per beat (not 15 fixed frames)
+- Key Change: REPLACES Phase 3 reference generation
+- Images used at beat boundaries in Phase 4
 - Example: 3 beats = 3 images, 6 beats = 6 images
 
-**Phase 3: Reference Assets**
-- Input: Spec from Phase 1
-- Process: Generate style guide + product references (SDXL)
-- Output: Canonical visual references
-- Cost: $0.02 | Time: 15s
+**Phase 3: Reference Assets** ❌ DISABLED (TDD v2.0)
+- Status: Explicitly disabled, kept in codebase for backward compatibility
+- OLD: Generated 1 reference image per video
+- NEW: Phase 2 storyboard images replace this functionality
+- Function returns "skipped" status immediately
+- May be removed entirely in future refactor
 
-**Phase 4: Chunked Video Generation**
-- Input: Spec + Animatic + References
-- Process: Generate 15 × 2s video chunks in parallel (Zeroscope/AnimateDiff)
-- Output: 15 video chunks
-- Cost: $1.50-$3.00 | Time: 5-8 minutes
-- Pattern: Parallel execution using Celery groups
+**Phase 4: Chunked Video Generation (TDD v2.0)** ✅ UPDATED
+- Input: Spec + Storyboard Images (from Phase 2)
+- Process: Generate video chunks with beat-boundary mapping
+- Init Image Strategy (Option C):
+  - Chunks at beat boundaries: Use storyboard image from Phase 2
+  - Chunks within beats: Use last-frame continuation
+  - Example: Beat 1 (10s) = Chunk 0 (storyboard) + Chunk 1 (last-frame)
+- Output: N video chunks (depends on total duration and model)
+- Cost: $0.45 per 5s chunk (wan model) | Time: ~45s per chunk
+- Pattern: Sequential generation for temporal coherence
 
 **Phase 5: Refinement**
 - Input: Stitched video
@@ -136,18 +142,31 @@ Each video generation flows through 6 sequential phases:
 
 ### 3. Temporal Consistency Pattern
 
-**Last-Frame Continuation (PR #8)** ✅ ACTIVE
-- **Chunk 0**: Uses Phase 3 reference image as init_image
-- **Chunks 1+**: Use last frame from previous chunk as init_image
-- Creates temporal coherence and motion continuity
-- Result: "One continuous take" feel, eliminates visual resets
-- Trade-off: Requires sequential generation (slower but better quality)
+**Beat Boundary Images + Last-Frame Continuation (TDD v2.0)** ✅ ACTIVE
+- **Beat Boundaries**: Use storyboard images from Phase 2
+  - Each beat starts with its corresponding storyboard image
+  - Provides visual refresh at narrative transitions
+  - Example: Chunk 0 (beat 1), Chunk 2 (beat 2), Chunk 3 (beat 3)
+- **Within Beats**: Use last-frame continuation
+  - Maintains temporal coherence during the beat
+  - Smooth motion within narrative segment
+  - Example: Beat 1 (10s) = Chunk 0 (storyboard) + Chunk 1 (last-frame)
+- **Algorithm**: 
+  ```python
+  beat_to_chunk = {}
+  current_time = 0
+  for beat_idx, beat in enumerate(beats):
+      chunk_idx = current_time // actual_chunk_duration
+      beat_to_chunk[chunk_idx] = beat_idx
+      current_time += beat['duration']
+  ```
+- Result: Narrative structure + temporal coherence
+- Trade-off: Sequential generation required (slower but better)
 
-**Animatic-as-Reference** (DISABLED FOR MVP)
-- Generate cheap, low-detail structural frames
-- Use as ControlNet inputs for video generation
-- Ensures character/object consistency across clips
-- May re-enable post-MVP for multi-image workflows
+**OLD: Phase 3 Single Reference (PR #8)** ❌ DEPRECATED
+- Chunk 0: Uses Phase 3 reference image
+- Chunks 1+: Use last frame continuation
+- Replaced by beat boundary system (more dynamic)
 
 ### 4. Processing Pattern Evolution
 
