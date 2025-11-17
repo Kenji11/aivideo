@@ -2,14 +2,9 @@
 import time
 import json
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict
 from celery import group
-from app.phases.phase4_chunks.chunk_generator import (
-    generate_single_chunk, 
-    build_chunk_specs,
-    generate_single_chunk_with_storyboard,
-    build_chunk_specs_with_storyboard
-)
+from app.phases.phase4_chunks.chunk_generator import generate_single_chunk, build_chunk_specs
 from app.common.exceptions import PhaseException
 
 
@@ -76,46 +71,9 @@ class ChunkGenerationService:
             print(f"   Reference URLs: {json.dumps(reference_urls, indent=2) if reference_urls else '{}'}")
             print("="*70)
             
-            # Check if we have storyboard images (from Phase 2)
-            # Storyboard images are stored in spec['beats'][i]['image_url']
-            beats = spec.get('beats', [])
-            storyboard_images_count = sum(1 for beat in beats if beat.get('image_url'))
-            
-            # Decide which logic to use
-            use_storyboard_logic = storyboard_images_count > 1  # Use new logic if we have multiple storyboard images
-            use_old_logic = storyboard_images_count <= 1  # Fallback to old logic if only one image
-            
-            print("="*70)
-            print(f"🔍 Logic Selection:")
-            print(f"   Storyboard Images Found: {storyboard_images_count}/{len(beats)} beats")
-            if use_storyboard_logic:
-                print(f"   ✅ Using NEW LOGIC: Storyboard-based chunk generation")
-            else:
-                print(f"   ✅ Using OLD LOGIC: Reference-based chunk generation (fallback)")
-            print("="*70)
-            
             # Build chunk specifications
             print(f"🔨 Building chunk specifications for {video_id}...")
-            beat_to_chunk_map = None
-            
-            if use_storyboard_logic:
-                try:
-                    chunk_specs, beat_to_chunk_map = build_chunk_specs_with_storyboard(
-                        video_id=video_id,
-                        spec=spec,
-                        reference_urls=reference_urls,
-                        user_id=user_id
-                    )
-                    print(f"   ✅ Storyboard mode: {len(chunk_specs)} chunks, {len(beat_to_chunk_map)} beat boundaries")
-                except Exception as e:
-                    print(f"   ⚠️  Storyboard logic failed: {str(e)}, falling back to old logic")
-                    use_storyboard_logic = False
-                    use_old_logic = True
-                    chunk_specs = build_chunk_specs(video_id, spec, animatic_urls, reference_urls, user_id)
-            else:
-                # Use old logic
-                chunk_specs = build_chunk_specs(video_id, spec, animatic_urls, reference_urls, user_id)
-            
+            chunk_specs = build_chunk_specs(video_id, spec, animatic_urls, reference_urls, user_id)
             num_chunks = len(chunk_specs)
             
             print(f"Generating {num_chunks} chunks in parallel...")
@@ -147,13 +105,7 @@ class ChunkGenerationService:
                         chunk_spec.previous_chunk_last_frame = last_frame_urls[i - 1]
                     
                     # Generate chunk synchronously (using apply to get result immediately)
-                    # Use storyboard-aware function if in storyboard mode
-                    if use_storyboard_logic:
-                        result = generate_single_chunk_with_storyboard.apply(
-                            args=[chunk_spec.dict(), beat_to_chunk_map]
-                        )
-                    else:
-                        result = generate_single_chunk.apply(args=[chunk_spec.dict()])
+                    result = generate_single_chunk.apply(args=[chunk_spec.dict()])
                     
                     # Accessing result.result may raise an exception if the task failed
                     try:
@@ -271,13 +223,7 @@ class ChunkGenerationService:
                             print(f"   ⚠️  Warning: Chunk {chunk_index} requires previous chunk's last frame, but it's not available")
                     
                     # Generate chunk synchronously (using apply to get result immediately)
-                    # Use storyboard-aware function if in storyboard mode (check if beat_to_chunk_map exists)
-                    if beat_to_chunk_map is not None:
-                        result = generate_single_chunk_with_storyboard.apply(
-                            args=[chunk_spec.dict(), beat_to_chunk_map]
-                        )
-                    else:
-                        result = generate_single_chunk.apply(args=[chunk_spec.dict()])
+                    result = generate_single_chunk.apply(args=[chunk_spec.dict()])
                     
                     # Accessing result.result may raise an exception if the task failed
                     try:
