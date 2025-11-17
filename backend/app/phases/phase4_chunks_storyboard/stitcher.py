@@ -107,9 +107,18 @@ class VideoStitcher:
                     )
                 
                 # Add filter complex with memory-efficient and speed-optimized settings
+                # Check if filter includes audio output
+                has_audio_in_filter = '[a]' in filter_complex
                 cmd.extend([
                     '-filter_complex', filter_complex,
-                    '-map', '[v]',  # Map output from filter
+                    '-map', '[v]',  # Map video output from filter
+                ])
+                if has_audio_in_filter:
+                    cmd.extend([
+                        '-map', '[a]',  # Map audio output from filter (if present)
+                        '-c:a', 'copy',  # Copy audio without re-encoding (preserves Veo audio)
+                    ])
+                cmd.extend([
                     '-c:v', 'libx264',
                     '-pix_fmt', 'yuv420p',
                     '-r', '24',  # 24 fps
@@ -204,6 +213,7 @@ class VideoStitcher:
                             '-i', chunk_path,
                             '-vf', f'scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2,fps=24,format=yuv420p',
                             '-c:v', 'libx264',
+                            '-c:a', 'copy',  # Copy audio without re-encoding (preserves Veo audio)
                             '-preset', 'ultrafast',  # Use 'ultrafast' for speed (8 min deadline)
                             '-crf', '23',
                             '-threads', '2',  # Limit threads to reduce memory usage
@@ -255,6 +265,7 @@ class VideoStitcher:
                     '-safe', '0',
                     '-i', concat_file,
                     '-c:v', 'libx264',
+                    '-c:a', 'copy',  # Copy audio without re-encoding (preserves Veo audio)
                     '-pix_fmt', 'yuv420p',
                     '-r', '24',
                     '-preset', 'ultrafast',  # Use 'ultrafast' for speed (8 min deadline)
@@ -334,6 +345,30 @@ class VideoStitcher:
                 except Exception:
                     pass  # Directory not empty, ignore
     
+    def _has_audio_stream(self, video_path: str) -> bool:
+        """
+        Check if video file has an audio stream using ffprobe.
+        
+        Args:
+            video_path: Path to video file
+            
+        Returns:
+            True if audio stream exists, False otherwise
+        """
+        try:
+            cmd = [
+                'ffprobe',
+                '-v', 'error',
+                '-select_streams', 'a:0',
+                '-show_entries', 'stream=codec_type',
+                '-of', 'csv=p=0',
+                video_path
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=5)
+            return result.returncode == 0 and result.stdout.strip() == 'audio'
+        except Exception:
+            return False  # Assume no audio if check fails
+    
     def _get_video_resolution(self, video_path: str) -> tuple:
         """
         Get video resolution (width, height) using ffprobe.
@@ -402,7 +437,12 @@ class VideoStitcher:
         """
         if len(chunk_paths) < 2:
             # Single chunk - no transitions needed
-            return "[0:v]copy[v]"
+            # Check if audio exists - if yes, preserve it; if no, video only
+            has_audio = self._has_audio_stream(chunk_paths[0])
+            if has_audio:
+                return "[0:v]copy[v];[0:a]copy[a]"
+            else:
+                return "[0:v]copy[v]"
         
         # Auto-detect target resolution if not provided
         if target_resolution is None:
@@ -422,9 +462,21 @@ class VideoStitcher:
             normalize_filter = f"{scale_filter},{pad_filter},fps=24,format=yuv420p,setpts=PTS-STARTPTS"
             input_labels.append(f"[{i}:v]{normalize_filter}[v{i}]")
         
-        # Concat all normalized inputs
+        # Check if any chunk has audio - if all have audio, include it; otherwise video only
+        has_audio = all(self._has_audio_stream(path) for path in chunk_paths)
+        
+        # Concat all normalized inputs (video and audio)
         concat_inputs = ';'.join(input_labels)
-        concat_parts = ''.join([f"[v{i}]" for i in range(len(chunk_paths))])
-        concat_filter = f"{concat_inputs};{concat_parts}concat=n={len(chunk_paths)}:v=1:a=0[v]"
+        concat_video_parts = ''.join([f"[v{i}]" for i in range(len(chunk_paths))])
+        
+        if has_audio:
+            # Build concat filter that includes both video and audio
+            # Format: [v0][v1]...[vN][0:a][1:a]...[N:a]concat=n=N:v=1:a=1[v][a]
+            concat_audio_parts = ''.join([f"[{i}:a]" for i in range(len(chunk_paths))])
+            # Use a=1 to include audio, v=1 for video - concat both video and audio streams together
+            concat_filter = f"{concat_inputs};{concat_video_parts}{concat_audio_parts}concat=n={len(chunk_paths)}:v=1:a=1[v][a]"
+        else:
+            # Video only - no audio streams
+            concat_filter = f"{concat_inputs};{concat_video_parts}concat=n={len(chunk_paths)}:v=1:a=0[v]"
         
         return concat_filter
