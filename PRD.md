@@ -3,9 +3,13 @@
 
 **Version:** 2.0  
 **Date:** November 14, 2025  
+**Last Updated:** November 17, 2025  
 **Project Duration:** 7 days (MVP in 48 hours)  
 **Target:** $5,000 Bounty Competition  
 **Region:** us-east-2 (Ohio)
+
+### Recent Changes
+- **November 17, 2025**: Migrated from Alembic to raw SQL migrations for better control and to eliminate race conditions in multi-container Docker setups
 
 ---
 
@@ -204,7 +208,7 @@ Build an end-to-end AI video generation pipeline that transforms text prompts in
 **Development Tools:**
 - Docker + Docker Compose (local dev)
 - Poetry (Python dependency management)
-- Alembic (database migrations)
+- Raw SQL migrations (custom runner)
 - Pytest (testing)
 
 ---
@@ -314,10 +318,13 @@ backend/
 │       ├── test_phase5/
 │       └── test_phase6/
 │
-├── alembic/                       # Database migrations
-│   ├── versions/
-│   └── env.py
+├── migrations/                    # Database migrations (SQL)
+│   ├── 001_initial_schema.sql
+│   ├── 002_add_final_music_url.sql
+│   ├── 003_add_storyboard_images.sql
+│   └── README.md
 │
+├── migrate.py                     # Migration runner
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
@@ -1933,8 +1940,8 @@ celery -A app.orchestrator.celery_app inspect active
 pytest tests/
 
 # Database migrations
-alembic revision --autogenerate -m "Initial migration"
-alembic upgrade head
+python migrate.py status   # Check migration status
+python migrate.py up       # Apply pending migrations
 ```
 
 ---
