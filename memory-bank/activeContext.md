@@ -1,33 +1,80 @@
 # Active Context
 
 ## Current Status
-**Project Phase**: MVP Complete - Production Testing  
-**PRD Version**: 2.0  
-**Date**: November 15, 2025  
-**Day**: 1 (Active Development)  
+**Project Phase**: TDD Implementation - Beat-Based Architecture Refactor  
+**TDD Version**: TDD-storyboarding.md (Version 2.0)  
+**Date**: November 16, 2025  
+**Day**: 2 (TDD Implementation)  
 **Team Size**: 1 person (solo development)  
 **Region**: AWS us-east-2 (Ohio)
 
 ## What Just Happened
-1. ✅ **PR #8 Complete**: Last-frame continuation for temporal coherence
-2. ✅ Fixed duration override bug (user-specified durations now respected)
-3. ✅ Enhanced Phase 1 logging (duration optimization + chunk calculation)
-4. ✅ All 8 PRs completed successfully
-5. ✅ Pipeline running end-to-end with Phase 1 → Phase 3 → Phase 4 flow
-6. ✅ Phase 2 (Animatic) temporarily disabled for MVP
-7. ✅ Phase 5 & 6 working (refinement has S3 path issue, being addressed)
+1. ✅ **TDD-tasks-1.md PR #1 Complete**: Beat Library & Template Archetypes implemented
+2. ✅ **Phase 2 Architecture Defined**: Storyboard generation replaces Phase 3 references
+3. ✅ **TDD-tasks-2.md Updated**: Removed PR #4 (testing), clarified Phase 2→3 replacement
+4. 🔄 **Starting TDD-tasks-2.md**: PR #4 & PR #5 - Phase 2 Storyboard + Phase 4 Integration
+5. ⏸️ **Full Testing Postponed**: Will add comprehensive tests after core implementation
 
 ## Current Focus
-**Testing 30s video generation with 6 chunks using last-frame continuation**
+**Planning TDD-tasks-2.md PRs #4 & #5: Phase 2 Storyboard Generation**
 
-### Immediate Tasks
-1. Test 30s video with user-specified duration (should generate 6 chunks)
-2. Verify last-frame continuation works across all 6 chunks
-3. Check video quality and temporal coherence
-4. Fix Phase 5 S3 path issue (stitched video not found)
-5. Document findings and next optimizations
+### Immediate Tasks (TDD PRs #4-5)
+1. ✅ Define Phase 2 architecture (Option C: beat boundary images)
+2. ✅ Update TDD-tasks-2.md with detailed implementation plan
+3. 🔄 Disable Phase 3 explicitly (keep code, mark as disabled)
+4. 🔄 Implement Phase 2 storyboard generation (1 image per beat)
+5. 🔄 Update Phase 4 to use storyboard images at beat boundaries
+6. 🔄 Update memory bank with architectural decisions
 
 ## Recent Decisions
+
+### TDD Architecture Decisions (November 17, 2025)
+
+1. **Complete Phase 1 Replacement** ✅
+   - DELETE old template JSON files (product_showcase.json, lifestyle_ad.json, announcement.json)
+   - DELETE old service methods (template selection, duration optimization)
+   - KEEP directory structure (`phase1_validate/` - no renaming)
+   - Replace with beat library + LLM composition system
+
+2. **Strict TDD Adherence** ✅
+   - ALL beat durations MUST be 5s, 10s, or 15s (no exceptions)
+   - LLM composes beat sequences (no hardcoded logic)
+   - 15 beats in library (5 opening, 5 product, 3 dynamic, 2 closing)
+   - 5 template archetypes as high-level guides
+
+3. **Database Strategy** ✅
+   - Add ONLY `storyboard_images` field (JSON, list of image URLs)
+   - Store `creativity_level`, `selected_archetype`, `num_beats`, `num_chunks` in `spec` JSON
+   - Do NOT remove old fields yet (backward compat for existing data)
+   - Do NOT modify `VideoStatus` enum (out of scope)
+   - Migration executed LAST (after all TDD PRs)
+
+4. **No Backward Compatibility for New Videos** ✅
+   - Old videos in DB stay untouched (spec is JSON)
+   - New videos use new spec format
+   - No code to support old format generation
+   - Clean break for forward progress
+
+5. **Phase 2 Replaces Phase 3** ✅ NEW
+   - OLD: Phase 3 generates 1 reference image per video
+   - NEW: Phase 2 generates N storyboard images (1 per beat)
+   - Phase 3 explicitly disabled but kept in codebase
+   - Storyboard images stored in database `storyboard_images` field
+
+6. **Beat-to-Chunk Mapping (Option C)** ✅ NEW
+   - Storyboard images used at **beat boundaries only**
+   - Within a beat: use last-frame continuation
+   - Example: Beat 1 (10s) = Chunk 0 (storyboard) + Chunk 1 (last-frame)
+   - Example: Beat 2 (5s) = Chunk 2 (storyboard from beat 2)
+   - Algorithm: `chunk_idx = beat_start_time // actual_chunk_duration`
+   - Maintains temporal coherence within beats
+   - Provides visual reset at narrative boundaries
+
+7. **Testing Strategy** ✅ NEW
+   - Comprehensive testing deferred until after core implementation
+   - Focus on getting system working end-to-end first
+   - Will add full test suite after PRs #4-5 complete
+   - Integration testing with real APIs as primary validation
 
 ### Key Implementation Decisions (November 15, 2025)
 
@@ -69,27 +116,42 @@
    - Phase 4: Init image selection per chunk
    - Why: Better debugging and transparency
 
-### Template Strategy
-Start with 3 templates:
-1. **Product Showcase**: Luxury goods, details-focused
-2. **Lifestyle Ad**: Real-world usage, dynamic
-3. **Announcement**: Brand messaging, bold graphics
+### New Beat-Based Strategy (TDD)
+**15-Beat Library:**
+- 5 Opening: hero_shot, ambient_lifestyle, teaser_reveal, dynamic_intro, atmospheric_setup
+- 5 Product: detail_showcase, product_in_motion, usage_scenario, lifestyle_context, feature_highlight_sequence
+- 3 Dynamic: action_montage, benefit_showcase, transformation_moment
+- 2 Closing: call_to_action, brand_moment
+
+**5 Template Archetypes:**
+1. **luxury_showcase**: Elegant, cinematic, premium goods
+2. **energetic_lifestyle**: Dynamic, active, motivational
+3. **minimalist_reveal**: Clean, simple, focused
+4. **emotional_storytelling**: Narrative, connection, transformation
+5. **feature_demo**: Informative, benefit-driven, professional
 
 ## Next Steps
 
-### Immediate (Now)
-1. ✅ Test with 30s user-specified duration
-2. 🔄 Verify 6 chunks generated (not 2)
-3. 🔄 Check temporal coherence across all chunks
-4. 🔲 Fix Phase 5 S3 path issue
-5. 🔲 Test full 30s video end-to-end
+### Immediate (TDD PRs #4-5) - CURRENT
+1. 🔄 Disable Phase 3 explicitly (add comments, return skipped status)
+2. 🔄 Create Phase 2 directory structure
+3. 🔄 Implement Phase 2 storyboard generation (1 image per beat)
+4. 🔄 Update Phase 4 to calculate beat-to-chunk mapping
+5. 🔄 Update Phase 4 to use storyboard images at beat boundaries
 
-### Short Term (Next Session)
-1. Optimize chunk generation speed (currently sequential)
-2. Consider batch generation after chunk 0
-3. Add transition effects at beat boundaries (future enhancement)
-4. Improve error handling and retry logic
-5. Add more comprehensive logging
+### Short Term (After PRs #4-5)
+1. Test Phase 1 → Phase 2 → Phase 4 pipeline
+2. Verify beat boundary images working correctly
+3. Verify last-frame continuation within beats
+4. Update orchestrator/pipeline to call Phase 2 (not Phase 3)
+5. End-to-end test with various beat sequences
+
+### Medium Term (TDD Completion)
+1. Add comprehensive test suite
+2. Execute database migration
+3. Update frontend to show storyboard images
+4. Performance optimization (parallel generation within beats)
+5. Fix any remaining Phase 5 S3 path issues
 
 ### Known Issues to Address
 1. **Phase 5 S3 Path**: Stitched video not found (404 error)
