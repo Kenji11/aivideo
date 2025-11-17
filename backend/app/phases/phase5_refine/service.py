@@ -61,9 +61,6 @@ class RefinementService:
             video_model = spec.get('model', 'hailuo')
             model_has_native_audio = video_model in ['veo_fast', 'veo']
             
-            if model_has_native_audio:
-                print(f"🎵 Model '{video_model}' generates native audio - using video as-is (no music library)")
-            
             # Step 1: Download stitched video from Phase 4
             print(f"📥 Downloading stitched video from: {stitched_url}")
             try:
@@ -73,23 +70,24 @@ class RefinementService:
             except Exception as e:
                 raise PhaseException(f"Failed to download stitched video from {stitched_url}: {str(e)}")
             
-            # Get actual video duration from the file (not from spec, as video might be longer)
-            print("⏱️  Detecting actual video duration...")
-            try:
-                video_clip = VideoFileClip(stitched_path)
-                actual_duration = video_clip.duration
-                video_clip.close()
-                print(f"   ✅ Actual video duration: {actual_duration:.2f}s (spec said: {spec.get('duration', 'unknown')}s)")
-            except Exception as e:
-                print(f"   ⚠️  Could not detect video duration: {str(e)}, using spec duration")
-                actual_duration = spec.get('duration', 30)
-            
-            # For models with native audio (Veo), skip music processing entirely
+            # For models with native audio (Veo), skip ALL music processing entirely
             if model_has_native_audio:
-                print("   ✅ Using native audio from video model - skipping music library")
+                print(f"🎵 Model '{video_model}' generates native audio - skipping ALL music processing")
+                print("   ✅ Using video with native audio as-is (no music library, no audio combination)")
                 final_path = stitched_path
                 music_url = None
             else:
+                # Get actual video duration from the file (not from spec, as video might be longer)
+                print("⏱️  Detecting actual video duration...")
+                try:
+                    video_clip = VideoFileClip(stitched_path)
+                    actual_duration = video_clip.duration
+                    video_clip.close()
+                    print(f"   ✅ Actual video duration: {actual_duration:.2f}s (spec said: {spec.get('duration', 'unknown')}s)")
+                except Exception as e:
+                    print(f"   ⚠️  Could not detect video duration: {str(e)}, using spec duration")
+                    actual_duration = spec.get('duration', 30)
+                
                 # Step 2: Analyze video content for better audio matching
                 print("🔍 Analyzing video content for audio matching...")
                 video_analysis = None

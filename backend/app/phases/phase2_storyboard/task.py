@@ -68,7 +68,7 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
             # Track storyboard image info
             storyboard_images.append(beat_image_info)
             
-            # Track cost
+            # Track cost (FLUX Dev: $0.025 per image)
             total_cost += COST_FLUX_DEV_IMAGE
             
             logger.info(

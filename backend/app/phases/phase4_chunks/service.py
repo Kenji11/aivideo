@@ -97,7 +97,9 @@ class ChunkGenerationService:
                         video_id,
                         "generating_chunks",
                         chunk_progress,
-                        current_phase="phase4_chunks"
+                        current_phase="phase4_chunks",
+                        current_chunk_index=i,  # 0-based index
+                        total_chunks=num_chunks
                     )
                     
                     # Update previous_chunk_last_frame if available

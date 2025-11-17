@@ -75,13 +75,17 @@ Each video generation flows through 6 sequential phases:
 
 **Phase 4: Chunked Video Generation (TDD v2.0)** ✅ UPDATED
 - Input: Spec + Storyboard Images (from Phase 2)
-- Process: Generate video chunks with beat-boundary mapping
+- Process: Generate video chunks with dynamic beat-boundary mapping
 - Init Image Strategy (Option C):
   - Chunks at beat boundaries: Use storyboard image from Phase 2
   - Chunks within beats: Use last-frame continuation
   - Example: Beat 1 (10s) = Chunk 0 (storyboard) + Chunk 1 (last-frame)
+- **Dynamic Mapping**: Phase 4 adapts to any number of storyboard images
+  - No hardcoded thresholds - works with 1, 3, 10, or any number of images
+  - Beat-to-chunk mapping calculated from actual beat start times
+  - Gracefully handles partial images (uses available, falls back for missing)
 - Output: N video chunks (depends on total duration and model)
-- Cost: $0.45 per 5s chunk (wan model) | Time: ~45s per chunk
+- Cost: $0.04 per 5s chunk (hailuo) | Time: ~45s per chunk
 - Pattern: Sequential generation for temporal coherence
 
 **Phase 5: Refinement**
@@ -151,15 +155,23 @@ Each video generation flows through 6 sequential phases:
   - Maintains temporal coherence during the beat
   - Smooth motion within narrative segment
   - Example: Beat 1 (10s) = Chunk 0 (storyboard) + Chunk 1 (last-frame)
-- **Algorithm**: 
+- **Dynamic Mapping Algorithm**: 
   ```python
+  # Uses actual beat['start'] values from Phase 1 (not recalculated)
   beat_to_chunk = {}
-  current_time = 0
   for beat_idx, beat in enumerate(beats):
-      chunk_idx = current_time // actual_chunk_duration
-      beat_to_chunk[chunk_idx] = beat_idx
-      current_time += beat['duration']
+      beat_start = beat.get('start', 0.0)
+      chunk_spacing = actual_chunk_duration * 0.75  # 25% overlap
+      chunk_idx = int(beat_start // chunk_spacing)
+      # Only map if chunk actually starts at beat (within 0.5s tolerance)
+      if abs(chunk_idx * chunk_spacing - beat_start) < 0.5:
+          beat_to_chunk[chunk_idx] = beat_idx
   ```
+- **Key Features**:
+  - Dynamically adapts to any number of storyboard images
+  - No hardcoded assumptions about image count
+  - Handles partial images gracefully (warns but continues)
+  - Falls back to old logic only if 0 images found
 - Result: Narrative structure + temporal coherence
 - Trade-off: Sequential generation required (slower but better)
 

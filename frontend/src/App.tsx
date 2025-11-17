@@ -42,7 +42,10 @@ function AppContent() {
   const [referenceAssets, setReferenceAssets] = useState<StatusResponse['reference_assets'] | null>(null);
   const [stitchedVideoUrl, setStitchedVideoUrl] = useState<string | null>(null);
   const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>('hailuo');
+  const [selectedModel, setSelectedModel] = useState<string>('veo_fast');
+  const [currentChunkIndex, setCurrentChunkIndex] = useState<number | null>(null);
+  const [totalChunks, setTotalChunks] = useState<number | null>(null);
+  const [currentPhase, setCurrentPhase] = useState<string | undefined>(undefined);
 
   const steps = [
     { id: 1, name: 'Create', icon: Sparkles },
@@ -52,13 +55,16 @@ function AppContent() {
   ];
 
   // Map current_phase to processing step index
+  // Phase 3 (References) is disabled - skipped in pipeline
   const getProcessingStepFromPhase = (phase: string | undefined, progress: number): number => {
     if (!phase) return 0;
     if (phase === 'phase1_validate') return 0;
-    if (phase === 'phase2_animatic') return 1;
-    if (phase === 'phase3_references') return 2;
-    if (phase === 'phase4_chunks') return 3;
-    return Math.floor(progress / 25);
+    if (phase === 'phase2_storyboard' || phase === 'phase2_animatic') return 1; // Support both new and legacy phase names
+    // Phase 3 (references) is disabled - skip to Phase 4
+    if (phase === 'phase3_references') return 2; // Should not occur, but handle gracefully
+    if (phase === 'phase4_chunks') return 2; // Moved from 3 to 2 (Phase 3 removed)
+    if (phase === 'phase5_refine') return 2; // Phase 5 is part of chunk generation/refinement, keep at step 2
+    return Math.min(Math.floor(progress / 25), 2); // Cap at 2 (max step index)
   };
 
   const getStepStatus = (stepIndex: number): 'completed' | 'processing' | 'pending' => {
@@ -69,9 +75,10 @@ function AppContent() {
 
   const processingSteps = [
     { name: 'Content planning with AI', status: getStepStatus(0) },
-    { name: 'Generating animatic frames', status: getStepStatus(1) },
-    { name: 'Creating reference images', status: getStepStatus(2) },
-    { name: 'Generating & stitching video chunks', status: getStepStatus(3) },
+    { name: 'Generating storyboard images', status: getStepStatus(1) },
+    // Phase 3 (Creating reference images) is disabled - commented out
+    // { name: 'Creating reference images', status: getStepStatus(2) },
+    { name: 'Generating & stitching video chunks', status: getStepStatus(2) }, // Moved from 3 to 2
   ];
 
   const addNotification = (type: Notification['type'], title: string, message: string) => {
@@ -92,41 +99,84 @@ function AppContent() {
   useEffect(() => {
     if (!videoId || !isProcessing) return;
 
+    let hasShownAnimaticNotification = false;
+    let hasShownStitchedNotification = false;
+
     const pollStatus = async () => {
       try {
         const status = await getVideoStatus(videoId);
         
         const currentStep = getProcessingStepFromPhase(status.current_phase, status.progress);
         setProcessingProgress(currentStep);
+        setCurrentPhase(status.current_phase);
         
-        if (status.animatic_urls && status.animatic_urls.length > 0 && !animaticUrls) {
-          setAnimaticUrls(status.animatic_urls);
-          addNotification('success', 'Animatic Frames Generated', `${status.animatic_urls.length} animatic frames ready!`);
+        // Update animatic URLs (allow updates if they change)
+        if (status.animatic_urls && status.animatic_urls.length > 0) {
+          // Only show notification on first set, but allow updates
+          setAnimaticUrls(prev => {
+            const isFirstTime = !prev;
+            if (isFirstTime && !hasShownAnimaticNotification) {
+              hasShownAnimaticNotification = true;
+              addNotification('success', 'Storyboard Images Generated', `${status.animatic_urls!.length} storyboard image${status.animatic_urls!.length !== 1 ? 's' : ''} ready!`);
+            }
+            return status.animatic_urls!;
+          });
         }
         
-        if (status.reference_assets && !referenceAssets) {
-          setReferenceAssets(status.reference_assets);
-          addNotification('success', 'Reference Assets Generated', 'Style guide and product references are ready!');
+        // Phase 3 (Reference Assets) is disabled - commented out
+        // if (status.reference_assets && !referenceAssets) {
+        //   setReferenceAssets(status.reference_assets);
+        //   addNotification('success', 'Reference Assets Generated', 'Style guide and product references are ready!');
+        // }
+        
+        // Update current chunk progress for Phase 4
+        if (status.current_phase === 'phase4_chunks') {
+          if (status.current_chunk_index !== undefined) {
+            setCurrentChunkIndex(status.current_chunk_index);
+          }
+          if (status.total_chunks !== undefined) {
+            setTotalChunks(status.total_chunks);
+          }
+        } else {
+          // Clear chunk progress when Phase 4 is done
+          setCurrentChunkIndex(null);
+          setTotalChunks(null);
         }
         
-        if (status.stitched_video_url && !stitchedVideoUrl) {
-          setStitchedVideoUrl(status.stitched_video_url);
-          addNotification('success', 'Video Chunks Generated', 'Video chunks are being stitched together!');
-        }
-        
-        // Update to final video URL when Phase 5 completes (prefer final_video_url over stitched_video_url)
-        if (status.final_video_url && status.final_video_url !== stitchedVideoUrl) {
-          setStitchedVideoUrl(status.final_video_url);
+        // Update video URLs - prefer final_video_url, fallback to stitched_video_url
+        // For Veo models, Phase 5 is skipped, so final_video_url might not be set
+        const videoUrl = status.final_video_url || status.stitched_video_url;
+        if (videoUrl) {
+          setStitchedVideoUrl(prev => {
+            const isFirstTime = !prev;
+            const urlChanged = prev && prev !== videoUrl;
+            const isFinalVideo = !!status.final_video_url;
+            
+            if (isFirstTime) {
+              // First time we get a video URL
+              if (!hasShownStitchedNotification) {
+                hasShownStitchedNotification = true;
+                if (isFinalVideo) {
+                  addNotification('success', 'Video Complete', 'Your video with audio is ready!');
+                } else {
+                  addNotification('success', 'Video Chunks Generated', 'Video chunks are being stitched together!');
+                }
+              }
+            } else if (urlChanged && isFinalVideo) {
+              // URL changed from stitched to final (Phase 5 completed for non-Veo models)
+              if (!hasShownStitchedNotification) {
+                hasShownStitchedNotification = true;
+                addNotification('success', 'Video Complete', 'Your video with audio is ready!');
+              }
+            }
+            
+            return videoUrl;
+          });
         }
         
         if (status.status === 'complete') {
           setIsProcessing(false);
           navigate('/preview');
-          if (status.final_video_url) {
-            addNotification('success', 'Video Complete', 'Your video with audio is ready!');
-          } else {
-            addNotification('success', 'Video Complete', 'Your video is ready!');
-          }
         } else if (status.status === 'failed') {
           setIsProcessing(false);
           addNotification('error', 'Generation Failed', status.error || 'Unknown error');
@@ -140,7 +190,7 @@ function AppContent() {
     pollStatus();
 
     return () => clearInterval(interval);
-  }, [videoId, isProcessing, referenceAssets, stitchedVideoUrl, animaticUrls, navigate]);
+  }, [videoId, isProcessing, navigate]); // Removed unnecessary dependencies to prevent re-renders
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -159,8 +209,14 @@ function AppContent() {
       setIsProcessing(true);
       setElapsedTime(0);
       setProcessingProgress(0);
-      setReferenceAssets(null);
+      // Reset all state for new video generation
+      setAnimaticUrls(null);
       setStitchedVideoUrl(null);
+      setCurrentChunkIndex(null);
+      setTotalChunks(null);
+      setCurrentPhase(undefined);
+      // Phase 3 disabled - reference assets not used
+      // setReferenceAssets(null);
       navigate('/processing');
       
       const response = await generateVideo({
@@ -424,15 +480,15 @@ function AppContent() {
                     className="input-field"
                     disabled={isProcessing}
                   >
-                    <option value="hailuo">Hailuo 2.3 Fast (Default)</option>
+                    <option value="veo_fast">Google Veo 3.1 Fast (Recommended)</option>
+                    <option value="veo">Google Veo 3.1</option>
+                    <option value="hailuo">Hailuo 2.3 Fast</option>
                     <option value="seedance">Seedance 1.0 Pro Fast</option>
                     <option value="kling">Kling v2.5 Turbo Pro</option>
                     <option value="pixverse">Pixverse v5</option>
                     <option value="wan_25_t2v">Wan 2.5 T2V</option>
                     <option value="wan_25_i2v">Wan 2.5 I2V Fast</option>
-                    <option value="veo_fast">Google Veo 3.1 Fast</option>
                     <option value="runway_gen4_turbo">Runway Gen-4 Turbo (Test)</option>
-                    <option value="veo">Google Veo 3.1</option>
                     <option value="hailuo_23">Minimax Hailuo 2.3</option>
                     <option value="sora">OpenAI Sora 2</option>
                     <option value="wan">Wan 2.1 (Legacy)</option>
@@ -519,36 +575,73 @@ function AppContent() {
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-1">
-                        🎬 Animatic Frames Generated
+                        🎬 Storyboard Images Generated
                       </h3>
                       <p className="text-sm text-slate-600 dark:text-slate-400">
-                        {animaticUrls.length} animatic frames ready for video generation
+                        {animaticUrls.length} storyboard image{animaticUrls.length !== 1 ? 's' : ''} ready for video generation
+                        {currentChunkIndex !== null && totalChunks !== null && (
+                          <span className="ml-2 text-blue-600 dark:text-blue-400 font-semibold">
+                            • Processing chunk {currentChunkIndex + 1} of {totalChunks}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-                    {animaticUrls.map((url, idx) => (
-                      <div key={idx} className="relative group">
-                        <img
-                          src={url}
-                          alt={`Animatic frame ${idx + 1}`}
-                          className="w-full h-32 object-cover rounded-lg border-2 border-slate-200 dark:border-slate-700 shadow-md group-hover:scale-105 transition-transform cursor-pointer"
-                          onClick={() => window.open(url, '_blank')}
-                          onError={(e) => {
-                            e.currentTarget.src = 'https://via.placeholder.com/200x200?text=Frame+Not+Available';
-                          }}
-                        />
-                        <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                          Frame {idx + 1}
+                    {animaticUrls.map((url, idx) => {
+                      const isProcessing = currentChunkIndex === idx && currentPhase === 'phase4_chunks';
+                      // Chunk is completed if currentChunkIndex is past this chunk's index
+                      // Or if Phase 4 is complete (currentPhase is not phase4_chunks and we have a final video)
+                      const isCompleted = (currentChunkIndex !== null && idx < currentChunkIndex) ||
+                                         (currentPhase !== 'phase4_chunks' && currentChunkIndex !== null && idx <= currentChunkIndex) ||
+                                         (stitchedVideoUrl && currentPhase !== 'phase4_chunks');
+                      
+                      return (
+                        <div key={idx} className="relative group">
+                          <div className={`relative ${isProcessing ? 'animate-pulse' : ''}`}>
+                            <img
+                              src={url}
+                              alt={`Storyboard image ${idx + 1}`}
+                              className={`w-full h-32 object-cover rounded-lg border-2 shadow-md group-hover:scale-105 transition-transform cursor-pointer ${
+                                isProcessing
+                                  ? 'border-blue-500 dark:border-blue-400 ring-4 ring-blue-300 dark:ring-blue-600'
+                                  : isCompleted
+                                  ? 'border-green-500 dark:border-green-400'
+                                  : 'border-slate-200 dark:border-slate-700'
+                              }`}
+                              onClick={() => window.open(url, '_blank')}
+                              onError={(e) => {
+                                e.currentTarget.src = 'https://via.placeholder.com/200x200?text=Image+Not+Available';
+                              }}
+                            />
+                            {isProcessing && (
+                              <div className="absolute inset-0 bg-blue-500 bg-opacity-20 rounded-lg flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+                              </div>
+                            )}
+                            {isCompleted && (
+                              <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1">
+                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                          <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                            Beat {idx + 1}
+                            {isProcessing && ' • Processing...'}
+                            {isCompleted && ' • Complete'}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
-              {referenceAssets && (
+              {/* Phase 3 (Reference Assets) is disabled - commented out */}
+              {/* {referenceAssets && (
                 <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
                     Reference Assets Generated
@@ -602,7 +695,7 @@ function AppContent() {
                     </div>
                   )}
                 </div>
-              )}
+              )} */}
             </div>
           } />
 
@@ -747,7 +840,8 @@ function AppContent() {
                       setTitle('');
                       setDescription('');
                       setStitchedVideoUrl(null);
-                      setReferenceAssets(null);
+                      // Phase 3 disabled - reference assets not used
+                      // setReferenceAssets(null);
                       navigate('/');
                     }}
                     className="w-full btn-secondary"
