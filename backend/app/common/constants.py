@@ -3,6 +3,40 @@ DEFAULT_DURATION = 30  # seconds
 DEFAULT_FPS = 30
 DEFAULT_RESOLUTION = "1080p"
 
+# Beat composition creativity control (0.0-1.0)
+# Controls how strictly the LLM follows template archetypes
+# 0.0 = strict template adherence, 1.0 = creative reinterpretation
+import os
+BEAT_COMPOSITION_CREATIVITY = float(os.getenv('BEAT_COMPOSITION_CREATIVITY', '0.5'))
+
+
+def get_planning_temperature(creativity: float) -> float:
+    """
+    Map creativity level (0.0-1.0) to LLM temperature for Phase 1 planning.
+    
+    Temperature ranges:
+    - 0.0 → 0.2 (strict template adherence - follows archetype closely)
+    - 0.5 → 0.5 (balanced adaptation - default, good mix of structure + creativity)
+    - 1.0 → 0.8 (creative reinterpretation - maximum creative freedom)
+    
+    Linear mapping: temperature = 0.2 + (creativity * 0.6)
+    
+    Args:
+        creativity: Creativity level from 0.0 (strict) to 1.0 (creative)
+        
+    Returns:
+        LLM temperature from 0.2 to 0.8
+        
+    Examples:
+        >>> get_planning_temperature(0.0)
+        0.2
+        >>> get_planning_temperature(0.5)
+        0.5
+        >>> get_planning_temperature(1.0)
+        0.8
+    """
+    return 0.2 + (creativity * 0.6)
+
 # Cost per API call (USD)
 COST_GPT4_TURBO = 0.01
 COST_SDXL_IMAGE = 0.0055  # Legacy, not used anymore

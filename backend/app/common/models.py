@@ -78,12 +78,15 @@ class VideoGeneration(Base):
     
     # Phase Outputs
     animatic_urls = Column(JSON, default=list)
+    storyboard_images = Column(JSON, default=list)  # Phase 2: Storyboard image URLs (one per beat)
     chunk_urls = Column(JSON, default=list)
     stitched_url = Column(String, nullable=True)
     refined_url = Column(String, nullable=True)
     final_video_url = Column(String, nullable=True)
     final_music_url = Column(String, nullable=True)  # Music URL from Phase 5 (saved even if combining fails)
     phase_outputs = Column(JSON, default=dict)  # Store outputs from each phase
+    
+    # Note: creativity_level, selected_archetype, num_beats, num_chunks stored in spec JSON
     
     # Metadata
     cost_usd = Column(Float, default=0.0)
