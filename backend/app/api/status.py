@@ -26,13 +26,30 @@ async def get_status(video_id: str, db: Session = Depends(get_db)) -> StatusResp
     animatic_urls = None
     reference_assets = None
     stitched_video_url = None
+    current_chunk_index = None  # Current chunk being processed in Phase 4
+    total_chunks = None  # Total number of chunks in Phase 4
     
     if video.phase_outputs:
-        # Look for Phase 2 output (animatic frames)
-        phase2_output = video.phase_outputs.get('phase2_animatic')
+        # Look for Phase 2 output (storyboard images)
+        # Check both phase2_storyboard (new) and phase2_animatic (legacy) for backward compatibility
+        phase2_output = video.phase_outputs.get('phase2_storyboard') or video.phase_outputs.get('phase2_animatic')
         if phase2_output and phase2_output.get('status') == 'success':
-            animatic_data = phase2_output.get('output_data', {})
-            animatic_urls_raw = animatic_data.get('animatic_urls', []) or video.animatic_urls or []
+            phase2_data = phase2_output.get('output_data', {})
+            
+            # Extract storyboard image URLs from beats (new Phase 2 structure)
+            spec = phase2_data.get('spec', {})
+            beats = spec.get('beats', [])
+            animatic_urls_raw = []
+            
+            # Extract image_url from each beat (storyboard images)
+            for beat in beats:
+                image_url = beat.get('image_url')
+                if image_url:
+                    animatic_urls_raw.append(image_url)
+            
+            # Fallback to old animatic_urls format if no beats found (backward compatibility)
+            if not animatic_urls_raw:
+                animatic_urls_raw = phase2_data.get('animatic_urls', []) or video.animatic_urls or []
             
             # Convert S3 URLs to presigned URLs for frontend access
             if animatic_urls_raw:
@@ -76,19 +93,29 @@ async def get_status(video_id: str, db: Session = Depends(get_db)) -> StatusResp
                         s3_path = s3_url.replace(f's3://{s3_client.bucket}/', '')
                         asset['s3_url'] = s3_client.generate_presigned_url(s3_path, expiration=3600)
         
-        # Look for Phase 4 output (stitched video)
+        # Look for Phase 4 output (stitched video) and current chunk progress
         phase4_output = video.phase_outputs.get('phase4_chunks')
-        if phase4_output and phase4_output.get('status') == 'success':
-            phase4_data = phase4_output.get('output_data', {})
-            stitched_url = phase4_data.get('stitched_video_url') or video.stitched_url
+        if phase4_output:
+            # Extract current chunk info if Phase 4 is in progress
+            if isinstance(phase4_output, dict):
+                current_chunk_index = phase4_output.get('current_chunk_index')
+                total_chunks = phase4_output.get('total_chunks')
+                if current_chunk_index is not None:
+                    current_chunk_index = current_chunk_index
+                    total_chunks = total_chunks
             
-            if stitched_url and stitched_url.startswith('s3://'):
-                # Convert S3 URL to presigned URL
-                from app.services.s3 import s3_client
-                s3_path = stitched_url.replace(f's3://{s3_client.bucket}/', '')
-                stitched_video_url = s3_client.generate_presigned_url(s3_path, expiration=3600)
-            elif stitched_url:
-                stitched_video_url = stitched_url
+            # Extract stitched video if Phase 4 completed
+            if phase4_output.get('status') == 'success':
+                phase4_data = phase4_output.get('output_data', {})
+                stitched_url = phase4_data.get('stitched_video_url') or video.stitched_url
+                
+                if stitched_url and stitched_url.startswith('s3://'):
+                    # Convert S3 URL to presigned URL
+                    from app.services.s3 import s3_client
+                    s3_path = stitched_url.replace(f's3://{s3_client.bucket}/', '')
+                    stitched_video_url = s3_client.generate_presigned_url(s3_path, expiration=3600)
+                elif stitched_url:
+                    stitched_video_url = stitched_url
     
     # Look for Phase 5 output (final video with audio)
     final_video_url = None
@@ -126,5 +153,7 @@ async def get_status(video_id: str, db: Session = Depends(get_db)) -> StatusResp
         animatic_urls=animatic_urls,
         reference_assets=reference_assets,
         stitched_video_url=stitched_video_url,
-        final_video_url=final_video_url
+        final_video_url=final_video_url,
+        current_chunk_index=current_chunk_index,
+        total_chunks=total_chunks
     )

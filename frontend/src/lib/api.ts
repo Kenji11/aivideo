@@ -83,6 +83,8 @@ export interface StatusResponse {
   animatic_urls?: string[];
   stitched_video_url?: string;
   final_video_url?: string;  // Phase 5 final video (with audio)
+  current_chunk_index?: number;  // Current chunk being processed (0-based)
+  total_chunks?: number;  // Total number of chunks
 }
 
 export interface VideoResponse {

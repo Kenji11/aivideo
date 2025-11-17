@@ -23,12 +23,13 @@
 - **Region**: us-east-2 (all AWS services)
 
 ### AI/ML Services
-- **OpenAI**: GPT-4 Turbo (prompt validation)
+- **OpenAI**: GPT-4 Turbo (prompt validation & beat composition)
 - **Replicate API**:
-  - SDXL: Image generation (animatic + references)
-  - Zeroscope v2 XL: Video generation (development)
-  - AnimateDiff: Video generation (final/high-quality)
-  - MusicGen: Background music generation
+  - FLUX Dev: Storyboard image generation (Phase 2) - $0.025/image
+  - Hailuo 2.3 Fast: Video generation (default) - $0.04/5s chunk
+  - Veo 3.1 Fast: Video generation (native audio) - $0.50/5s chunk
+  - MusicGen: Background music generation (Phase 5) - $0.15/video
+  - Other models: wan, zeroscope, animatediff, kling, pixverse, sora
 
 ### Infrastructure (AWS - us-east-2)
 - **Compute**: Elastic Beanstalk (Web + Worker tiers)
@@ -198,16 +199,18 @@ python-multipart==0.0.6        # File uploads
 ## Technical Constraints
 
 ### Video Generation
-- **Resolution**: Generate at 1024×576, upscale to 1920×1080
-- **Frame Rate**: Generate at 24fps, interpolate to 30fps
-- **Chunk Size**: 2 seconds (48 frames at 24fps)
-- **Chunk Count**: 15 chunks for 30s video
-- **Overlap**: 0.5s overlap between chunks for smooth transitions
+- **Resolution**: 1280×720 (720p) default, supports up to 1080p
+- **Frame Rate**: 30fps (hailuo) or 24fps (other models)
+- **Chunk Duration**: Model-dependent (hailuo: 5s, zeroscope: 3s, animatediff: 2s)
+- **Chunk Count**: Calculated dynamically: `ceil(video_duration / actual_chunk_duration)`
+  - Example: 30s video with hailuo (5s chunks) = 6 chunks
+- **Overlap**: 25% overlap between chunks for smooth transitions
+- **Generation Strategy**: Sequential (required for last-frame continuation)
 
 ### Performance Targets
-- **Generation Time**: <10 minutes per 30s video
+- **Generation Time**: ~8-9 minutes per 30s video (hailuo) or ~6-7 minutes (Veo)
 - **Success Rate**: >90%
-- **Cost**: <$2 per video (MVP)
+- **Cost**: ~$0.51 per 30s video (hailuo) or ~$0.36 (Veo, no Phase 5)
 - **Concurrent Users**: 1 per user (MVP)
 
 ### Database Schema

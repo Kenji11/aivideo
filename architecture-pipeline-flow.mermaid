@@ -1,0 +1,101 @@
+graph TB
+    Start([User Submits Prompt<br/>'Create 30s Nike ad'])
+    
+    subgraph "Phase 1: Validation & Planning"
+        P1Start[Receive Prompt + Assets]
+        P1GPT[GPT-4 Turbo<br/>Analyze Intent]
+        P1Beat[Compose Beat Sequence<br/>from 15-Beat Library]
+        P1Spec[Create Video Spec<br/>- beats with durations<br/>- style, product, audio]
+        P1Output[Spec JSON<br/>Duration: 30s<br/>Beats: 3-6 beats<br/>Model: hailuo]
+        
+        P1Start --> P1GPT
+        P1GPT --> P1Beat
+        P1Beat --> P1Spec
+        P1Spec --> P1Output
+    end
+    
+    subgraph "Phase 2: Storyboard Generation"
+        P2Start[Extract Beats from Spec]
+        P2Loop[For Each Beat]
+        P2Generate[Generate FLUX Dev Image<br/>~8s per image]
+        P2Upload[Upload to S3<br/>storyboard/beat_XX.png]
+        P2Update[Update beat['image_url']]
+        P2Output[Spec with image_urls<br/>N storyboard images<br/>N = number of beats]
+        
+        P2Start --> P2Loop
+        P2Loop --> P2Generate
+        P2Generate --> P2Upload
+        P2Upload --> P2Update
+        P2Update -->|Next Beat| P2Loop
+        P2Loop -->|All Beats| P2Output
+    end
+    
+    subgraph "Phase 3: References"
+        P3Skip[SKIPPED<br/>Phase 2 replaces this]
+    end
+    
+    subgraph "Phase 4: Video Chunk Generation"
+        P4Start[Calculate Chunk Count<br/>ceil(30s / 5s) = 6 chunks]
+        P4Map[Map Beats to Chunks<br/>Dynamic beat-to-chunk mapping<br/>Uses actual beat start times]
+        P4Loop[Sequential Generation]
+        
+        subgraph "Chunk Generation Logic"
+            P4Check{Chunk starts<br/>beat boundary?}
+            P4Storyboard[Use Storyboard Image<br/>from Phase 2]
+            P4LastFrame[Use Last Frame<br/>from Previous Chunk]
+            P4Generate[Generate Chunk<br/>~45s per chunk]
+            P4Extract[Extract Last Frame<br/>for next chunk]
+        end
+        
+        P4Stitch[Stitch Chunks<br/>FFmpeg with transitions]
+        P4Output[Stitched Video<br/>30s, 720p, 30fps]
+        
+        P4Start --> P4Map
+        P4Map --> P4Loop
+        P4Loop --> P4Check
+        P4Check -->|Yes| P4Storyboard
+        P4Check -->|No| P4LastFrame
+        P4Storyboard --> P4Generate
+        P4LastFrame --> P4Generate
+        P4Generate --> P4Extract
+        P4Extract -->|Next Chunk| P4Loop
+        P4Loop -->|All Chunks| P4Stitch
+        P4Stitch --> P4Output
+    end
+    
+    subgraph "Phase 5: Refinement & Audio"
+        P5Check{Model has<br/>native audio?}
+        P5Skip[SKIP Phase 5<br/>Use stitched video]
+        P5Music[Generate Music<br/>MusicGen ~30s]
+        P5Combine[Combine Video + Audio<br/>MoviePy/FFmpeg]
+        P5Output[Final Video<br/>30s with audio]
+        
+        P5Check -->|Veo models| P5Skip
+        P5Check -->|Other models| P5Music
+        P5Music --> P5Combine
+        P5Combine --> P5Output
+    end
+    
+    subgraph "Complete"
+        Complete[Update Database<br/>status = COMPLETE<br/>final_video_url<br/>cost_usd<br/>generation_time]
+        End([User Receives Video<br/>Presigned URL])
+    end
+    
+    Start --> P1Start
+    P1Output --> P2Start
+    P2Output --> P3Skip
+    P3Skip --> P4Start
+    P4Output --> P5Check
+    P5Skip --> Complete
+    P5Output --> Complete
+    Complete --> End
+    
+    style Start fill:#e1f5ff
+    style End fill:#d4edda
+    style P1Output fill:#fff3cd
+    style P2Output fill:#fff3cd
+    style P3Skip fill:#f8d7da
+    style P4Output fill:#fff3cd
+    style P5Output fill:#fff3cd
+    style Complete fill:#d4edda
+

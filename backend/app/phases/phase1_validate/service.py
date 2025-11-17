@@ -12,16 +12,6 @@ class PromptValidationService:
     def __init__(self):
         """Initialize the validation service"""
         self.openai = openai_client
-        # Try to use OpenRouter if available, fallback to OpenAI
-        try:
-            from app.services.openrouter import openrouter_client
-            if openrouter_client.api_key:
-                self.use_openrouter = True
-                self.openrouter = openrouter_client
-            else:
-                self.use_openrouter = False
-        except Exception:
-            self.use_openrouter = False
     
     def validate_and_extract(self, prompt: str, assets: List[Dict] = None) -> Dict:
         """
@@ -110,33 +100,17 @@ Extract the following information from the user's prompt and return as JSON:
 Choose the template that best matches the user's intent. Extract all available information, using reasonable defaults if information is missing."""
         
         try:
-            # Use OpenRouter if available, otherwise OpenAI
-            if self.use_openrouter:
-                # OpenRouter API call (OpenAI-compatible format)
-                response_data = self.openrouter.chat_completion(
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt}
-                    ],
-                    model="openai/gpt-4-turbo",  # Can use any model: "anthropic/claude-3-opus", "google/gemini-pro", etc.
-                    temperature=0.3,
-                    max_tokens=1000,
-                    response_format={"type": "json_object"}  # Ensure JSON response
-                )
-                # Extract content from OpenRouter response (same format as OpenAI)
-                content = response_data['choices'][0]['message']['content']
-            else:
-                # OpenAI API call
-                response = self.openai.chat.completions.create(
-                    model="gpt-4-turbo-preview",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt}
-                    ],
-                    response_format={"type": "json_object"},
-                    temperature=0.3
-                )
-                content = response.choices[0].message.content
+            # Use OpenAI API
+            response = self.openai.chat.completions.create(
+                model="gpt-4-turbo-preview",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.3
+            )
+            content = response.choices[0].message.content
             
             extracted = json.loads(content)
             return extracted

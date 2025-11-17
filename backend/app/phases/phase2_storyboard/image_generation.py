@@ -1,7 +1,7 @@
 """
 Image generation helper for Phase 2 storyboard generation.
 
-Generates one SDXL image per beat using FLUX Dev model (same as Phase 3).
+Generates one image per beat using FLUX Dev model (same as Phase 3).
 """
 
 import os
@@ -11,7 +11,7 @@ import logging
 from typing import Dict
 from app.services.replicate import replicate_client
 from app.services.s3 import s3_client
-from app.common.constants import COST_FLUX_DEV_IMAGE, get_video_s3_key
+from app.common.constants import get_video_s3_key
 from app.common.exceptions import PhaseException
 
 logger = logging.getLogger(__name__)
@@ -87,6 +87,7 @@ def generate_beat_image(
     try:
         # Call Replicate FLUX Dev model (same as Phase 3)
         # Cost: $0.025/image (better quality than SDXL)
+        logger.info(f"   Using Replicate FLUX Dev model...")
         output = replicate_client.run(
             "black-forest-labs/flux-dev",
             input={
