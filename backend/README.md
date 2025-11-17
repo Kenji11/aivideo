@@ -65,51 +65,52 @@ Expected response: `{"status": "ok"}`
 
 ## Database Migrations
 
-This project uses Alembic for database schema management.
+This project uses raw SQL migrations for database schema management.
 
-> 📖 **Detailed guide**: See [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) for comprehensive migration documentation
+> 📖 **Detailed guide**: See [migrations/README.md](migrations/README.md) for comprehensive migration documentation
 
 ### Running Migrations
 
-**First time setup:**
+**From your local machine:**
 ```bash
-# Run migrations to create tables
-alembic upgrade head
+# Check migration status
+python migrate.py status
+
+# Run all pending migrations
+python migrate.py up
 ```
 
-**After pulling new code:**
+**From Docker:**
 ```bash
-# Check current migration status
-alembic current
+# Check migration status
+docker compose exec api python migrate.py status
 
-# Apply new migrations
-alembic upgrade head
+# Run all pending migrations
+docker compose exec api python migrate.py up
 ```
 
 ### Creating New Migrations
 
-When you modify the SQLAlchemy models in `app/common/models.py`:
+When you need to modify the database schema:
 
-```bash
-# Generate a new migration automatically
-alembic revision --autogenerate -m "description of changes"
+1. Create a new SQL file in `migrations/` with the next number:
+   ```bash
+   migrations/004_your_description.sql
+   ```
 
-# Review the generated migration file in alembic/versions/
-# Edit if needed, then apply it
-alembic upgrade head
-```
+2. Write your SQL (use `DO $$ BEGIN ... END $$;` for conditional logic):
+   ```sql
+   -- Description of what this migration does
+   -- Migration: 004_your_description
+   -- Date: YYYY-MM-DD
+   
+   ALTER TABLE video_generations ADD COLUMN new_field VARCHAR;
+   ```
 
-### Docker Setup
-
-When using Docker, migrations run automatically on container startup. If you need to run them manually:
-
-```bash
-# Access the API container
-docker-compose exec api bash
-
-# Run migrations
-alembic upgrade head
-```
+3. Apply the migration:
+   ```bash
+   python migrate.py up
+   ```
 
 ### Migration Best Practices
 
