@@ -60,10 +60,6 @@ venv.bak/
 
 # Database
 *.db
-*.sqlite3
-*.sqlite
-db.sqlite3
-*.sql
 
 # Logs
 *.log
