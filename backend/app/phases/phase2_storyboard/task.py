@@ -12,6 +12,10 @@ from app.common.schemas import PhaseOutput
 from app.phases.phase2_storyboard.image_generation import generate_beat_image
 from app.common.constants import COST_FLUX_DEV_IMAGE
 from app.common.exceptions import PhaseException
+from app.orchestrator.progress import update_progress, update_cost
+from app.database import SessionLocal
+from app.common.models import VideoGeneration
+from sqlalchemy.orm.attributes import flag_modified
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +29,9 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
     start_time = time.time()
     
     try:
+        # Update progress at start
+        update_progress(video_id, "generating_storyboard", 25, current_phase="phase2_storyboard")
+        
         # Extract required information from spec
         beats = spec.get('beats', [])
         style = spec.get('style', {})
@@ -88,10 +95,47 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
         # Calculate duration
         duration_seconds = time.time() - start_time
         
+        # Update cost tracking
+        update_cost(video_id, "phase2_storyboard", total_cost)
+        
+        # Update progress
+        update_progress(
+            video_id,
+            "generating_storyboard",
+            40,
+            current_phase="phase2_storyboard",
+            total_cost=total_cost
+        )
+        
         logger.info(
             f"✅ Phase 2 complete: {len(storyboard_images)} storyboard images generated, "
             f"cost=${total_cost:.4f}, duration={duration_seconds:.2f}s"
         )
+        
+        # Store Phase 2 output in database
+        db = SessionLocal()
+        try:
+            video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+            if video:
+                if video.phase_outputs is None:
+                    video.phase_outputs = {}
+                output_dict = {
+                    "video_id": video_id,
+                    "phase": "phase2_storyboard",
+                    "status": "success",
+                    "output_data": {
+                        "storyboard_images": storyboard_images,
+                        "spec": spec
+                    },
+                    "cost_usd": total_cost,
+                    "duration_seconds": duration_seconds,
+                    "error_message": None
+                }
+                video.phase_outputs['phase2_storyboard'] = output_dict
+                flag_modified(video, 'phase_outputs')
+                db.commit()
+        finally:
+            db.close()
         
         # Create success output
         # Note: spec is updated in-place with image_url added to each beat
@@ -116,6 +160,37 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
         
         logger.error(f"❌ Phase 2 failed for video {video_id}: {str(e)}")
         
+        # Update progress with failure
+        update_progress(
+            video_id,
+            "failed",
+            0,
+            error_message=str(e),
+            current_phase="phase2_storyboard"
+        )
+        
+        # Store failure in database
+        db = SessionLocal()
+        try:
+            video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+            if video:
+                if video.phase_outputs is None:
+                    video.phase_outputs = {}
+                output_dict = {
+                    "video_id": video_id,
+                    "phase": "phase2_storyboard",
+                    "status": "failed",
+                    "output_data": {},
+                    "cost_usd": 0.0,
+                    "duration_seconds": duration_seconds,
+                    "error_message": str(e)
+                }
+                video.phase_outputs['phase2_storyboard'] = output_dict
+                flag_modified(video, 'phase_outputs')
+                db.commit()
+        finally:
+            db.close()
+        
         # Create failure output
         output = PhaseOutput(
             video_id=video_id,
@@ -131,20 +206,43 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
 
 
 @celery_app.task(bind=True)
-def generate_storyboard(self, video_id: str, spec: dict, user_id: str = None):
+def generate_storyboard(self, phase1_output: dict, user_id: str = None):
     """
     Phase 2: Generate storyboard images (one per beat).
     
-    Celery task wrapper that calls the core implementation.
+    Receives Phase 1 output and extracts spec from it.
     
     Args:
         self: Celery task instance (from bind=True)
-        video_id: Unique video generation ID
-        spec: Video specification from Phase 1 (must contain 'beats' list)
+        phase1_output: PhaseOutput dict from Phase 1 (contains spec in output_data)
         user_id: User ID for organizing outputs in S3 (required)
         
     Returns:
         PhaseOutput dict with storyboard_images list and updated spec
     """
+    # Check if Phase 1 succeeded
+    if phase1_output.get('status') != 'success':
+        error_msg = phase1_output.get('error_message', 'Phase 1 failed')
+        video_id = phase1_output.get('video_id', 'unknown')
+        logger.error(f"Phase 1 failed, cannot proceed with Phase 2: {error_msg}")
+        
+        # Update progress
+        update_progress(video_id, "failed", 0, error_message=f"Phase 1 failed: {error_msg}", current_phase="phase2_storyboard")
+        
+        # Return failed PhaseOutput
+        return PhaseOutput(
+            video_id=video_id,
+            phase="phase2_storyboard",
+            status="failed",
+            output_data={},
+            cost_usd=0.0,
+            duration_seconds=0.0,
+            error_message=f"Phase 1 failed: {error_msg}"
+        ).dict()
+    
+    # Extract spec and video_id from Phase 1 output
+    video_id = phase1_output['video_id']
+    spec = phase1_output['output_data']['spec']
+    
+    # Call core implementation
     return _generate_storyboard_impl(video_id, spec, user_id)
-

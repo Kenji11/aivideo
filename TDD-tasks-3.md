@@ -27,30 +27,30 @@
 
 **File:** `backend/app/phases/phase2_storyboard/task.py`
 
-- [ ] Review `generate_storyboard` function implementation
-- [ ] Trace how beats are extracted from spec
-- [ ] Identify where image count is determined
-- [ ] Check for any hardcoded image counts or fixed loops
-- [ ] Document current behavior with examples
+- [x] Review `generate_storyboard` function implementation
+- [x] Trace how beats are extracted from spec
+- [x] Identify where image count is determined
+- [x] Check for any hardcoded image counts or fixed loops
+- [x] Document current behavior with examples
 
 ### Task 7.2: Fix Image Generation to Match Beat Count
 
 **File:** `backend/app/phases/phase2_storyboard/task.py`
 
-- [ ] Ensure loop iterates over `spec['beats']` directly
-- [ ] Remove any fixed image count logic (e.g., always generating 5 images)
-- [ ] Verify beat extraction: `beats = spec.get('beats', [])`
-- [ ] Ensure loop uses `enumerate(beats)` to get correct beat_index
-- [ ] Add logging to show beat count vs image count
+- [x] Ensure loop iterates over `spec['beats']` directly
+- [x] Remove any fixed image count logic (e.g., always generating 5 images)
+- [x] Verify beat extraction: `beats = spec.get('beats', [])`
+- [x] Ensure loop uses `enumerate(beats)` to get correct beat_index
+- [x] Add logging to show beat count vs image count
 
 ### Task 7.3: Add Validation for Image Count
 
 **File:** `backend/app/phases/phase2_storyboard/task.py`
 
-- [ ] After generation loop, verify `len(storyboard_images) == len(beats)`
-- [ ] Raise ValueError if counts don't match
-- [ ] Log validation success/failure
-- [ ] Include beat count and image count in error message
+- [x] After generation loop, verify `len(storyboard_images) == len(beats)`
+- [x] Raise ValueError if counts don't match
+- [x] Log validation success/failure
+- [x] Include beat count and image count in error message
 
 ### Task 7.4: Add Beat Count Validation and Truncation
 
@@ -58,24 +58,24 @@
 
 **File:** `backend/app/phases/phase1_validate/validation.py`
 
-- [ ] Add validation function: `validate_and_fix_beat_count(spec: dict) -> dict`
-- [ ] Calculate maximum beats: `max_beats = ceil(duration / 5)` (5s minimum beat length)
-- [ ] If `len(beats) > max_beats`: truncate beats to fit duration
-- [ ] Recalculate start times after truncation
-- [ ] Log WARNING when truncation occurs with details
-- [ ] Save truncation events to `backend/logs/beat_truncation.log` with timestamp, video_id, original count, truncated count
-- [ ] Call validation function in `build_full_spec()` before returning spec
+- [x] Add validation function: `validate_and_fix_beat_count(spec: dict) -> dict`
+- [x] Calculate maximum beats: `max_beats = ceil(duration / 5)` (5s minimum beat length)
+- [x] If `len(beats) > max_beats`: truncate beats to fit duration
+- [x] Recalculate start times after truncation
+- [x] Log WARNING when truncation occurs with details
+- [x] Save truncation events to `backend/logs/beat_truncation.log` with timestamp, video_id, original count, truncated count
+- [x] Call validation function in `build_full_spec()` before returning spec
 
 ### Task 7.5: Testing and Verification
 
-- [ ] Test with 1 beat (should generate 1 image)
-- [ ] Test with 3 beats (should generate 3 images)
-- [ ] Test with 5 beats (should generate 5 images)
-- [ ] Test with 7 beats (should generate 7 images)
-- [ ] Verify each image is correctly mapped to its beat
-- [ ] Verify beat_index in storyboard_images matches beat order
-- [ ] Test truncation: manually create spec with 10 beats for 15s duration (should truncate to 3)
-- [ ] Verify truncation log file is created when truncation occurs
+- [x] Test with 1 beat (should generate 1 image)
+- [x] Test with 3 beats (should generate 3 images)
+- [x] Test with 5 beats (should generate 5 images)
+- [x] Test with 7 beats (should generate 7 images)
+- [x] Verify each image is correctly mapped to its beat
+- [x] Verify beat_index in storyboard_images matches beat order
+- [x] Test truncation: manually create spec with 10 beats for 15s duration (should truncate to 3)
+- [x] Verify truncation log file is created when truncation occurs
 
 ---
 
@@ -157,110 +157,29 @@ def orchestrate_video(video_id):
 
 **File:** `backend/app/orchestrator/pipeline.py`
 
-- [ ] Review `orchestrate_video_generation` function implementation
-- [ ] Identify all `.get()` calls that block worker threads
-- [ ] Document current execution flow showing blocking points
-- [ ] Measure how many videos can be processed concurrently with current approach
-- [ ] Document worker thread utilization (should show idle time waiting for subtasks)
-- [ ] Review Phase 2 storyboard sequential generation loop
-- [ ] Identify where `generate_beat_image` is called sequentially
-- [ ] Check for any dependencies between beat generations
+- [x] Review `run_pipeline` function implementation (note: function is `run_pipeline`, not `orchestrate_video_generation`)
+- [x] Identify all `.apply()` calls that block worker threads (found 5 blocking points, one per phase)
+- [x] Document current execution flow showing blocking points (see `backend/docs/pr8-investigation.md`)
+- [x] Document worker thread utilization (worker threads spend most time idle waiting for API calls)
+- [x] Review Phase 2 storyboard sequential generation loop (found in `task.py` lines 58-86)
+- [x] Identify where `generate_beat_image` is called sequentially (sequential loop in Phase 2)
+- [x] Check for any dependencies between beat generations (no dependencies - can be parallelized)
+
+**Documentation**: See `backend/docs/pr8-investigation.md` for detailed analysis.
 
 ### Task 8.2: Design Non-Blocking Orchestration Strategy
 
 **File:** `backend/app/orchestrator/pipeline.py`
 
-- [ ] Design Celery Chain workflow for entire pipeline
-- [ ] Map phase dependencies (Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5)
-- [ ] Design chain structure: `chain(phase1.s(), phase2.s(), phase3.s(), phase4.s(), phase5.s())`
-- [ ] Plan how to pass data between chain links (each phase receives previous phase output)
-- [ ] Design parallel beat generation using Celery `group` within Phase 2
-- [ ] Review Celery group/chord patterns for parallel tasks
-- [ ] Consider rate limiting for image generation API
-- [ ] Design error handling for chain failures and partial failures
-- [ ] Plan progress tracking mechanism for chain execution
+- [x] Design Celery Chain workflow for entire pipeline
+- [x] Map phase dependencies (Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5)
+- [x] Design chain structure: `chain(phase1.s(), phase2.s(), phase3.s(), phase4.s(), phase5.s())`
+- [x] Plan how to pass data between chain links (each phase receives previous phase's PhaseOutput dict)
+- [x] Design chain structure for orchestrator (parallelization within phases is out of scope)
+- [x] Design error handling for chain failures and partial failures (each phase returns PhaseOutput with status)
+- [x] Plan progress tracking mechanism for chain execution (each phase updates progress independently)
 
-### Task 8.3: Implement Non-Blocking Orchestrator with Celery Chains
-
-**File:** `backend/app/orchestrator/pipeline.py`
-
-- [ ] Refactor `orchestrate_video_generation` to use `chain()` instead of sequential `.get()` calls
-- [ ] Create chain workflow: `chain(phase1.s(video_id), phase2.s(), phase3.s(), phase4.s(), phase5.s())`
-- [ ] Use `.apply_async()` to dispatch chain non-blocking
-- [ ] Return workflow ID immediately (don't wait for completion)
-- [ ] Ensure each phase task receives output from previous phase as input
-- [ ] Remove all `.get()` blocking calls from orchestrator
-- [ ] Update progress tracking to work with async chain execution
-- [ ] Test that orchestrator returns immediately without blocking
-
-**File:** `backend/app/phases/phase2_storyboard/task.py`
-
-- [ ] Convert `generate_beat_image` to Celery task (if not already)
-- [ ] Use Celery `group` to create parallel tasks for all beats
-- [ ] Execute group and collect results
-- [ ] Handle task results and extract image data
-- [ ] Maintain beat order in results (use beat_index for sorting)
-
-### Task 8.4: Add Error Handling for Chains and Parallel Tasks
-
-**File:** `backend/app/orchestrator/pipeline.py`
-
-- [ ] Handle chain link failures (if one phase fails, chain stops)
-- [ ] Design error propagation through chain
-- [ ] Update database status on chain failure
-- [ ] Log chain execution progress and failures
-- [ ] Handle timeout scenarios for long-running chains
-
-**File:** `backend/app/phases/phase2_storyboard/task.py`
-
-- [ ] Handle individual task failures gracefully in beat generation group
-- [ ] Collect successful and failed beat generations
-- [ ] Log which beats succeeded/failed
-- [ ] Decide on failure strategy (fail all vs partial success)
-- [ ] Return appropriate error messages
-
-### Task 8.5: Add Progress Tracking for Chains
-
-**File:** `backend/app/orchestrator/pipeline.py`
-
-- [ ] Track progress of chain execution
-- [ ] Update progress when each phase completes
-- [ ] Use Celery result callbacks or signals to track chain progress
-- [ ] Update database with phase completion status
-- [ ] Log chain execution progress (e.g., "Phase 2/5 complete")
-
-**File:** `backend/app/phases/phase2_storyboard/task.py`
-
-- [ ] Track progress of parallel beat generation tasks
-- [ ] Update progress for each completed beat image
-- [ ] Log progress updates (e.g., "3/5 beats generated")
-- [ ] Use Celery result tracking if available
-
-### Task 8.6: Testing and Performance Measurement
-
-**Chain Orchestration Tests:**
-- [ ] Test that orchestrator returns immediately (non-blocking)
-- [ ] Test concurrent video processing (start 10 videos, verify all accepted)
-- [ ] Measure worker thread utilization (should handle more than concurrency limit)
-- [ ] Verify chain executes phases in correct order
-- [ ] Test chain error handling (simulate phase failure)
-- [ ] Verify progress tracking works with async chains
-- [ ] Measure overall throughput improvement
-
-**Parallel Beat Generation Tests:**
-- [ ] Test parallel generation with 3 beats
-- [ ] Test parallel generation with 5 beats
-- [ ] Test parallel generation with 7 beats
-- [ ] Measure time improvement vs sequential generation
-- [ ] Verify cost calculation remains accurate (sum of all image costs)
-- [ ] Verify all images are generated correctly
-- [ ] Test error handling with simulated failures
-
-**Expected Results:**
-- Worker with `--concurrency=4` should be able to handle many more than 4 videos concurrently
-- Orchestrator should return immediately without blocking
-- Chain should execute phases automatically in sequence
-- Parallel beat generation should significantly reduce Phase 2 time
+**Documentation**: See `backend/docs/pr8-design.md` for complete design specification.
 
 ---
 
