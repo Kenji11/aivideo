@@ -51,8 +51,16 @@ class Settings(BaseSettings):
         description="Service account private key (from FIREBASE_PRIVATE_KEY env var, replaces private_key in JSON)"
     )
     # Option 2: Individual environment variables (alternative)
-    firebase_project_id: str = ""
-    firebase_client_email: str = ""  # Service account client email
+    firebase_project_id: str = Field(
+        default="",
+        env="FIREBASE_PROJECT_ID",
+        description="Firebase project ID (from FIREBASE_PROJECT_ID env var)"
+    )
+    firebase_client_email: str = Field(
+        default="",
+        env="FIREBASE_CLIENT_EMAIL",
+        description="Firebase service account client email (from FIREBASE_CLIENT_EMAIL env var)"
+    )
     
     model_config = SettingsConfigDict(
         # .env file is optional - if it exists, use it (dev), otherwise use environment variables (prod)
