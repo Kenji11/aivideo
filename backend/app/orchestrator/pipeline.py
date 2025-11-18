@@ -76,6 +76,16 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
         # Extract spec from Phase 1
         spec = result1['output_data']['spec']
         
+        # Log spec details for debugging
+        beats_count = len(spec.get('beats', []))
+        spec_duration = spec.get('duration', 'unknown')
+        print(f"📋 Spec extracted from Phase 1:")
+        print(f"   - Duration: {spec_duration}s")
+        print(f"   - Beats count: {beats_count}")
+        print(f"   - Beat details:")
+        for i, beat in enumerate(spec.get('beats', []), 1):
+            print(f"      {i}. {beat.get('beat_id', 'unknown')} - {beat.get('duration', '?')}s (start: {beat.get('start', 0)}s)")
+        
         # Add model selection to spec for Phase 4
         spec['model'] = model
         
@@ -95,6 +105,12 @@ def run_pipeline(video_id: str, prompt: str, assets: list = None, model: str = '
         
         # ============ PHASE 2: GENERATE STORYBOARD (TDD v2.0) ============
         update_progress(video_id, "generating_storyboard", 25, current_phase="phase2_storyboard")
+        
+        # Verify spec before passing to Phase 2
+        beats_to_generate = len(spec.get('beats', []))
+        print(f"🎨 Passing spec to Phase 2 storyboard generation:")
+        print(f"   - Expected images: {beats_to_generate} (one per beat)")
+        print(f"   - Spec duration: {spec.get('duration', 'unknown')}s")
         
         # Run Phase 2 storyboard task synchronously
         result2_storyboard_obj = generate_storyboard.apply(args=[video_id, spec, user_id])

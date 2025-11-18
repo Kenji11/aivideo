@@ -29,6 +29,15 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
         beats = spec.get('beats', [])
         style = spec.get('style', {})
         product = spec.get('product', {})
+        spec_duration = spec.get('duration', 'unknown')
+        
+        # Log received spec details
+        logger.info(f"📥 Phase 2 received spec:")
+        logger.info(f"   - Duration: {spec_duration}s")
+        logger.info(f"   - Beats count: {len(beats)}")
+        logger.info(f"   - Beat details:")
+        for i, beat in enumerate(beats, 1):
+            logger.info(f"      {i}. {beat.get('beat_id', 'unknown')} - {beat.get('duration', '?')}s (start: {beat.get('start', 0)}s)")
         
         if not beats:
             raise PhaseException("Spec must contain at least one beat")
