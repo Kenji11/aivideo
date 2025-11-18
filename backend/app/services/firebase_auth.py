@@ -122,6 +122,17 @@ def initialize_firebase() -> None:
                 "token_uri": "https://oauth2.googleapis.com/token",
             }
             cred = credentials.Certificate(cred_dict)
+        # Check if some but not all env vars are set (for better error messages)
+        elif settings.firebase_project_id or settings.firebase_private_key or settings.firebase_client_email:
+            missing = []
+            if not settings.firebase_project_id:
+                missing.append("FIREBASE_PROJECT_ID")
+            if not settings.firebase_private_key:
+                missing.append("FIREBASE_PRIVATE_KEY")
+            if not settings.firebase_client_email:
+                missing.append("FIREBASE_CLIENT_EMAIL")
+            logger.error(f"Firebase environment variables partially set. Missing: {', '.join(missing)}")
+            logger.error("All three environment variables (FIREBASE_PROJECT_ID, FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL) must be set to use environment variable authentication.")
         # Fourth, try to use default credentials (for GCP environments)
         elif settings.firebase_project_id:
             logger.info(f"Initializing Firebase with default credentials for project: {settings.firebase_project_id}")
