@@ -24,9 +24,42 @@ AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
 S3_BUCKET=ai-video-assets-dev
 AWS_REGION=us-east-2
+
+# Firebase (for authentication)
+# Option 1: JSON file with private_key from env var (recommended)
+# Copy firebase-credentials.json.example to firebase-credentials.json and fill in values (except private_key)
+# Then set the private_key here:
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour private key here\n-----END PRIVATE KEY-----\n"
+# And set the path to the JSON file (or use GOOGLE_APPLICATION_CREDENTIALS env var)
+FIREBASE_CREDENTIALS_PATH=./firebase-credentials.json
+
+# Option 2: Use GOOGLE_APPLICATION_CREDENTIALS env var pointing to JSON file
+# GOOGLE_APPLICATION_CREDENTIALS=/path/to/firebase-credentials.json
+# FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour private key here\n-----END PRIVATE KEY-----\n"
+
+# Option 3: Use individual environment variables (alternative)
+# FIREBASE_PROJECT_ID=your-project-id
+# FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour private key here\n-----END PRIVATE KEY-----\n"
+# FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
 ```
 
 **Note:** The `.env` file is gitignored and should never be committed. Copy these variables and fill in your actual API keys and credentials.
+
+### Firebase Credentials Setup
+
+**Recommended Approach: JSON file with private_key in .env**
+
+1. Go to [Firebase Console](https://console.firebase.google.com/) → Your Project → Project Settings → Service Accounts
+2. Click "Generate new private key" to download a JSON file
+3. Copy `firebase-credentials.json.example` to `firebase-credentials.json`
+4. Copy all fields from the downloaded JSON **except `private_key`** into `firebase-credentials.json`
+5. Extract the `private_key` value and add it to `.env` as `FIREBASE_PRIVATE_KEY`
+6. Set `FIREBASE_CREDENTIALS_PATH=./firebase-credentials.json` in `.env` (or use `GOOGLE_APPLICATION_CREDENTIALS`)
+
+**Important:** 
+- `firebase-credentials.json` can be committed (it doesn't contain the private key)
+- `FIREBASE_PRIVATE_KEY` in `.env` is gitignored and should never be committed
+- The `FIREBASE_PRIVATE_KEY` in `.env` should be in quotes and include `\n` for newlines
 
 ## Docker Setup
 
