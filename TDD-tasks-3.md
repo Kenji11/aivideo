@@ -27,120 +27,159 @@
 
 **File:** `backend/app/phases/phase2_storyboard/task.py`
 
-- [ ] Review `generate_storyboard` function implementation
-- [ ] Trace how beats are extracted from spec
-- [ ] Identify where image count is determined
-- [ ] Check for any hardcoded image counts or fixed loops
-- [ ] Document current behavior with examples
+- [x] Review `generate_storyboard` function implementation
+- [x] Trace how beats are extracted from spec
+- [x] Identify where image count is determined
+- [x] Check for any hardcoded image counts or fixed loops
+- [x] Document current behavior with examples
 
 ### Task 7.2: Fix Image Generation to Match Beat Count
 
 **File:** `backend/app/phases/phase2_storyboard/task.py`
 
-- [ ] Ensure loop iterates over `spec['beats']` directly
-- [ ] Remove any fixed image count logic (e.g., always generating 5 images)
-- [ ] Verify beat extraction: `beats = spec.get('beats', [])`
-- [ ] Ensure loop uses `enumerate(beats)` to get correct beat_index
-- [ ] Add logging to show beat count vs image count
+- [x] Ensure loop iterates over `spec['beats']` directly
+- [x] Remove any fixed image count logic (e.g., always generating 5 images)
+- [x] Verify beat extraction: `beats = spec.get('beats', [])`
+- [x] Ensure loop uses `enumerate(beats)` to get correct beat_index
+- [x] Add logging to show beat count vs image count
 
 ### Task 7.3: Add Validation for Image Count
 
 **File:** `backend/app/phases/phase2_storyboard/task.py`
 
-- [ ] After generation loop, verify `len(storyboard_images) == len(beats)`
-- [ ] Raise ValueError if counts don't match
-- [ ] Log validation success/failure
-- [ ] Include beat count and image count in error message
+- [x] After generation loop, verify `len(storyboard_images) == len(beats)`
+- [x] Raise ValueError if counts don't match
+- [x] Log validation success/failure
+- [x] Include beat count and image count in error message
 
-### Task 7.4: Testing and Verification
+### Task 7.4: Add Beat Count Validation and Truncation
 
-- [ ] Test with 1 beat (should generate 1 image)
-- [ ] Test with 3 beats (should generate 3 images)
-- [ ] Test with 5 beats (should generate 5 images)
-- [ ] Test with 7 beats (should generate 7 images)
-- [ ] Verify each image is correctly mapped to its beat
-- [ ] Verify beat_index in storyboard_images matches beat order
+**Goal:** Prevent Phase 1 from generating too many beats for the target duration
+
+**File:** `backend/app/phases/phase1_validate/validation.py`
+
+- [x] Add validation function: `validate_and_fix_beat_count(spec: dict) -> dict`
+- [x] Calculate maximum beats: `max_beats = ceil(duration / 5)` (5s minimum beat length)
+- [x] If `len(beats) > max_beats`: truncate beats to fit duration
+- [x] Recalculate start times after truncation
+- [x] Log WARNING when truncation occurs with details
+- [x] Save truncation events to `backend/logs/beat_truncation.log` with timestamp, video_id, original count, truncated count
+- [x] Call validation function in `build_full_spec()` before returning spec
+
+### Task 7.5: Testing and Verification
+
+- [x] Test with 1 beat (should generate 1 image)
+- [x] Test with 3 beats (should generate 3 images)
+- [x] Test with 5 beats (should generate 5 images)
+- [x] Test with 7 beats (should generate 7 images)
+- [x] Verify each image is correctly mapped to its beat
+- [x] Verify beat_index in storyboard_images matches beat order
+- [x] Test truncation: manually create spec with 10 beats for 15s duration (should truncate to 3)
+- [x] Verify truncation log file is created when truncation occurs
 
 ---
 
-## PR #8: Enable Parallel Generation for Independent Beats
+## PR #8: Non-Blocking Orchestration with Celery Chains
 
-**Goal:** Generate storyboard images for independent beats in parallel instead of sequentially
+**Goal:** Refactor orchestrator to use Celery Chains for non-blocking pipeline execution, enabling true concurrent video processing
 
 **Current Issue:**
-- Storyboard images are generated one at a time in a loop
-- Each beat image generation is independent and can be parallelized
-- Sequential generation is slow and inefficient
+- **Blocking Orchestrator Problem**: The orchestrator uses `.get()` calls that block worker threads
+- Worker with `--concurrency=4` can only handle 4 videos at once, even though worker is idle waiting for subtasks
+- Each phase waits for the previous phase to complete before starting, holding worker threads hostage
+- Sequential storyboard image generation is slow and inefficient (can be parallelized)
+
+**The Problem (Current State):**
+```python
+# Current implementation (BAD - blocks worker)
+@celery_app.task
+def orchestrate_video(video_id):
+    # Phase 1
+    result1 = phase1_task.delay(video_id)
+    plan = result1.get()  # ❌ BLOCKS worker thread waiting
+    
+    # Phase 2
+    result2 = phase2_task.delay(video_id, plan)
+    storyboard = result2.get()  # ❌ BLOCKS again
+    
+    # Phase 3
+    result3 = phase3_task.delay(video_id, storyboard)
+    chunks = result3.get()  # ❌ BLOCKS again
+    
+    # etc...
+```
+
+**Result:** Worker with `--concurrency=4` can only handle 4 videos at once, even though the worker is just sitting idle waiting for subtasks.
+
+**The Solution: Celery Chains**
+- Non-blocking orchestration using Celery's native workflow primitives
+- Orchestrator dispatches entire pipeline as chain and returns immediately
+- Worker thread freed to handle more videos concurrently
+- Each phase automatically starts when previous phase completes
+
+**Example Implementation:**
+```python
+from celery import chain
+
+@celery_app.task
+def orchestrate_video(video_id):
+    """
+    Dispatch entire pipeline as chain - returns immediately.
+    Worker thread freed to handle more videos.
+    """
+    workflow = chain(
+        phase1_planning.s(video_id),
+        phase2_storyboard.s(),
+        phase3_chunks.s(),
+        phase4_stitch.s(),
+        phase5_music.s()
+    ).apply_async()
+    
+    # Returns immediately - worker thread freed!
+    return workflow.id
+```
 
 **Investigation Needed:**
-- Review current sequential generation implementation
+- Review current blocking orchestrator implementation in `pipeline.py`
+- Identify all `.get()` calls that block worker threads
+- Review current sequential storyboard generation implementation
 - Identify dependencies between beat image generations
-- Determine optimal parallelization strategy (Celery groups, async, etc.)
+- Determine optimal parallelization strategy (Celery groups for beats, chains for phases)
 - Consider rate limiting and cost implications
 
 **Files to Review:**
+- `backend/app/orchestrator/pipeline.py` (main orchestrator with blocking calls)
 - `backend/app/phases/phase2_storyboard/task.py` (main generation loop)
 - `backend/app/phases/phase2_storyboard/image_generation.py` (individual image generation)
 - `backend/app/orchestrator/celery_app.py` (Celery configuration)
 
-### Task 8.1: Investigate Current Sequential Implementation
+### Task 8.1: Investigate Current Blocking Orchestrator
 
-**File:** `backend/app/phases/phase2_storyboard/task.py`
+**File:** `backend/app/orchestrator/pipeline.py`
 
-- [ ] Review current loop structure in `generate_storyboard`
-- [ ] Identify where `generate_beat_image` is called sequentially
-- [ ] Document current execution flow
-- [ ] Check for any dependencies between beat generations
-- [ ] Measure current generation time per beat
+- [x] Review `run_pipeline` function implementation (note: function is `run_pipeline`, not `orchestrate_video_generation`)
+- [x] Identify all `.apply()` calls that block worker threads (found 5 blocking points, one per phase)
+- [x] Document current execution flow showing blocking points (see `backend/docs/pr8-investigation.md`)
+- [x] Document worker thread utilization (worker threads spend most time idle waiting for API calls)
+- [x] Review Phase 2 storyboard sequential generation loop (found in `task.py` lines 58-86)
+- [x] Identify where `generate_beat_image` is called sequentially (sequential loop in Phase 2)
+- [x] Check for any dependencies between beat generations (no dependencies - can be parallelized)
 
-### Task 8.2: Design Parallel Generation Strategy
+**Documentation**: See `backend/docs/pr8-investigation.md` for detailed analysis.
 
-**File:** `backend/app/phases/phase2_storyboard/task.py`
+### Task 8.2: Design Non-Blocking Orchestration Strategy
 
-- [ ] Choose parallelization approach (Celery group vs async vs threading)
-- [ ] Review Celery group/chord patterns for parallel tasks
-- [ ] Consider rate limiting for image generation API
-- [ ] Design error handling for partial failures
-- [ ] Plan progress tracking mechanism
+**File:** `backend/app/orchestrator/pipeline.py`
 
-### Task 8.3: Implement Parallel Beat Image Generation
+- [x] Design Celery Chain workflow for entire pipeline
+- [x] Map phase dependencies (Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5)
+- [x] Design chain structure: `chain(phase1.s(), phase2.s(), phase3.s(), phase4.s(), phase5.s())`
+- [x] Plan how to pass data between chain links (each phase receives previous phase's PhaseOutput dict)
+- [x] Design chain structure for orchestrator (parallelization within phases is out of scope)
+- [x] Design error handling for chain failures and partial failures (each phase returns PhaseOutput with status)
+- [x] Plan progress tracking mechanism for chain execution (each phase updates progress independently)
 
-**File:** `backend/app/phases/phase2_storyboard/task.py`
-
-- [ ] Convert `generate_beat_image` to Celery task (if not already)
-- [ ] Use Celery `group` to create parallel tasks for all beats
-- [ ] Execute group and collect results
-- [ ] Handle task results and extract image data
-- [ ] Maintain beat order in results (use beat_index for sorting)
-
-### Task 8.4: Add Error Handling for Parallel Tasks
-
-**File:** `backend/app/phases/phase2_storyboard/task.py`
-
-- [ ] Handle individual task failures gracefully
-- [ ] Collect successful and failed beat generations
-- [ ] Log which beats succeeded/failed
-- [ ] Decide on failure strategy (fail all vs partial success)
-- [ ] Return appropriate error messages
-
-### Task 8.5: Add Progress Tracking
-
-**File:** `backend/app/phases/phase2_storyboard/task.py`
-
-- [ ] Track progress of parallel tasks
-- [ ] Update progress for each completed beat image
-- [ ] Log progress updates (e.g., "3/5 beats generated")
-- [ ] Use Celery result tracking if available
-
-### Task 8.6: Testing and Performance Measurement
-
-- [ ] Test parallel generation with 3 beats
-- [ ] Test parallel generation with 5 beats
-- [ ] Test parallel generation with 7 beats
-- [ ] Measure time improvement vs sequential generation
-- [ ] Verify cost calculation remains accurate (sum of all image costs)
-- [ ] Verify all images are generated correctly
-- [ ] Test error handling with simulated failures
+**Documentation**: See `backend/docs/pr8-design.md` for complete design specification.
 
 ---
 

@@ -36,9 +36,129 @@ os.environ['DATABASE_URL'] = 'postgresql://dev:devpass@localhost:5434/videogen'
 # Add parent directory to path so we can import app
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from app.phases.phase2_storyboard.task import _generate_storyboard_impl
 from app.common.constants import MOCK_USER_ID
-from app.services.s3 import s3_client
+# Import directly from modules to avoid circular import with celery_app
+from app.common.schemas import PhaseOutput
+from app.phases.phase2_storyboard.image_generation import generate_beat_image
+from app.common.constants import COST_FLUX_DEV_IMAGE
+from app.common.exceptions import PhaseException
+import time
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Copy implementation directly to avoid importing task.py (which imports celery_app)
+def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
+    """
+    Core implementation of storyboard generation (without Celery wrapper).
+    Copied from task.py to avoid circular import issues.
+    """
+    start_time = time.time()
+    
+    try:
+        # Extract required information from spec
+        beats = spec.get('beats', [])
+        style = spec.get('style', {})
+        product = spec.get('product', {})
+        spec_duration = spec.get('duration', 'unknown')
+        
+        # Log received spec details
+        logger.info(f"📥 Phase 2 received spec:")
+        logger.info(f"   - Duration: {spec_duration}s")
+        logger.info(f"   - Beats count: {len(beats)}")
+        logger.info(f"   - Beat details:")
+        for i, beat in enumerate(beats, 1):
+            logger.info(f"      {i}. {beat.get('beat_id', 'unknown')} - {beat.get('duration', '?')}s (start: {beat.get('start', 0)}s)")
+        
+        if not beats:
+            raise PhaseException("Spec must contain at least one beat")
+        
+        if not user_id:
+            raise PhaseException("user_id is required for S3 uploads")
+        
+        logger.info(
+            f"Starting Phase 2 storyboard generation for video {video_id}: "
+            f"{len(beats)} beats to generate"
+        )
+        
+        # Initialize tracking
+        storyboard_images = []
+        total_cost = 0.0
+        
+        # Generate one image per beat
+        for beat_index, beat in enumerate(beats):
+            logger.info(
+                f"Generating storyboard image {beat_index + 1}/{len(beats)}: "
+                f"beat_id={beat.get('beat_id')}, duration={beat.get('duration')}s"
+            )
+            
+            # Generate image for this beat
+            beat_image_info = generate_beat_image(
+                video_id=video_id,
+                beat_index=beat_index,
+                beat=beat,
+                style=style,
+                product=product,
+                user_id=user_id
+            )
+            
+            # Add image URL to the beat in spec
+            beat['image_url'] = beat_image_info['image_url']
+            
+            # Track storyboard image info
+            storyboard_images.append(beat_image_info)
+            
+            # Track cost (FLUX Dev: $0.025 per image)
+            total_cost += COST_FLUX_DEV_IMAGE
+            
+            logger.info(
+                f"✅ Generated storyboard image {beat_index + 1}/{len(beats)}: "
+                f"{beat_image_info['image_url'][:80]}..."
+            )
+        
+        # Calculate duration
+        duration_seconds = time.time() - start_time
+        
+        logger.info(
+            f"✅ Phase 2 complete: {len(storyboard_images)} storyboard images generated, "
+            f"cost=${total_cost:.4f}, duration={duration_seconds:.2f}s"
+        )
+        
+        # Create success output
+        # Note: spec is updated in-place with image_url added to each beat
+        output = PhaseOutput(
+            video_id=video_id,
+            phase="phase2_storyboard",
+            status="success",
+            output_data={
+                "storyboard_images": storyboard_images,
+                "spec": spec  # Return updated spec with image_urls in beats
+            },
+            cost_usd=total_cost,
+            duration_seconds=duration_seconds,
+            error_message=None
+        )
+        
+        return output.dict()
+        
+    except Exception as e:
+        # Calculate duration
+        duration_seconds = time.time() - start_time
+        
+        logger.error(f"❌ Phase 2 failed for video {video_id}: {str(e)}")
+        
+        # Create failure output
+        output = PhaseOutput(
+            video_id=video_id,
+            phase="phase2_storyboard",
+            status="failed",
+            output_data={},
+            cost_usd=0.0,
+            duration_seconds=duration_seconds,
+            error_message=str(e)
+        )
+        
+        return output.dict()
 
 
 def find_phase1_output_files():
@@ -200,40 +320,42 @@ def test_phase2_storyboard(
             
             print(f"✅ Generated {len(storyboard_images)} storyboard images:")
             print()
-            print("📦 S3 STORAGE PATHS")
-            print("=" * 80)
-            print(f"S3 Bucket: {s3_client.bucket}")
-            print(f"Base Path: {user_id}/videos/{video_id}/")
-            print(f"Full S3 Path: s3://{s3_client.bucket}/{user_id}/videos/{video_id}/")
-            print()
             
+            # # S3 STORAGE PATHS (commented out - not needed for testing)
+            # print("📦 S3 STORAGE PATHS")
+            # print("=" * 80)
+            # print(f"S3 Bucket: {s3_client.bucket}")
+            # print(f"Base Path: {user_id}/videos/{video_id}/")
+            # print(f"Full S3 Path: s3://{s3_client.bucket}/{user_id}/videos/{video_id}/")
+            # print()
+            
+            print("📊 GENERATED IMAGES")
+            print("=" * 80)
             for i, img_info in enumerate(storyboard_images, 1):
                 beat_index = img_info.get('beat_index', '?')
                 beat_id = img_info.get('beat_id', 'unknown')
                 image_url = img_info.get('image_url', 'N/A')
                 
-                # Extract S3 key from URL
-                s3_key = image_url
-                if 's3://' in image_url:
-                    # Extract key after bucket name: s3://bucket/key
-                    s3_key = image_url.replace(f's3://{s3_client.bucket}/', '')
-                elif 'amazonaws.com' in image_url:
-                    # Extract key from https URL
-                    try:
-                        from urllib.parse import urlparse
-                        parsed = urlparse(image_url)
-                        s3_key = parsed.path.lstrip('/')
-                    except:
-                        pass
+                # # S3 key extraction (commented out - not needed)
+                # s3_key = image_url
+                # if 's3://' in image_url:
+                #     s3_key = image_url.replace(f's3://{s3_client.bucket}/', '')
+                # elif 'amazonaws.com' in image_url:
+                #     try:
+                #         from urllib.parse import urlparse
+                #         parsed = urlparse(image_url)
+                #         s3_key = parsed.path.lstrip('/')
+                #     except:
+                #         pass
                 
                 filename = f"beat_{beat_index:02d}.png"
-                full_s3_path = f"s3://{s3_client.bucket}/{user_id}/videos/{video_id}/{filename}"
+                # full_s3_path = f"s3://{s3_client.bucket}/{user_id}/videos/{video_id}/{filename}"
                 
                 print(f"  {i}. Beat {beat_index}: {beat_id}")
                 print(f"     Filename: {filename}")
-                print(f"     S3 Key: {s3_key}")
-                print(f"     Full S3 Path: {full_s3_path}")
-                print(f"     Full URL: {image_url}")
+                # print(f"     S3 Key: {s3_key}")
+                # print(f"     Full S3 Path: {full_s3_path}")
+                print(f"     Image URL: {image_url[:80]}..." if len(image_url) > 80 else f"     Image URL: {image_url}")
                 print(f"     Shot Type: {img_info.get('shot_type', 'N/A')}")
                 print(f"     Duration: {img_info.get('duration', 'N/A')}s")
                 print()
@@ -267,23 +389,24 @@ def test_phase2_storyboard(
             print("=" * 80)
             print(f"Video ID: {video_id}")
             print(f"User ID: {user_id}")
-            print(f"S3 Bucket: {s3_client.bucket}")
-            print(f"S3 Base Path: {user_id}/videos/{video_id}/")
-            print(f"Full S3 Path: s3://{s3_client.bucket}/{user_id}/videos/{video_id}/")
+            # print(f"S3 Bucket: {s3_client.bucket}")  # Commented out
+            # print(f"S3 Base Path: {user_id}/videos/{video_id}/")  # Commented out
+            # print(f"Full S3 Path: s3://{s3_client.bucket}/{user_id}/videos/{video_id}/")  # Commented out
             print(f"Output saved to: {output_file}")
             print(f"Total Images: {len(storyboard_images)}")
             print(f"Total Cost: ${result.get('cost_usd', 0):.4f}")
             print()
-            print("🔍 To find images in S3:")
-            print(f"   Bucket: {s3_client.bucket}")
-            print(f"   Path: {user_id}/videos/{video_id}/")
-            print(f"   Files: beat_00.png, beat_01.png, ... beat_{len(storyboard_images)-1:02d}.png")
-            print()
+            # # S3 info (commented out - not needed for testing)
+            # print("🔍 To find images in S3:")
+            # print(f"   Bucket: {s3_client.bucket}")
+            # print(f"   Path: {user_id}/videos/{video_id}/")
+            # print(f"   Files: beat_00.png, beat_01.png, ... beat_{len(storyboard_images)-1:02d}.png")
+            # print()
             print("📋 Summary:")
             print(f"   - Video ID: {video_id}")
             print(f"   - User ID: {user_id}")
             print(f"   - Images generated: {len(storyboard_images)}")
-            print(f"   - All images saved to: s3://{s3_client.bucket}/{user_id}/videos/{video_id}/")
+            # print(f"   - All images saved to: s3://{s3_client.bucket}/{user_id}/videos/{video_id}/")  # Commented out
             print("=" * 80)
             
             return 0
