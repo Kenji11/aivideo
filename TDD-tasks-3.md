@@ -52,7 +52,21 @@
 - [ ] Log validation success/failure
 - [ ] Include beat count and image count in error message
 
-### Task 7.4: Testing and Verification
+### Task 7.4: Add Beat Count Validation and Truncation
+
+**Goal:** Prevent Phase 1 from generating too many beats for the target duration
+
+**File:** `backend/app/phases/phase1_validate/validation.py`
+
+- [ ] Add validation function: `validate_and_fix_beat_count(spec: dict) -> dict`
+- [ ] Calculate maximum beats: `max_beats = ceil(duration / 5)` (5s minimum beat length)
+- [ ] If `len(beats) > max_beats`: truncate beats to fit duration
+- [ ] Recalculate start times after truncation
+- [ ] Log WARNING when truncation occurs with details
+- [ ] Save truncation events to `backend/logs/beat_truncation.log` with timestamp, video_id, original count, truncated count
+- [ ] Call validation function in `build_full_spec()` before returning spec
+
+### Task 7.5: Testing and Verification
 
 - [ ] Test with 1 beat (should generate 1 image)
 - [ ] Test with 3 beats (should generate 3 images)
@@ -60,6 +74,8 @@
 - [ ] Test with 7 beats (should generate 7 images)
 - [ ] Verify each image is correctly mapped to its beat
 - [ ] Verify beat_index in storyboard_images matches beat order
+- [ ] Test truncation: manually create spec with 10 beats for 15s duration (should truncate to 3)
+- [ ] Verify truncation log file is created when truncation occurs
 
 ---
 
