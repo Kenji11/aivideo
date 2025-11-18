@@ -90,6 +90,11 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       throw new Error("DB_PASSWORD must be set in your .env file");
     }
 
+    // Load Firebase credentials from environment variables
+    const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || '';
+    const firebasePrivateKey = process.env.FIREBASE_PRIVATE_KEY || '';
+    const firebaseClientEmail = process.env.FIREBASE_CLIENT_EMAIL || '';
+
     // Create Aurora Serverless v2 cluster
     const auroraCluster = new rds.DatabaseCluster(this, 'AuroraCluster', {
       engine: rds.DatabaseClusterEngine.auroraPostgres({
@@ -269,6 +274,10 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         // AWS Credentials - from environment variables (set by GitHub Actions)
         AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || '',
         AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || '',
+        // Firebase credentials - from environment variables (set by GitHub Actions)
+        FIREBASE_PROJECT_ID: firebaseProjectId,
+        FIREBASE_PRIVATE_KEY: firebasePrivateKey,
+        FIREBASE_CLIENT_EMAIL: firebaseClientEmail,
         // Application environment - explicitly set for production
         ENVIRONMENT: 'production',
         DEBUG: 'false',
@@ -347,6 +356,10 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         // AWS Credentials - from environment variables (set by GitHub Actions)
         AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || '',
         AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || '',
+        // Firebase credentials - from environment variables (set by GitHub Actions)
+        FIREBASE_PROJECT_ID: firebaseProjectId,
+        FIREBASE_PRIVATE_KEY: firebasePrivateKey,
+        FIREBASE_CLIENT_EMAIL: firebaseClientEmail,
         // Application environment - explicitly set for production
         ENVIRONMENT: 'production',
         DEBUG: 'false',
