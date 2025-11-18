@@ -287,7 +287,8 @@ function AppContent() {
   const handleLogout = async () => {
     try {
       await signOut();
-      navigate('/login');
+      // No need to navigate - Auth component will be shown automatically when user becomes null
+      navigate('/');
     } catch (error) {
       console.error('Logout error:', error);
       addNotification('error', 'Logout Failed', 'Failed to sign out. Please try again.');
