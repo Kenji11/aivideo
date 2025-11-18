@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getIdToken } from './firebase';
 
 // Get API URL from environment variable, default to localhost:8000
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -11,9 +12,20 @@ const apiClient = axios.create({
   },
 });
 
-// Request interceptor for logging (optional, can be removed in production)
+// Request interceptor for adding Firebase auth token and logging
 apiClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    // Add Firebase ID token to request headers if user is authenticated
+    try {
+      const token = await getIdToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      // If token retrieval fails, continue without token (graceful fallback)
+      console.warn('[API] Failed to get auth token:', error);
+    }
+    
     console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
     return config;
   },
