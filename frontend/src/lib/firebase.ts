@@ -22,6 +22,22 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
+// Validate that required Firebase environment variables are set
+if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
+  const missingVars = [];
+  if (!firebaseConfig.apiKey) missingVars.push('VITE_FIREBASE_API_KEY');
+  if (!firebaseConfig.authDomain) missingVars.push('VITE_FIREBASE_AUTH_DOMAIN');
+  if (!firebaseConfig.projectId) missingVars.push('VITE_FIREBASE_PROJECT_ID');
+  
+  console.error(
+    `[Firebase] Missing required environment variables: ${missingVars.join(', ')}\n` +
+    'Please ensure these are set during the build process (e.g., in GitHub Actions secrets).'
+  );
+  throw new Error(
+    `Firebase configuration error: Missing environment variables: ${missingVars.join(', ')}`
+  );
+}
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
