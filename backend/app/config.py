@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 from functools import lru_cache
 import logging
 import os
@@ -37,6 +38,22 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
     
+    # Firebase credentials
+    # Option 1: JSON file path (with private_key from env var)
+    firebase_credentials_path: str = Field(
+        default="/app/firebase-credentials.json",
+        env="FIREBASE_CREDENTIALS_PATH",
+        description="Path to service account JSON file (without private_key, defaults to Docker mount path)"
+    )
+    firebase_private_key: str = Field(
+        default="",
+        env="FIREBASE_PRIVATE_KEY",
+        description="Service account private key (from FIREBASE_PRIVATE_KEY env var, replaces private_key in JSON)"
+    )
+    # Option 2: Individual environment variables (alternative)
+    firebase_project_id: str = ""
+    firebase_client_email: str = ""  # Service account client email
+    
     model_config = SettingsConfigDict(
         # .env file is optional - if it exists, use it (dev), otherwise use environment variables (prod)
         env_file=".env" if os.path.exists(".env") else None,
@@ -72,6 +89,27 @@ class Settings(BaseSettings):
         logger.info(f"Replicate API Token: {self._mask_key(self.replicate_api_token)}")
         logger.info(f"AWS Access Key ID: {self._mask_key(self.aws_access_key_id)}")
         logger.info(f"AWS Secret Access Key: {self._mask_key(self.aws_secret_access_key)}")
+        
+        # Log Firebase config status
+        google_app_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        if google_app_creds:
+            logger.info(f"Firebase credentials: Using GOOGLE_APPLICATION_CREDENTIALS")
+            if self.firebase_private_key:
+                logger.info("Firebase private key: Using FIREBASE_PRIVATE_KEY from environment")
+        elif self.firebase_credentials_path:
+            logger.info(f"Firebase credentials: Using firebase_credentials_path")
+            if self.firebase_private_key:
+                logger.info("Firebase private key: Using FIREBASE_PRIVATE_KEY from environment")
+            else:
+                logger.warning("FIREBASE_PRIVATE_KEY not set - will use private_key from JSON file")
+        elif self.firebase_project_id and self.firebase_private_key and self.firebase_client_email:
+            logger.info(f"Firebase project ID: {self.firebase_project_id}")
+            logger.info(f"Firebase client email: {self._mask_key(self.firebase_client_email)}")
+            logger.info("Firebase private key: *** (masked)")
+        elif self.firebase_project_id:
+            logger.info(f"Firebase project ID: {self.firebase_project_id}")
+        else:
+            logger.warning("Firebase credentials not configured - authentication will fail")
         
         # Check if values are set
         missing = []

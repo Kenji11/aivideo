@@ -57,9 +57,40 @@ export const getCurrentUser = (): User | null => {
 };
 
 export const getIdToken = async (forceRefresh: boolean = false): Promise<string | null> => {
-  const user = auth.currentUser;
-  if (!user) return null;
-  return user.getIdToken(forceRefresh);
+  // Check if user is already available
+  if (auth.currentUser) {
+    try {
+      return await auth.currentUser.getIdToken(forceRefresh);
+    } catch (error) {
+      console.error('[Firebase] Error getting ID token:', error);
+      return null;
+    }
+  }
+  
+  // If currentUser is null, wait for auth state to be determined
+  // This handles the case where auth hasn't finished initializing
+  return new Promise((resolve) => {
+    // Set a timeout to avoid waiting forever
+    const timeout = setTimeout(() => {
+      console.warn('[Firebase] Timeout waiting for auth state');
+      resolve(null);
+    }, 2000); // 2 second timeout
+    
+    const unsubscribe = onAuthStateChanged((user) => {
+      clearTimeout(timeout);
+      unsubscribe();
+      if (user) {
+        user.getIdToken(forceRefresh)
+          .then(resolve)
+          .catch((error) => {
+            console.error('[Firebase] Error getting ID token:', error);
+            resolve(null);
+          });
+      } else {
+        resolve(null);
+      }
+    });
+  });
 };
 
 export default app;
