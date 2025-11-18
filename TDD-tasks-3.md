@@ -63,47 +63,119 @@
 
 ---
 
-## PR #8: Enable Parallel Generation for Independent Beats
+## PR #8: Non-Blocking Orchestration with Celery Chains
 
-**Goal:** Generate storyboard images for independent beats in parallel instead of sequentially
+**Goal:** Refactor orchestrator to use Celery Chains for non-blocking pipeline execution, enabling true concurrent video processing
 
 **Current Issue:**
-- Storyboard images are generated one at a time in a loop
-- Each beat image generation is independent and can be parallelized
-- Sequential generation is slow and inefficient
+- **Blocking Orchestrator Problem**: The orchestrator uses `.get()` calls that block worker threads
+- Worker with `--concurrency=4` can only handle 4 videos at once, even though worker is idle waiting for subtasks
+- Each phase waits for the previous phase to complete before starting, holding worker threads hostage
+- Sequential storyboard image generation is slow and inefficient (can be parallelized)
+
+**The Problem (Current State):**
+```python
+# Current implementation (BAD - blocks worker)
+@celery_app.task
+def orchestrate_video(video_id):
+    # Phase 1
+    result1 = phase1_task.delay(video_id)
+    plan = result1.get()  # ❌ BLOCKS worker thread waiting
+    
+    # Phase 2
+    result2 = phase2_task.delay(video_id, plan)
+    storyboard = result2.get()  # ❌ BLOCKS again
+    
+    # Phase 3
+    result3 = phase3_task.delay(video_id, storyboard)
+    chunks = result3.get()  # ❌ BLOCKS again
+    
+    # etc...
+```
+
+**Result:** Worker with `--concurrency=4` can only handle 4 videos at once, even though the worker is just sitting idle waiting for subtasks.
+
+**The Solution: Celery Chains**
+- Non-blocking orchestration using Celery's native workflow primitives
+- Orchestrator dispatches entire pipeline as chain and returns immediately
+- Worker thread freed to handle more videos concurrently
+- Each phase automatically starts when previous phase completes
+
+**Example Implementation:**
+```python
+from celery import chain
+
+@celery_app.task
+def orchestrate_video(video_id):
+    """
+    Dispatch entire pipeline as chain - returns immediately.
+    Worker thread freed to handle more videos.
+    """
+    workflow = chain(
+        phase1_planning.s(video_id),
+        phase2_storyboard.s(),
+        phase3_chunks.s(),
+        phase4_stitch.s(),
+        phase5_music.s()
+    ).apply_async()
+    
+    # Returns immediately - worker thread freed!
+    return workflow.id
+```
 
 **Investigation Needed:**
-- Review current sequential generation implementation
+- Review current blocking orchestrator implementation in `pipeline.py`
+- Identify all `.get()` calls that block worker threads
+- Review current sequential storyboard generation implementation
 - Identify dependencies between beat image generations
-- Determine optimal parallelization strategy (Celery groups, async, etc.)
+- Determine optimal parallelization strategy (Celery groups for beats, chains for phases)
 - Consider rate limiting and cost implications
 
 **Files to Review:**
+- `backend/app/orchestrator/pipeline.py` (main orchestrator with blocking calls)
 - `backend/app/phases/phase2_storyboard/task.py` (main generation loop)
 - `backend/app/phases/phase2_storyboard/image_generation.py` (individual image generation)
 - `backend/app/orchestrator/celery_app.py` (Celery configuration)
 
-### Task 8.1: Investigate Current Sequential Implementation
+### Task 8.1: Investigate Current Blocking Orchestrator
 
-**File:** `backend/app/phases/phase2_storyboard/task.py`
+**File:** `backend/app/orchestrator/pipeline.py`
 
-- [ ] Review current loop structure in `generate_storyboard`
+- [ ] Review `orchestrate_video_generation` function implementation
+- [ ] Identify all `.get()` calls that block worker threads
+- [ ] Document current execution flow showing blocking points
+- [ ] Measure how many videos can be processed concurrently with current approach
+- [ ] Document worker thread utilization (should show idle time waiting for subtasks)
+- [ ] Review Phase 2 storyboard sequential generation loop
 - [ ] Identify where `generate_beat_image` is called sequentially
-- [ ] Document current execution flow
 - [ ] Check for any dependencies between beat generations
-- [ ] Measure current generation time per beat
 
-### Task 8.2: Design Parallel Generation Strategy
+### Task 8.2: Design Non-Blocking Orchestration Strategy
 
-**File:** `backend/app/phases/phase2_storyboard/task.py`
+**File:** `backend/app/orchestrator/pipeline.py`
 
-- [ ] Choose parallelization approach (Celery group vs async vs threading)
+- [ ] Design Celery Chain workflow for entire pipeline
+- [ ] Map phase dependencies (Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5)
+- [ ] Design chain structure: `chain(phase1.s(), phase2.s(), phase3.s(), phase4.s(), phase5.s())`
+- [ ] Plan how to pass data between chain links (each phase receives previous phase output)
+- [ ] Design parallel beat generation using Celery `group` within Phase 2
 - [ ] Review Celery group/chord patterns for parallel tasks
 - [ ] Consider rate limiting for image generation API
-- [ ] Design error handling for partial failures
-- [ ] Plan progress tracking mechanism
+- [ ] Design error handling for chain failures and partial failures
+- [ ] Plan progress tracking mechanism for chain execution
 
-### Task 8.3: Implement Parallel Beat Image Generation
+### Task 8.3: Implement Non-Blocking Orchestrator with Celery Chains
+
+**File:** `backend/app/orchestrator/pipeline.py`
+
+- [ ] Refactor `orchestrate_video_generation` to use `chain()` instead of sequential `.get()` calls
+- [ ] Create chain workflow: `chain(phase1.s(video_id), phase2.s(), phase3.s(), phase4.s(), phase5.s())`
+- [ ] Use `.apply_async()` to dispatch chain non-blocking
+- [ ] Return workflow ID immediately (don't wait for completion)
+- [ ] Ensure each phase task receives output from previous phase as input
+- [ ] Remove all `.get()` blocking calls from orchestrator
+- [ ] Update progress tracking to work with async chain execution
+- [ ] Test that orchestrator returns immediately without blocking
 
 **File:** `backend/app/phases/phase2_storyboard/task.py`
 
@@ -113,27 +185,53 @@
 - [ ] Handle task results and extract image data
 - [ ] Maintain beat order in results (use beat_index for sorting)
 
-### Task 8.4: Add Error Handling for Parallel Tasks
+### Task 8.4: Add Error Handling for Chains and Parallel Tasks
+
+**File:** `backend/app/orchestrator/pipeline.py`
+
+- [ ] Handle chain link failures (if one phase fails, chain stops)
+- [ ] Design error propagation through chain
+- [ ] Update database status on chain failure
+- [ ] Log chain execution progress and failures
+- [ ] Handle timeout scenarios for long-running chains
 
 **File:** `backend/app/phases/phase2_storyboard/task.py`
 
-- [ ] Handle individual task failures gracefully
+- [ ] Handle individual task failures gracefully in beat generation group
 - [ ] Collect successful and failed beat generations
 - [ ] Log which beats succeeded/failed
 - [ ] Decide on failure strategy (fail all vs partial success)
 - [ ] Return appropriate error messages
 
-### Task 8.5: Add Progress Tracking
+### Task 8.5: Add Progress Tracking for Chains
+
+**File:** `backend/app/orchestrator/pipeline.py`
+
+- [ ] Track progress of chain execution
+- [ ] Update progress when each phase completes
+- [ ] Use Celery result callbacks or signals to track chain progress
+- [ ] Update database with phase completion status
+- [ ] Log chain execution progress (e.g., "Phase 2/5 complete")
 
 **File:** `backend/app/phases/phase2_storyboard/task.py`
 
-- [ ] Track progress of parallel tasks
+- [ ] Track progress of parallel beat generation tasks
 - [ ] Update progress for each completed beat image
 - [ ] Log progress updates (e.g., "3/5 beats generated")
 - [ ] Use Celery result tracking if available
 
 ### Task 8.6: Testing and Performance Measurement
 
+**Chain Orchestration Tests:**
+- [ ] Test that orchestrator returns immediately (non-blocking)
+- [ ] Test concurrent video processing (start 10 videos, verify all accepted)
+- [ ] Measure worker thread utilization (should handle more than concurrency limit)
+- [ ] Verify chain executes phases in correct order
+- [ ] Test chain error handling (simulate phase failure)
+- [ ] Verify progress tracking works with async chains
+- [ ] Measure overall throughput improvement
+
+**Parallel Beat Generation Tests:**
 - [ ] Test parallel generation with 3 beats
 - [ ] Test parallel generation with 5 beats
 - [ ] Test parallel generation with 7 beats
@@ -141,6 +239,12 @@
 - [ ] Verify cost calculation remains accurate (sum of all image costs)
 - [ ] Verify all images are generated correctly
 - [ ] Test error handling with simulated failures
+
+**Expected Results:**
+- Worker with `--concurrency=4` should be able to handle many more than 4 videos concurrently
+- Orchestrator should return immediately without blocking
+- Chain should execute phases automatically in sequence
+- Parallel beat generation should significantly reduce Phase 2 time
 
 ---
 
