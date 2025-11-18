@@ -4,6 +4,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
@@ -225,11 +226,21 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         name: 'redis',
         cloudMapNamespace: namespace,
       },
+      minHealthyPercent: 100,
+      maxHealthyPercent: 300,
     });
 
     // API Service
     // Get image URI from environment variable (set by GitHub Actions)
     const imageUri = process.env.IMAGE_URI || `971422717446.dkr.ecr.us-east-1.amazonaws.com/aivideo/backend:latest`;
+    
+    // Parse ECR repository from image URI
+    // Format: <account>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>
+    const ecrRepository = ecr.Repository.fromRepositoryName(
+      this,
+      'BackendECRRepository',
+      'aivideo/backend'
+    );
 
     const apiTaskDefinition = new ecs.FargateTaskDefinition(this, 'APITaskDefinition', {
       memoryLimitMiB: 512,
@@ -237,8 +248,10 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       executionRole: taskExecutionRole,
     });
 
+    // Extract tag from image URI (default to 'latest')
+    const imageTag = imageUri.includes(':') ? imageUri.split(':')[1] : 'latest';
     const apiContainer = apiTaskDefinition.addContainer('APIContainer', {
-      image: ecs.ContainerImage.fromRegistry(imageUri),
+      image: ecs.ContainerImage.fromEcrRepository(ecrRepository, imageTag),
       memoryLimitMiB: 512,
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'api',
@@ -285,6 +298,8 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       },
       assignPublicIp: true,
       enableExecuteCommand: true,
+      minHealthyPercent: 100,
+      maxHealthyPercent: 300,
     });
 
     // Ensure Redis is ready before starting API
@@ -300,8 +315,10 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       executionRole: taskExecutionRole,
     });
 
+    // Extract tag from image URI (default to 'latest')
+    const workerImageTag = imageUri.includes(':') ? imageUri.split(':')[1] : 'latest';
     const workerContainer = workerTaskDefinition.addContainer('WorkerContainer', {
-      image: ecs.ContainerImage.fromRegistry(imageUri),
+      image: ecs.ContainerImage.fromEcrRepository(ecrRepository, workerImageTag),
       memoryLimitMiB: 4096,  // 4GB - increased from 512MB
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'worker',
@@ -357,6 +374,8 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       },
       assignPublicIp: true,
       enableExecuteCommand: true,
+      minHealthyPercent: 100,
+      maxHealthyPercent: 300,
     });
 
     // Ensure Redis is ready before starting Worker
