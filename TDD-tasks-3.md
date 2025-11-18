@@ -183,264 +183,107 @@ def orchestrate_video(video_id):
 
 ---
 
-## PR #9: Streaming Downloads + Parallel Image Generation (Phase 2)
+## PR #9: Enable Streaming Downloads for Phase 2, Phase 4, and Phase 5
 
-**Goal:** Implement streaming downloads for generated images, then enable parallel image generation for all beats in Phase 2 storyboard
+**Goal:** Implement streaming downloads for all file downloads (images, videos, audio) to reduce memory footprint in containers
 
 **Current Issue:**
-- Phase 2 generates storyboard images sequentially (one at a time)
-- Large images are loaded entirely into memory before processing
-- No parallelization means slow generation for videos with many beats
-- Memory usage can spike with large image downloads
+- Large files (images, videos, audio) are loaded entirely into memory before processing
+- Memory usage can spike with large downloads
+- Containers may run out of memory when processing multiple files
 
-**The Solution (Two-Part):**
-
-**Part 1: Enable Streaming Downloads**
-- Implement streaming downloads for all image generation APIs (Replicate, etc.)
-- Download images in chunks to avoid loading entire files into memory
-- Write directly to disk/S3 as data arrives
-- Reduce memory footprint in containers
-
-**Part 2: Parallelize Image Generation**
-- Use Celery `group()` to generate all beat images in parallel
-- Each beat image generation becomes independent subtask
-- Maintain beat order in results using `group()` ordering
-- Add rate limiting to avoid API throttling
+**The Solution:**
+- Implement streaming downloads for all file downloads
+- Download files in chunks to avoid loading entire files into memory
+- Stream directly to S3 or temporary files as data arrives
+- Reduce memory footprint significantly
 
 **Benefits:**
-- Faster storyboard generation (parallel instead of sequential)
-- Lower memory usage (streaming instead of buffering)
+- Lower memory usage (streaming instead of buffering entire files)
 - Better container resource utilization
 - More videos can be processed concurrently
+- Prevents memory-related crashes
 
 **Investigation Needed:**
-- Review current image download implementation
-- Identify all places where images are downloaded (Replicate API responses)
-- Review current sequential loop in Phase 2
-- Design parallel task structure for beat image generation
-- Determine optimal rate limiting strategy
+- Review current download implementation in Phase 2 (images)
+- Review current download implementation in Phase 4 (videos)
+- Review current download implementation in Phase 5 (audio/video)
+- Identify all places where files are downloaded
+- Review S3 upload implementation
 
 **Files to Review:**
-- `backend/app/phases/phase2_storyboard/task.py` (sequential generation loop)
-- `backend/app/phases/phase2_storyboard/image_generation.py` (image generation logic)
-- `backend/app/services/replicate.py` (image download implementation)
+- `backend/app/phases/phase2_storyboard/image_generation.py` (image downloads)
+- `backend/app/phases/phase4_chunks_storyboard/service.py` (video chunk downloads)
+- `backend/app/phases/phase5_refine/service.py` (audio/video downloads)
+- `backend/app/services/replicate.py` (download implementation)
 - `backend/app/services/s3.py` (S3 upload implementation)
 
-### Task 9.1: Investigate Current Image Download Implementation
+### Task 9.1: Investigate Current Download Implementation
 
-**Files:** `backend/app/services/replicate.py`, `backend/app/phases/phase2_storyboard/image_generation.py`
+**Files:** `backend/app/services/replicate.py`, Phase 2/4/5 service files
 
 - [ ] Review how Replicate API responses are downloaded
-- [ ] Identify where image bytes are loaded into memory
-- [ ] Check if images are buffered entirely before processing
-- [ ] Document current memory usage pattern
-- [ ] Review S3 upload implementation for images
+- [ ] Identify where file bytes are loaded into memory
+- [ ] Check if files are buffered entirely before processing
+- [ ] Document current memory usage pattern for each phase
+- [ ] Review S3 upload implementation
 - [ ] Identify opportunities for streaming
 
-### Task 9.2: Implement Streaming Downloads
+### Task 9.2: Implement Streaming Downloads for Phase 2 (Images)
 
-**File:** `backend/app/services/replicate.py`
+**File:** `backend/app/phases/phase2_storyboard/image_generation.py`
 
-- [ ] Create `stream_download()` function for image URLs
-- [ ] Use `requests.get(stream=True)` with `iter_content(chunk_size=8192)`
-- [ ] Write chunks directly to temporary file or S3
-- [ ] Add progress tracking for large downloads
-- [ ] Handle partial downloads and errors gracefully
-- [ ] Add retry logic for failed chunks
-- [ ] Update all image download calls to use streaming
+- [ ] Update image download to use `requests.get(stream=True)`
+- [ ] Use `iter_content(chunk_size=8192)` to download in chunks
+- [ ] Stream to BytesIO buffer or directly to S3
+- [ ] Update S3 upload to use `upload_fileobj()` with file-like objects
+- [ ] Remove intermediate file buffering
+- [ ] Test with large images
 
-**File:** `backend/app/services/s3.py`
-
-- [ ] Update S3 upload to accept file-like objects (streaming)
-- [ ] Use `upload_fileobj()` instead of `upload_file()` where possible
-- [ ] Enable multipart uploads for large files
-- [ ] Stream directly from download to S3 (no intermediate disk)
-
-### Task 9.3: Design Parallel Image Generation Structure
-
-**File:** `backend/app/phases/phase2_storyboard/task.py`
-
-- [ ] Design task signature: `generate_single_beat_image(video_id, beat, beat_index, user_id)`
-- [ ] Plan how to collect results maintaining beat order
-- [ ] Design error handling for individual beat failures
-- [ ] Plan progress tracking across parallel tasks
-- [ ] Design rate limiting strategy (max concurrent image generations)
-
-### Task 9.4: Implement Single Beat Image Generation Task
-
-**File:** `backend/app/phases/phase2_storyboard/image_generation.py` (create new file if needed)
-
-- [ ] Create `@celery_app.task` for single beat image generation
-- [ ] Extract beat image generation logic from main loop
-- [ ] Accept beat data and video_id as parameters
-- [ ] Use streaming downloads for generated images
-- [ ] Return beat_index and image_url in result
-- [ ] Handle errors and return error status
-- [ ] Update progress for this specific beat
-
-### Task 9.5: Refactor Phase 2 to Use Celery Group
-
-**File:** `backend/app/phases/phase2_storyboard/task.py`
-
-- [ ] Replace sequential loop with Celery `group()`
-- [ ] Create list of tasks: `[generate_beat_image.s(video_id, beat, i, user_id) for i, beat in enumerate(beats)]`
-- [ ] Execute group and collect results: `job = group(tasks).apply_async()`
-- [ ] Wait for all tasks to complete: `results = job.get()`
-- [ ] Sort results by beat_index to maintain order
-- [ ] Check for any failed tasks and handle appropriately
-- [ ] Update storyboard_images with results
-
-### Task 9.6: Add Rate Limiting and Resource Management
-
-**File:** `backend/app/orchestrator/celery_app.py`
-
-- [ ] Configure rate limit for image generation tasks
-- [ ] Set max concurrent image generations (e.g., 5 at a time)
-- [ ] Add queue configuration for image generation
-- [ ] Document rate limiting rationale (API limits, cost control)
-
-### Task 9.7: Testing and Verification
-
-- [ ] Test with 3 beats (verify all 3 images generated in parallel)
-- [ ] Test with 10 beats (verify rate limiting works)
-- [ ] Monitor memory usage during parallel generation
-- [ ] Verify streaming reduces memory footprint
-- [ ] Test error handling (one beat fails, others continue)
-- [ ] Verify beat order is preserved in final results
-- [ ] Compare generation time: sequential vs parallel
-- [ ] Test with slow network to verify streaming works
-
----
-
-## PR #10: Streaming Downloads + Parallel Chunk Generation (Phase 4)
-
-**Goal:** Implement streaming downloads for video chunks, then enable parallel chunk generation for all beats in Phase 4
-
-**Current Issue:**
-- Phase 4 generates video chunks sequentially (one at a time)
-- Large video files are loaded entirely into memory before processing
-- No parallelization means slow generation for videos with many chunks
-- Memory usage can spike with large video downloads (video files >> image files)
-
-**The Solution (Two-Part):**
-
-**Part 1: Enable Streaming Downloads**
-- Implement streaming downloads for all video generation APIs (Hailuo, Replicate, etc.)
-- Download video chunks in chunks (stream) to avoid loading entire files into memory
-- Write directly to disk/S3 as data arrives
-- Reduce memory footprint in containers (critical for video files)
-
-**Part 2: Parallelize Chunk Generation**
-- Use Celery `group()` to generate all video chunks in parallel
-- Each chunk generation becomes independent subtask
-- Maintain chunk order in results using `group()` ordering
-- Add rate limiting to avoid API throttling and cost overruns
-
-**Benefits:**
-- Faster chunk generation (parallel instead of sequential)
-- Lower memory usage (streaming instead of buffering entire videos)
-- Better container resource utilization
-- More videos can be processed concurrently
-
-**Investigation Needed:**
-- Review current video chunk download implementation
-- Identify all places where video chunks are downloaded (Hailuo API, Replicate API)
-- Review current sequential loop in Phase 4
-- Design parallel task structure for chunk generation
-- Determine optimal rate limiting strategy (video gen is expensive)
-
-**Files to Review:**
-- `backend/app/phases/phase4_chunks_storyboard/task.py` (sequential generation loop)
-- `backend/app/phases/phase4_chunks_storyboard/service.py` (chunk generation logic)
-- `backend/app/services/replicate.py` (video download implementation)
-- `backend/app/services/s3.py` (S3 upload implementation for videos)
-
-### Task 10.1: Investigate Current Video Chunk Download Implementation
-
-**Files:** `backend/app/services/replicate.py`, `backend/app/phases/phase4_chunks_storyboard/service.py`
-
-- [ ] Review how video generation API responses are downloaded
-- [ ] Identify where video bytes are loaded into memory
-- [ ] Check if videos are buffered entirely before processing
-- [ ] Document current memory usage pattern for video chunks
-- [ ] Review S3 upload implementation for video chunks
-- [ ] Identify opportunities for streaming (critical for large video files)
-
-### Task 10.2: Implement Streaming Downloads for Video Chunks
-
-**File:** `backend/app/services/replicate.py`
-
-- [ ] Create `stream_download_video()` function for video URLs
-- [ ] Use `requests.get(stream=True)` with `iter_content(chunk_size=8192)`
-- [ ] Write chunks directly to temporary file or S3
-- [ ] Add progress tracking for large video downloads
-- [ ] Handle partial downloads and errors gracefully
-- [ ] Add retry logic for failed chunks
-- [ ] Update all video download calls to use streaming
-
-**File:** `backend/app/services/s3.py`
-
-- [ ] Ensure S3 upload supports file-like objects for videos
-- [ ] Use `upload_fileobj()` with multipart uploads for large videos
-- [ ] Stream directly from download to S3 (no intermediate disk if possible)
-- [ ] Configure appropriate chunk size for video uploads
-
-### Task 10.3: Design Parallel Chunk Generation Structure
+### Task 9.3: Implement Streaming Downloads for Phase 4 (Video Chunks)
 
 **File:** `backend/app/phases/phase4_chunks_storyboard/service.py`
 
-- [ ] Design task signature: `generate_single_chunk(video_id, beat, chunk_index, spec, reference_urls, user_id)`
-- [ ] Plan how to collect results maintaining chunk order
-- [ ] Design error handling for individual chunk failures
-- [ ] Plan progress tracking across parallel tasks
-- [ ] Design rate limiting strategy (video gen is expensive, limit concurrent generations)
+- [ ] Update video chunk download to use `requests.get(stream=True)`
+- [ ] Use `iter_content(chunk_size=8192)` to download in chunks
+- [ ] Stream to temporary file or directly to S3
+- [ ] Use `upload_fileobj()` for S3 uploads
+- [ ] Enable multipart uploads for large video files
+- [ ] Remove intermediate memory buffering
+- [ ] Test with large video chunks
 
-### Task 10.4: Implement Single Chunk Generation Task
+### Task 9.4: Implement Streaming Downloads for Phase 5 (Audio/Video)
 
-**File:** `backend/app/phases/phase4_chunks_storyboard/service.py` (or new task file)
+**File:** `backend/app/phases/phase5_refine/service.py`
 
-- [ ] Create `@celery_app.task` for single chunk generation
-- [ ] Extract chunk generation logic from main loop
-- [ ] Accept beat data, chunk_index, and video_id as parameters
-- [ ] Use streaming downloads for generated video chunks
-- [ ] Return chunk_index and chunk_url in result
-- [ ] Handle errors and return error status
-- [ ] Update progress for this specific chunk
+- [ ] Update audio download to use `requests.get(stream=True)`
+- [ ] Update video download to use `requests.get(stream=True)`
+- [ ] Use `iter_content(chunk_size=8192)` for all downloads
+- [ ] Stream to temporary files or directly to S3
+- [ ] Use `upload_fileobj()` for S3 uploads
+- [ ] Remove intermediate memory buffering
+- [ ] Test with large audio/video files
 
-### Task 10.5: Refactor Phase 4 to Use Celery Group
+### Task 9.5: Update S3 Service for Streaming
 
-**File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
+**File:** `backend/app/services/s3.py`
 
-- [ ] Replace sequential loop with Celery `group()`
-- [ ] Create list of tasks: `[generate_chunk.s(video_id, beat, i, spec, ref_urls, user_id) for i, beat in enumerate(beats)]`
-- [ ] Execute group and collect results: `job = group(tasks).apply_async()`
-- [ ] Wait for all tasks to complete: `results = job.get()`
-- [ ] Sort results by chunk_index to maintain order
-- [ ] Check for any failed tasks and handle appropriately
-- [ ] Update chunk_urls with results
-- [ ] Pass ordered chunks to stitcher
+- [ ] Ensure `upload_fileobj()` method exists and works correctly
+- [ ] Support file-like objects (BytesIO, file handles)
+- [ ] Enable multipart uploads for large files
+- [ ] Add proper content-type handling
+- [ ] Test with various file sizes
 
-### Task 10.6: Add Rate Limiting and Resource Management
+### Task 9.6: Testing and Verification
 
-**File:** `backend/app/orchestrator/celery_app.py`
-
-- [ ] Configure rate limit for chunk generation tasks
-- [ ] Set max concurrent chunk generations (e.g., 3 at a time due to cost)
-- [ ] Add queue configuration for chunk generation
-- [ ] Document rate limiting rationale (API cost, memory limits)
-- [ ] Consider separate queue for chunk generation vs image generation
-
-### Task 10.7: Testing and Verification
-
-- [ ] Test with 3 chunks (verify all 3 generated in parallel)
-- [ ] Test with 7 chunks (verify rate limiting works)
-- [ ] Monitor memory usage during parallel chunk generation
+- [ ] Test Phase 2 with multiple large images
+- [ ] Test Phase 4 with multiple large video chunks
+- [ ] Test Phase 5 with large audio/video files
+- [ ] Monitor memory usage during downloads (should be constant, not growing)
 - [ ] Verify streaming reduces memory footprint significantly
-- [ ] Test error handling (one chunk fails, others continue)
-- [ ] Verify chunk order is preserved in final results
-- [ ] Compare generation time: sequential vs parallel
 - [ ] Test with slow network to verify streaming works
-- [ ] Verify stitching works with parallel-generated chunks
+- [ ] Test error handling for partial downloads
+- [ ] Verify all files are correctly uploaded to S3
 
 ---
 
