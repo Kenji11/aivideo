@@ -135,5 +135,7 @@ PHASE4_TIMEOUT = 600
 PHASE5_TIMEOUT = 300
 PHASE6_TIMEOUT = 180
 
-# Mock user ID for development/testing (before auth is implemented)
+# Mock user ID for development/testing (DEPRECATED - do not use in production routes)
+# This is kept for backward compatibility and testing purposes only.
+# All production API routes now require Firebase authentication and use real user IDs.
 MOCK_USER_ID = "mock-user-00000000-0000-0000-0000-000000000000"
