@@ -289,5 +289,4 @@ dump.rdb
 
 # Postgres Data
 postgres_data/
-firebase-credentials.json
 !firebase-credentials.json.example
