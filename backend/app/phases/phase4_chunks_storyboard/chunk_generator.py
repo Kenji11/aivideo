@@ -5,6 +5,7 @@ import subprocess
 import requests
 import time
 import math
+import json
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
 
@@ -317,7 +318,8 @@ def generate_single_chunk_continuous(chunk_spec_obj: ChunkSpec) -> dict:
     
     print(f"🎬 [{timestamp}] Chunk {chunk_num} - Continuous Generation")
     print(f"   Using last frame from previous chunk")
-    print(f"   Prompt: {chunk_spec_obj.prompt[:80]}...")
+    print(f"   📝 Full Prompt:")
+    print(f"      {chunk_spec_obj.prompt}")
     
     temp_files = []
     
@@ -358,6 +360,18 @@ def generate_single_chunk_continuous(chunk_spec_obj: ChunkSpec) -> dict:
                 replicate_input[param_names.get('width', 'width')] = model_config['params'].get('width')
             if 'height' in param_names:
                 replicate_input[param_names.get('height', 'height')] = model_config['params'].get('height')
+            
+            # Log the entire input object (excluding file handles)
+            input_log = {}
+            for key, value in replicate_input.items():
+                if hasattr(value, 'read') or isinstance(value, (bytes, bytearray)):
+                    # It's a file-like object or binary data
+                    input_log[key] = f"<file: {prev_frame_path}>"
+                else:
+                    input_log[key] = value
+            
+            print(f"   📦 Model Input Object:")
+            print(f"      {json.dumps(input_log, indent=6)}")
             
             output = replicate_client.run(
                 model_name,
@@ -484,7 +498,8 @@ def generate_single_chunk_with_storyboard(
         
         print(f"🎬 [{timestamp}] Chunk {chunk_num} - Beat Start (Storyboard)")
         print(f"   Beat Index: {beat_idx}")
-        print(f"   Prompt: {chunk_spec_obj.prompt[:80]}...")
+        print(f"   📝 Full Prompt:")
+        print(f"      {chunk_spec_obj.prompt}")
         
         temp_files = []
         
@@ -525,6 +540,18 @@ def generate_single_chunk_with_storyboard(
                     replicate_input[param_names.get('width', 'width')] = model_config['params'].get('width')
                 if 'height' in param_names:
                     replicate_input[param_names.get('height', 'height')] = model_config['params'].get('height')
+                
+                # Log the entire input object (excluding file handles)
+                input_log = {}
+                for key, value in replicate_input.items():
+                    if hasattr(value, 'read') or isinstance(value, (bytes, bytearray)):
+                        # It's a file-like object or binary data
+                        input_log[key] = f"<file: {storyboard_path}>"
+                    else:
+                        input_log[key] = value
+                
+                print(f"   📦 Model Input Object:")
+                print(f"      {json.dumps(input_log, indent=6)}")
                 
                 output = replicate_client.run(
                     model_name,
