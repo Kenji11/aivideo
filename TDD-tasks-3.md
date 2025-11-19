@@ -183,92 +183,133 @@ def orchestrate_video(video_id):
 
 ---
 
-## PR #9: Parallel Chunk Generation with Dependency-Aware Waves
+## PR #9: Parallel Chunk Generation with Pipelined Chains
 
-**Goal:** Enable parallel chunk generation while respecting dependencies between reference-based and last-frame-based chunks
+**Goal:** Enable parallel chunk generation with streaming execution - followers start immediately when their predecessor completes
 
 **Current Issue:**
 - Phase 4 generates chunks sequentially (slow)
 - Chunks with reference images could be generated in parallel
-- Chunks using last frames need to wait for their predecessor, but can run in parallel with other dependent chunks
+- Chunks using last frames need to wait for their predecessor, but could start immediately when ready
+- Current approach would force all Wave 1 chunks to finish before ANY Wave 2 chunk starts (inefficient)
 
 **The Solution:**
-- Use Celery `chord` pattern for parallel execution
-- Split Phase 4 into two waves:
-  - **Wave 1**: Generate all chunks with reference images (parallel)
-  - **Wave 2**: Generate all chunks using last frames (parallel, after Wave 1 completes)
-- Maintain chain pattern for non-blocking orchestration
+- Use **pipelined chains** - each beat sequence (reference → follower) runs as an independent chain
+- All chains run in parallel via `chord`
+- Followers start immediately when their predecessor finishes (no waiting for other sequences)
+- Phase 4 dynamically builds chain structure based on beat configuration
 
 **Benefits:**
-- Significant speedup for videos with multiple beats
-- 6 beats with 3 reference images: Wave 1 runs 3 chunks in parallel, Wave 2 runs 3 chunks in parallel
-- Worker threads remain non-blocking
-- Respects chunk generation dependencies
+- **Maximum parallelism**: All reference chunks start together, followers start as soon as their predecessor finishes
+- **Streaming execution**: No rigid wave boundaries - work flows continuously
+- **Faster completion**: Follower chunks don't wait for slowest reference chunk in unrelated sequence
+- **Worker threads remain non-blocking**: Returns chord signature, Celery handles waiting
+- **Simpler mental model**: Each sequence is independent
 
-**Dependency Structure Example:**
+**Execution Pattern Example:**
 ```
-Wave 1 (Parallel): Beats with reference_image
-- Beat 0 (has ref) → Chunk 0
-- Beat 2 (has ref) → Chunk 2  
-- Beat 4 (has ref) → Chunk 4
+6 beats: [0-ref, 1-follow, 2-ref, 3-follow, 4-ref, 5-follow]
 
-Wave 2 (Parallel): Beats using last_frame from previous chunk
-- Beat 1 (uses Chunk 0's last frame) → Chunk 1
-- Beat 3 (uses Chunk 2's last frame) → Chunk 3
-- Beat 5 (uses Chunk 4's last frame) → Chunk 5
+Sequence Chains (all run in parallel):
+- Chain A: Chunk 0 (ref) → Chunk 1 (last frame)
+- Chain B: Chunk 2 (ref) → Chunk 3 (last frame)  
+- Chain C: Chunk 4 (ref) → Chunk 5 (last frame)
+
+Timeline:
+0s:  [Chunk 0] [Chunk 2] [Chunk 4]  ← All reference chunks start
+5s:  [Chunk 0] [Chunk 2] [✓ Chunk 4 done → Chunk 5 starts immediately]
+7s:  [Chunk 0] [✓ Chunk 2 done → Chunk 3 starts immediately] [Chunk 5]
+10s: [✓ Chunk 0 done → Chunk 1 starts immediately] [Chunk 3] [Chunk 5]
+12s: [Chunk 1] [✓ Chunk 3 done] [✓ Chunk 5 done]
+15s: [✓ Chunk 1 done]
+
+Compare to rigid waves (would wait until 10s to start ANY follower)
 ```
 
-**Chord Pattern Example:**
+**Pipelined Chain Pattern Example:**
 ```python
 from celery import chain, chord
 
-# Individual parallelizable tasks
+# Individual chunk generation tasks
 @celery_app.task
 def generate_chunk_with_reference(beat, video_id):
-    chunk_url = hailuo_generate(beat["reference_image"])
-    save_chunk_to_db(video_id, beat["beat_id"], chunk_url)
-    return chunk_url
+    """Generate chunk from reference image."""
+    chunk_result = generate_chunk(beat['reference_image'], video_id, beat['beat_index'])
+    last_frame_path = extract_and_save_last_frame(chunk_result['url'])
+    
+    return {
+        **chunk_result,
+        'beat_index': beat['beat_index'],
+        'last_frame_path': last_frame_path
+    }
 
 @celery_app.task
-def generate_chunk_with_last_frame(beat, video_id, previous_chunk_id):
-    last_frame = extract_last_frame(previous_chunk_id)
-    chunk_url = hailuo_generate(last_frame)
-    save_chunk_to_db(video_id, beat["beat_id"], chunk_url)
-    return chunk_url
+def generate_chunk_with_last_frame(prev_chunk_result, next_beat, video_id):
+    """Generate chunk using last frame from previous chunk (receives prev result via chain)."""
+    chunk_result = generate_chunk(
+        prev_chunk_result['last_frame_path'],
+        video_id,
+        next_beat['beat_index']
+    )
+    
+    return {
+        **chunk_result,
+        'beat_index': next_beat['beat_index']
+    }
 
-# Wave tasks with chords
+# Phase 4 orchestrator (dynamically builds chains)
 @celery_app.task
-def phase4_wave1_chunks(phase3_result):
-    """Create chord for parallel reference-based chunks."""
-    beats_with_refs = [b for b in beats if b.get("reference_image")]
+def phase4_chunks(phase3_result):
+    """Build pipelined chains - each beat sequence runs independently."""
+    beats = phase3_result['beats']
+    video_id = phase3_result['video_id']
     
-    result = chord([
-        generate_chunk_with_reference.s(beat, video_id)
-        for beat in beats_with_refs
-    ])(phase4_wave1_complete.s(phase3_result))
+    chains = []
+    i = 0
     
-    # DON'T call .get() - return chord AsyncResult
-    return result
+    while i < len(beats):
+        beat = beats[i]
+        
+        if not beat.get('reference_image'):
+            raise ValueError(f"Beat {i} must have reference_image")
+        
+        # Start chain with reference beat
+        beat_chain = [generate_chunk_with_reference.s(beat, video_id)]
+        
+        # Add follower beat if it exists and uses last frame
+        if i + 1 < len(beats) and not beats[i + 1].get('reference_image'):
+            beat_chain.append(
+                generate_chunk_with_last_frame.s(beats[i + 1], video_id)
+            )
+            i += 2  # Skip next beat (included in chain)
+        else:
+            i += 1  # Just this beat
+        
+        chains.append(chain(*beat_chain))
+    
+    # All chains run in parallel, collect results when done
+    return chord(chains)(finalize_phase4.s(phase3_result)).apply_async()
 
 @celery_app.task
-def phase4_wave2_chunks(phase4_wave1_result):
-    """Create chord for parallel last-frame-based chunks."""
-    beats_with_last_frames = [b for b in beats if not b.get("reference_image")]
+def finalize_phase4(chain_results, phase3_result):
+    """Collect and merge all chunk results from parallel chains."""
+    all_chunks = []
+    for result in chain_results:
+        # Each chain returns 1 or 2 chunks
+        if isinstance(result, list):
+            all_chunks.extend(result)
+        else:
+            all_chunks.append(result)
     
-    result = chord([
-        generate_chunk_with_last_frame.s(beat, video_id, prev_chunk_id)
-        for beat in beats_with_last_frames
-    ])(phase4_wave2_complete.s(phase4_wave1_result))
-    
-    return result
+    all_chunks.sort(key=lambda x: x['beat_index'])
+    return {**phase3_result, 'chunks': all_chunks}
 
-# Main pipeline
+# Main pipeline (stays simple - Phase 4 handles complexity internally)
 workflow = chain(
     phase1_planning.s(video_id, prompt),
     phase2_storyboards.s(),
     phase3_references.s(),
-    phase4_wave1_chunks.s(),  # Returns chord (auto-waits)
-    phase4_wave2_chunks.s(),  # Returns chord (auto-waits)
+    phase4_chunks.s(),  # Returns chord of chains (auto-waits)
     phase5_stitch.s(),
     phase6_music.s()
 ).apply_async()
@@ -285,151 +326,190 @@ workflow = chain(
 
 - [ ] Review current sequential chunk generation loop
 - [ ] Identify how reference images are used vs last frames
-- [ ] Understand chunk dependency structure in spec
+- [ ] Understand beat sequence structure (reference → follower patterns)
 - [ ] Document how beats are marked with `reference_image` field
 - [ ] Trace how last frames are extracted and passed to next chunk
 - [ ] Confirm chunks are saved to DB with proper ordering
+- [ ] Identify where chunks are currently generated in sequence
 
-### Task 9.2: Design Two-Wave Chord Pattern
+### Task 9.2: Design Pipelined Chain Pattern
 
 **Files:** `backend/app/phases/phase4_chunks_storyboard/task.py`, `backend/app/orchestrator/pipeline.py`
 
-- [ ] Design Wave 1 chord: parallel chunks with reference images
-- [ ] Design Wave 2 chord: parallel chunks using last frames
-- [ ] Plan data flow: Wave 1 results → extract last frames → Wave 2 input
-- [ ] Design chord callback structure for each wave
-- [ ] Map how to identify which beats belong to which wave
-- [ ] Plan error handling for partial failures in each wave
-- [ ] Design progress tracking for two-wave execution
+- [ ] Design beat sequence identification logic (reference → follower pairing)
+- [ ] Design chain structure: `chain(ref_chunk, follower_chunk)` for each sequence
+- [ ] Plan data flow: reference task extracts last frame → passes to follower via chain
+- [ ] Design chord-of-chains structure for parallel sequence execution
+- [ ] Plan how to handle beats that are all references (no followers)
+- [ ] Plan error handling for partial failures in individual chains
+- [ ] Design progress tracking for streaming execution
 
 **Key Questions:**
-- [ ] How to filter beats by `reference_image` presence?
-- [ ] How to map dependent beats to their predecessor's last frame?
-- [ ] How to merge Wave 1 and Wave 2 results in correct order?
+- [ ] How to iterate through beats and identify sequences?
+- [ ] How to pass last frame from reference task to follower task in chain?
+- [ ] How to collect results from chains of varying lengths (1 or 2 chunks)?
+- [ ] How to ensure beat_index ordering is preserved?
 
 ### Task 9.3: Create Individual Chunk Generation Tasks
 
 **File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
 
-- [ ] Create `generate_chunk_with_reference` task (for Wave 1)
+- [ ] Create `generate_chunk_with_reference` task
   - Input: beat dict, video_id
   - Extract reference_image from beat
   - Call video generation API with reference
   - Save chunk to DB with beat_index
+  - **Extract and save last frame** for potential follower
   - Return chunk metadata (id, url, beat_index, last_frame_path)
 
-- [ ] Create `generate_chunk_with_last_frame` task (for Wave 2)
-  - Input: beat dict, video_id, previous_chunk_id
-  - Fetch last frame from previous chunk
+- [ ] Create `generate_chunk_with_last_frame` task
+  - Input: **prev_chunk_result** (from chain), next_beat dict, video_id
+  - Extract last_frame_path from prev_chunk_result
   - Call video generation API with last frame
   - Save chunk to DB with beat_index
-  - Return chunk metadata (id, url, beat_index, last_frame_path)
+  - Return chunk metadata (id, url, beat_index)
 
 - [ ] Ensure both tasks are idempotent (can retry safely)
 - [ ] Add proper error handling and logging
-- [ ] Extract last frame after generation for next wave
+- [ ] Test that chain passes prev_chunk_result correctly to follower
 
-### Task 9.4: Create Wave 1 Chord (Reference-Based Chunks)
+### Task 9.4: Create Phase 4 Orchestrator with Dynamic Chain Building
 
 **File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
 
-- [ ] Create `phase4_wave1_chunks` task
+- [ ] Create `phase4_chunks` task
   - Input: phase3_result (contains beats and storyboard data)
-  - Filter beats with `reference_image` field
-  - Build chord with `generate_chunk_with_reference` for each beat
-  - Attach `phase4_wave1_complete` callback
+  - Parse beats array to identify sequences
+  - Build list of chains (one per sequence)
+  - Wrap all chains in chord for parallel execution
   - Return chord AsyncResult (Celery auto-waits)
 
-- [ ] Create `phase4_wave1_complete` callback task
-  - Input: list of chunk results, phase3_result
-  - Merge results with phase3_result
-  - Return updated result dict with wave1_chunks
-  - Log completion and chunk count
+- [ ] Implement beat sequence parsing logic:
+  ```python
+  chains = []
+  i = 0
+  while i < len(beats):
+      # Check if beat has reference
+      if beat.get('reference_image'):
+          # Start chain with reference
+          chain_tasks = [generate_chunk_with_reference.s(beat, video_id)]
+          
+          # Check if next beat is follower (no reference)
+          if i+1 < len(beats) and not beats[i+1].get('reference_image'):
+              # Add follower to chain
+              chain_tasks.append(generate_chunk_with_last_frame.s(beats[i+1], video_id))
+              i += 2  # Skip next beat
+          else:
+              i += 1  # Just this beat
+          
+          chains.append(chain(*chain_tasks))
+      else:
+          # Error: beat without reference and not following a reference
+          raise ValueError(f"Beat {i} missing reference_image")
+  ```
 
-### Task 9.5: Create Wave 2 Chord (Last-Frame-Based Chunks)
+- [ ] Test chain building logic with various beat configurations
+
+### Task 9.5: Create Finalize Callback
 
 **File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
 
-- [ ] Create `phase4_wave2_chunks` task
-  - Input: phase4_wave1_result (contains wave1 chunks)
-  - Filter beats without `reference_image` field
-  - Map each dependent beat to its predecessor chunk (by beat_index - 1)
-  - Build chord with `generate_chunk_with_last_frame` for each beat
-  - Attach `phase4_wave2_complete` callback
-  - Return chord AsyncResult
-
-- [ ] Create `phase4_wave2_complete` callback task
-  - Input: list of chunk results, phase4_wave1_result
-  - Merge Wave 1 and Wave 2 results in correct beat order
-  - Return complete phase4_result with all chunks
+- [ ] Create `finalize_phase4` task
+  - Input: chain_results (list of results, each 1 or 2 chunks), phase3_result
+  - Flatten results: each chain returns either single chunk or 2 chunks
+  - Handle both single results and lists
+  - Sort chunks by beat_index
+  - Return complete phase4_result with all chunks ordered correctly
   - Log completion and total chunk count
 
-### Task 9.6: Update Orchestrator Chain
+- [ ] Handle result flattening:
+  ```python
+  all_chunks = []
+  for result in chain_results:
+      if isinstance(result, list):
+          all_chunks.extend(result)
+      else:
+          all_chunks.append(result)
+  
+  all_chunks.sort(key=lambda x: x['beat_index'])
+  ```
+
+### Task 9.6: Update Orchestrator to Use New Phase 4
 
 **File:** `backend/app/orchestrator/pipeline.py`
 
-- [ ] Update `run_pipeline` to use two-wave Phase 4:
+- [ ] Verify main pipeline structure remains simple:
   ```python
   workflow = chain(
       phase1_planning.s(...),
       phase2_storyboards.s(),
       phase3_references.s(),
-      phase4_wave1_chunks.s(),  # Returns chord (auto-waits)
-      phase4_wave2_chunks.s(),  # Returns chord (auto-waits)
+      phase4_chunks.s(),  # Returns chord of chains (auto-waits)
       phase5_stitch.s(),
       phase6_music.s()
   ).apply_async()
   ```
-- [ ] Remove old blocking `phase4_chunks` task
-- [ ] Update progress tracking to account for two waves
+- [ ] Remove old sequential `phase4_chunks` implementation
+- [ ] Ensure phase4_chunks is imported correctly
 - [ ] Test chain execution flows correctly
 
 ### Task 9.7: Handle Edge Cases
 
 **File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
 
-- [ ] Handle case where all beats have reference images (Wave 2 is empty)
-  - Wave 2 chord should be skipped or return empty list gracefully
+- [ ] Handle case where all beats have reference images (all single-chunk chains)
+  - Each sequence is length 1, still runs in parallel
+  - No follower chunks
   
-- [ ] Handle case where no beats have reference images (Wave 1 is empty)
-  - This shouldn't happen (first beat should always have reference)
-  - Add validation and error if this occurs
+- [ ] Handle case where beat without reference is not preceded by reference beat
+  - Should raise ValueError with clear message
+  - This indicates Phase 1/3 data issue
 
-- [ ] Handle case with single beat (no parallelization needed)
+- [ ] Handle case with single beat (1 sequence, 1 chunk)
   - Still use chord pattern for consistency
+  - Chord with single chain works fine
+
+- [ ] Handle case with alternating pattern (ref, follow, ref, follow, ...)
+  - Should create N/2 chains
 
 - [ ] Ensure beat_index ordering is preserved in final results
-  - Sort chunks by beat_index before returning
+  - Sort by beat_index in finalize_phase4
 
 ### Task 9.8: Update Progress Tracking
 
 **Files:** `backend/app/orchestrator/progress.py`, chunk generation tasks
 
-- [ ] Update progress for Wave 1 start
-- [ ] Update progress for each Wave 1 chunk completion
-- [ ] Update progress for Wave 1 completion
-- [ ] Update progress for Wave 2 start
-- [ ] Update progress for each Wave 2 chunk completion
-- [ ] Update progress for Wave 2 completion
-- [ ] Calculate progress percentage accounting for two waves
+- [ ] Update progress for Phase 4 start
+- [ ] Update progress for each reference chunk completion
+  - Progress: (completed_refs / total_refs) * 50%
+- [ ] Update progress for each follower chunk completion
+  - Progress: 50% + (completed_followers / total_followers) * 50%
+- [ ] Update progress for Phase 4 completion (100%)
+- [ ] Calculate progress percentage accounting for streaming execution
+- [ ] Log when individual chains complete
 
 ### Task 9.9: Testing and Verification
 
-- [ ] Test with 2 beats (1 reference, 1 last-frame): should run sequentially as 2 waves
-- [ ] Test with 4 beats (2 reference, 2 last-frame): Wave 1 runs 2 parallel, Wave 2 runs 2 parallel
-- [ ] Test with 6 beats (3 reference, 3 last-frame): Wave 1 runs 3 parallel, Wave 2 runs 3 parallel
-- [ ] Test with all reference images: Wave 2 should handle empty case gracefully
+- [ ] Test with 2 beats (1 ref → 1 follow): 1 chain with 2 tasks
+- [ ] Test with 3 beats (ref, follow, ref): 2 chains (first has 2 tasks, second has 1 task)
+- [ ] Test with 4 beats (ref, follow, ref, follow): 2 chains, each with 2 tasks
+- [ ] Test with 6 beats (alternating): 3 chains, each with 2 tasks, all run in parallel
+- [ ] Test with all reference images: N chains, each with 1 task
 - [ ] Verify chunks are saved to DB in correct beat_index order
-- [ ] Verify last frames are correctly extracted and passed to Wave 2
-- [ ] Test error handling: if 1 chunk in Wave 1 fails, how does Wave 2 handle missing last frame?
-- [ ] Verify progress tracking shows both waves correctly
+- [ ] Verify follower chunks start immediately when predecessor finishes (check timestamps)
+- [ ] Verify follower doesn't wait for unrelated reference chunks to finish
+- [ ] Test error handling: if 1 reference chunk fails, does its follower fail gracefully?
+- [ ] Test error handling: if 1 chain fails, do other chains continue?
+- [ ] Verify progress tracking updates in real-time as chunks complete
 - [ ] Test with concurrent video generations to verify true parallelization
+- [ ] Compare execution time to sequential approach (should be significantly faster)
 
 **Key Implementation Notes:**
-1. **No `.get()` calls** - return chord AsyncResults, let Celery handle waiting
-2. **Wave dependencies** - Wave 2 task receives Wave 1 results via chain
-3. **Beat ordering** - preserve beat_index throughout both waves
-4. **Last frame extraction** - must happen in Wave 1 before Wave 2 starts
-5. **Error isolation** - failure in one chord doesn't block others (within same wave)
+1. **No `.get()` calls** - return chord AsyncResult, let Celery handle waiting
+2. **Chain data passing** - follower task receives previous chunk result as first parameter
+3. **Beat ordering** - sort by beat_index in finalize callback
+4. **Last frame extraction** - happens in reference task, passed via chain to follower
+5. **Error isolation** - failure in one chain doesn't block other chains
+6. **Dynamic structure** - phase4_chunks builds chain structure at runtime based on beat configuration
 
 ---
