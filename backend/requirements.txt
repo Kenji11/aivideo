@@ -26,5 +26,8 @@ Pillow>=10.0.0
 moviepy==1.0.3  # Phase 5: Video/audio processing (pinned to 1.x for API stability)
 mutagen>=1.47.0  # Read MP3 metadata (ID3 tags) for genre detection
 
+# LangChain (for parallel execution)
+langchain-core>=0.1.0
+
 # Firebase Admin SDK for token verification
 firebase-admin>=6.0.0
