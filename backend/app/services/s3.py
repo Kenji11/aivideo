@@ -2,6 +2,9 @@ import boto3
 import tempfile
 import os
 from app.config import get_settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -96,4 +99,14 @@ class S3Client:
             print(f"⚠️  Error listing S3 files with prefix '{prefix}': {str(e)}")
             return []
 
-s3_client = S3Client()
+# Initialize with error handling - don't crash on import
+try:
+    s3_client = S3Client()
+    logger.debug("S3 client initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize S3 client: {e}", exc_info=True)
+    # Create a placeholder that will fail on use, but allow import to succeed
+    class FailedClient:
+        def __getattr__(self, name):
+            raise RuntimeError(f"S3 client initialization failed: {e}")
+    s3_client = FailedClient()

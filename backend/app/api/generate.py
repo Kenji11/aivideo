@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.common.schemas import GenerateRequest, GenerateResponse
 from app.common.models import VideoGeneration, VideoStatus, Asset
-from app.common.constants import MOCK_USER_ID
+from app.common.auth import get_current_user
 from app.database import get_db
 from app.orchestrator.pipeline import run_pipeline
 import uuid
@@ -10,17 +10,25 @@ import uuid
 router = APIRouter()
 
 @router.post("/api/generate")
-async def generate_video(request: GenerateRequest, db: Session = Depends(get_db)) -> GenerateResponse:
+async def generate_video(
+    request: GenerateRequest,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> GenerateResponse:
     """Submit video generation job"""
     
     # Create video record
     video_id = str(uuid.uuid4())
     
     # Convert asset IDs to asset dictionaries for Phase 1
+    # Only include assets that belong to the authenticated user
     asset_dicts = []
     if request.reference_assets:
         for asset_id in request.reference_assets:
-            asset = db.query(Asset).filter(Asset.id == asset_id).first()
+            asset = db.query(Asset).filter(
+                Asset.id == asset_id,
+                Asset.user_id == user_id
+            ).first()
             if asset:
                 # Create asset dict with s3_key for Phase 1/3 processing
                 asset_dicts.append({
@@ -29,13 +37,13 @@ async def generate_video(request: GenerateRequest, db: Session = Depends(get_db)
                     'asset_id': asset_id
                 })
             else:
-                # Asset not found - log warning but continue
-                print(f"⚠️  Asset ID {asset_id} not found in database, skipping")
+                # Asset not found or doesn't belong to user - log warning but continue
+                print(f"⚠️  Asset ID {asset_id} not found or not accessible, skipping")
     
     # Create database record
     video_record = VideoGeneration(
         id=video_id,
-        user_id=MOCK_USER_ID,  # TODO: Get from auth token in future
+        user_id=user_id,  # Use authenticated user ID
         title=request.title or "Untitled Video",  # Default title if not provided
         description=request.description,
         prompt=request.prompt,

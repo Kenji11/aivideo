@@ -18,7 +18,7 @@
 - **Result Backend**: Redis (same instance)
 - **Database**: PostgreSQL 15 (RDS)
 - **ORM**: SQLAlchemy 2.x
-- **Migrations**: Alembic
+- **Migrations**: Raw SQL (custom runner)
 - **Deployment**: Elastic Beanstalk (Docker containers)
 - **Region**: us-east-2 (all AWS services)
 
@@ -154,7 +154,6 @@ fastapi[all]==0.104.1          # Web framework
 celery[redis]==5.3.4           # Task queue
 redis==5.0.1                   # Redis client
 sqlalchemy==2.0.23             # ORM
-alembic==1.12.1                # Migrations
 psycopg2-binary==2.9.9         # PostgreSQL driver
 boto3==1.29.7                  # AWS SDK
 replicate==0.15.4              # Replicate API client

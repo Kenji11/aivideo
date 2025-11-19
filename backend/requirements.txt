@@ -6,7 +6,6 @@ pydantic-settings==2.1.0
 
 # Database
 sqlalchemy==2.0.23
-alembic==1.13.0
 psycopg2-binary==2.9.9
 
 # Task Queue
@@ -26,3 +25,6 @@ requests>=2.31.0
 Pillow>=10.0.0
 moviepy==1.0.3  # Phase 5: Video/audio processing (pinned to 1.x for API stability)
 mutagen>=1.47.0  # Read MP3 metadata (ID3 tags) for genre detection
+
+# Firebase Admin SDK for token verification
+firebase-admin>=6.0.0

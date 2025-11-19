@@ -6,9 +6,18 @@ with full beat details from the beat library.
 """
 
 import logging
+import math
+import os
+from pathlib import Path
+from datetime import datetime
 from app.common.beat_library import BEAT_LIBRARY, OPENING_BEATS, CLOSING_BEATS
 
 logger = logging.getLogger(__name__)
+
+# Ensure logs directory exists
+LOGS_DIR = Path(__file__).parent.parent.parent.parent / "logs"
+LOGS_DIR.mkdir(exist_ok=True)
+TRUNCATION_LOG = LOGS_DIR / "beat_truncation.log"
 
 
 def validate_spec(spec: dict) -> None:
@@ -80,6 +89,69 @@ def validate_spec(spec: dict) -> None:
             )
     
     logger.info(f"✅ Spec validation passed: {len(beats)} beats, {duration}s total")
+
+
+def validate_and_fix_beat_count(spec: dict, video_id: str) -> dict:
+    """
+    Validate beat count against duration and truncate if necessary.
+    
+    This is a guardrail to prevent Phase 1 LLM from returning too many beats.
+    If beats exceed maximum for the duration, truncate and log warning.
+    
+    Args:
+        spec: Video specification with beats
+        video_id: Video ID for logging
+        
+    Returns:
+        Fixed spec (may have truncated beats)
+    """
+    duration = spec.get('duration', 30)
+    beats = spec.get('beats', [])
+    
+    # Calculate maximum beats (assuming 5s minimum beat length)
+    max_beats = math.ceil(duration / 5)
+    
+    if len(beats) <= max_beats:
+        # Beat count is valid
+        return spec
+    
+    # Too many beats - truncate
+    original_count = len(beats)
+    truncated_beats = beats[:max_beats]
+    
+    # Recalculate start times to ensure they're sequential
+    current_time = 0
+    for beat in truncated_beats:
+        beat['start'] = current_time
+        current_time += beat['duration']
+    
+    # Update spec with truncated beats
+    spec['beats'] = truncated_beats
+    spec['duration'] = current_time  # Update duration to match truncated beats
+    
+    # Log warning
+    warning_msg = (
+        f"⚠️  Beat count truncation: video_id={video_id}, "
+        f"original_beats={original_count}, truncated_to={max_beats}, "
+        f"original_duration={duration}s, new_duration={current_time}s"
+    )
+    logger.warning(warning_msg)
+    
+    # Save to truncation log file
+    try:
+        timestamp = datetime.now().isoformat()
+        log_entry = (
+            f"{timestamp} | video_id={video_id} | "
+            f"original_beats={original_count} | truncated_to={max_beats} | "
+            f"original_duration={duration}s | new_duration={current_time}s\n"
+        )
+        with open(TRUNCATION_LOG, 'a') as f:
+            f.write(log_entry)
+        logger.info(f"Truncation event logged to: {TRUNCATION_LOG}")
+    except Exception as e:
+        logger.error(f"Failed to write truncation log: {e}")
+    
+    return spec
 
 
 def build_full_spec(llm_output: dict, video_id: str) -> dict:
@@ -162,6 +234,9 @@ def build_full_spec(llm_output: dict, video_id: str) -> dict:
         f"✅ Built full spec: {len(full_beats)} beats, "
         f"{current_time}s duration, archetype={spec['template']}"
     )
+    
+    # Validate and fix beat count (truncate if too many beats)
+    spec = validate_and_fix_beat_count(spec, video_id)
     
     return spec
 

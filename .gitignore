@@ -53,16 +53,13 @@ venv.bak/
 
 # Environment Variables
 .env
+.env.prod
 .env.local
 .env.*.local
 *.env
 
 # Database
 *.db
-*.sqlite3
-*.sqlite
-db.sqlite3
-*.sql
 
 # Logs
 *.log
@@ -292,4 +289,4 @@ dump.rdb
 
 # Postgres Data
 postgres_data/
-pgdata/
+!firebase-credentials.json.example
