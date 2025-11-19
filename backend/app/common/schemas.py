@@ -47,6 +47,8 @@ class StatusResponse(BaseModel):
     reference_assets: Optional[Dict] = None  # Phase 3 reference assets
     stitched_video_url: Optional[str] = None  # Phase 4 stitched video
     final_video_url: Optional[str] = None  # Phase 5 final video (with audio)
+    current_chunk_index: Optional[int] = None  # Current chunk being processed in Phase 4
+    total_chunks: Optional[int] = None  # Total number of chunks in Phase 4
 
 class VideoResponse(BaseModel):
     """Response from video endpoint"""
