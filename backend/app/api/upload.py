@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Query
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List
 import uuid
 import tempfile
 import os
@@ -10,7 +10,7 @@ import mimetypes
 
 from app.database import get_db
 from app.common.models import Asset, AssetType, AssetSource
-from app.common.constants import MOCK_USER_ID
+from app.common.auth import get_current_user
 from app.common.schemas import UploadedAsset, UploadResponse
 from app.services.s3 import s3_client
 
@@ -55,7 +55,7 @@ def determine_asset_type(mime_type: str) -> AssetType:
 @router.post("/api/upload")
 async def upload_assets(
     files: List[UploadFile] = File(...),
-    user_id: str = MOCK_USER_ID,  # TODO: Get from auth token in future
+    user_id: str = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -172,19 +172,16 @@ async def upload_assets(
 
 @router.get("/api/assets")
 async def get_assets(
-    user_id: Optional[str] = Query(None, description="User ID to filter assets (defaults to MOCK_USER_ID)"),
+    user_id: str = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Get all assets for a user.
+    Get all assets for the authenticated user.
     
     Returns list of assets with metadata including presigned URLs for access.
     """
-    # Use provided user_id or default to MOCK_USER_ID
-    filter_user_id = user_id or MOCK_USER_ID
-    
-    # Query assets for the user
-    assets = db.query(Asset).filter(Asset.user_id == filter_user_id).order_by(Asset.created_at.desc()).all()
+    # Query assets for the authenticated user only
+    assets = db.query(Asset).filter(Asset.user_id == user_id).order_by(Asset.created_at.desc()).all()
     
     # Convert to response format
     asset_list = []
@@ -204,6 +201,6 @@ async def get_assets(
     return {
         "assets": asset_list,
         "total": len(asset_list),
-        "user_id": filter_user_id
+        "user_id": user_id
     }
 

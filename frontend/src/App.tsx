@@ -18,11 +18,13 @@ import { VideoLibrary } from './pages/VideoLibrary';
 import { Billing } from './pages/Billing';
 import { API } from './pages/API';
 import { generateVideo, getVideoStatus, StatusResponse, listVideos, VideoListItem } from './lib/api';
+import { useAuth } from './contexts/AuthContext';
 
 // Main App Content (inside router)
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [prompt, setPrompt] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -32,10 +34,6 @@ function AppContent() {
   const [, setSelectedProject] = useState<VideoListItem | null>(null);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    // Check localStorage on mount
-    return localStorage.getItem('isLoggedIn') === 'true';
-  });
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [videoId, setVideoId] = useState<string | null>(null);
   const [animaticUrls, setAnimaticUrls] = useState<string[] | null>(null);
@@ -283,26 +281,45 @@ function AppContent() {
   };
 
   const handleAuthSuccess = () => {
-    setIsLoggedIn(true);
-    localStorage.setItem('isLoggedIn', 'true');
     navigate('/');
   };
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    localStorage.removeItem('isLoggedIn');
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      // No need to navigate - Auth component will be shown automatically when user becomes null
+      navigate('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+      addNotification('error', 'Logout Failed', 'Failed to sign out. Please try again.');
+    }
   };
 
-  if (!isLoggedIn) {
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mb-4"></div>
+          <p className="text-slate-600 dark:text-slate-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth page if user is not logged in
+  if (!user) {
     return <Auth onAuthSuccess={handleAuthSuccess} />;
   }
 
   const showStepIndicator = ['/processing', '/preview', '/download'].includes(location.pathname);
 
+  // Get user display name or email
+  const userName = user.displayName || user.email?.split('@')[0] || 'User';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <Header onLogout={handleLogout} userName="User" />
+      <Header onLogout={handleLogout} userName={userName} />
 
       <NotificationCenter
         notifications={notifications}

@@ -3,9 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import generate, status, video, health, upload
 from app.database import init_db
 from app.common.logging import setup_logging
+from app.services.firebase_auth import initialize_firebase
+import logging
 
 # Initialize logging
 setup_logging("INFO")
+logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
@@ -33,8 +36,15 @@ app.include_router(upload.router, tags=["upload"])
 # Startup event
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database on startup"""
+    """Initialize database and Firebase on startup"""
     init_db()
+    
+    # Initialize Firebase Admin SDK
+    try:
+        initialize_firebase()
+    except Exception as e:
+        logger.warning(f"Firebase initialization failed: {e}")
+        logger.warning("Authentication will not work until Firebase is properly configured")
 
 # Root endpoint
 @app.get("/")

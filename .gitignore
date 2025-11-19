@@ -289,4 +289,4 @@ dump.rdb
 
 # Postgres Data
 postgres_data/
-pgdata/
+!firebase-credentials.json.example
