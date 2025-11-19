@@ -500,17 +500,8 @@ function AppContent() {
                     <option value="veo_fast">Google Veo 3.1 Fast (Recommended)</option>
                     <option value="veo">Google Veo 3.1</option>
                     <option value="hailuo">Hailuo 2.3 Fast</option>
-                    <option value="seedance">Seedance 1.0 Pro Fast</option>
-                    <option value="kling">Kling v2.5 Turbo Pro</option>
-                    <option value="pixverse">Pixverse v5</option>
-                    <option value="wan_25_t2v">Wan 2.5 T2V</option>
-                    <option value="wan_25_i2v">Wan 2.5 I2V Fast</option>
-                    <option value="runway_gen4_turbo">Runway Gen-4 Turbo (Test)</option>
                     <option value="hailuo_23">Minimax Hailuo 2.3</option>
-                    <option value="sora">OpenAI Sora 2</option>
-                    <option value="wan">Wan 2.1 (Legacy)</option>
-                    <option value="zeroscope">Zeroscope v2 XL</option>
-                    <option value="animatediff">AnimateDiff</option>
+                    <option value="runway_gen4_turbo">Runway Gen-4 Turbo (Test)</option>
                     <option value="runway">Runway Gen-2</option>
                   </select>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
