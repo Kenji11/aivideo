@@ -76,7 +76,7 @@ def build_status_response_from_redis_video_data(redis_data: Dict[str, Any]) -> S
     
     if phase_outputs:
         # Phase 2: Storyboard images
-        phase2_output = phase_outputs.get('phase2_storyboard') or phase_outputs.get('phase2_animatic')
+        phase2_output = phase_outputs.get('phase2_storyboard')
         if phase2_output and phase2_output.get('status') == 'success':
             phase2_data = phase2_output.get('output_data', {})
             spec_data = phase2_data.get('spec', {}) or spec
@@ -96,33 +96,6 @@ def build_status_response_from_redis_video_data(redis_data: Dict[str, Any]) -> S
                 for url in animatic_urls_raw:
                     presigned = _get_presigned_url_from_cache(video_id, f"animatic_{len(animatic_urls)}", url)
                     animatic_urls.append(presigned)
-        
-        # Phase 3: Reference assets
-        phase3_output = phase_outputs.get('phase3_references')
-        if phase3_output and phase3_output.get('status') == 'success':
-            reference_assets = phase3_output.get('output_data', {}).copy()
-            
-            # Convert S3 URLs to presigned URLs
-            style_guide_url = reference_assets.get('style_guide_url')
-            if style_guide_url:
-                reference_assets['style_guide_url'] = _get_presigned_url_from_cache(
-                    video_id, "style_guide_url", style_guide_url
-                )
-            
-            product_reference_url = reference_assets.get('product_reference_url')
-            if product_reference_url:
-                reference_assets['product_reference_url'] = _get_presigned_url_from_cache(
-                    video_id, "product_reference_url", product_reference_url
-                )
-            
-            uploaded_assets = reference_assets.get('uploaded_assets')
-            if uploaded_assets:
-                for i, asset in enumerate(uploaded_assets):
-                    s3_url = asset.get('s3_url')
-                    if s3_url:
-                        asset['s3_url'] = _get_presigned_url_from_cache(
-                            video_id, f"uploaded_asset_{i}", s3_url
-                        )
         
         # Phase 4: Stitched video and chunk progress
         phase4_output = phase_outputs.get('phase4_chunks')
@@ -188,7 +161,7 @@ def build_status_response_from_db(video: VideoGeneration) -> StatusResponse:
     
     if video.phase_outputs:
         # Phase 2: Storyboard images
-        phase2_output = video.phase_outputs.get('phase2_storyboard') or video.phase_outputs.get('phase2_animatic')
+        phase2_output = video.phase_outputs.get('phase2_storyboard')
         if phase2_output and phase2_output.get('status') == 'success':
             phase2_data = phase2_output.get('output_data', {})
             spec = phase2_data.get('spec', {}) or video.spec or {}
@@ -208,33 +181,6 @@ def build_status_response_from_db(video: VideoGeneration) -> StatusResponse:
                 for url in animatic_urls_raw:
                     presigned = _get_presigned_url_from_cache(video.id, f"animatic_{len(animatic_urls)}", url)
                     animatic_urls.append(presigned)
-        
-        # Phase 3: Reference assets
-        phase3_output = video.phase_outputs.get('phase3_references')
-        if phase3_output and phase3_output.get('status') == 'success':
-            reference_assets = phase3_output.get('output_data', {}).copy()
-            
-            # Convert S3 URLs to presigned URLs
-            style_guide_url = reference_assets.get('style_guide_url')
-            if style_guide_url:
-                reference_assets['style_guide_url'] = _get_presigned_url_from_cache(
-                    video.id, "style_guide_url", style_guide_url
-                )
-            
-            product_reference_url = reference_assets.get('product_reference_url')
-            if product_reference_url:
-                reference_assets['product_reference_url'] = _get_presigned_url_from_cache(
-                    video.id, "product_reference_url", product_reference_url
-                )
-            
-            uploaded_assets = reference_assets.get('uploaded_assets')
-            if uploaded_assets:
-                for i, asset in enumerate(uploaded_assets):
-                    s3_url = asset.get('s3_url')
-                    if s3_url:
-                        asset['s3_url'] = _get_presigned_url_from_cache(
-                            video.id, f"uploaded_asset_{i}", s3_url
-                        )
         
         # Phase 4: Stitched video and chunk progress
         phase4_output = video.phase_outputs.get('phase4_chunks')
