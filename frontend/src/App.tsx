@@ -7,7 +7,9 @@ import { Header } from './components/Header';
 import { StepIndicator } from './components/StepIndicator';
 import { ProjectCard } from './components/ProjectCard';
 import { ProcessingSteps } from './components/ProcessingSteps';
-import { NotificationCenter, Notification } from './components/NotificationCenter';
+import { Notification } from './components/NotificationCenter';
+import { toast } from '@/hooks/use-toast';
+import { Toaster } from '@/components/ui/toaster';
 import type { Template } from './components/TemplateGallery';
 import { ExportPanel } from './components/ExportPanel';
 import { Auth } from './pages/Auth';
@@ -31,7 +33,7 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading: authLoading, signOut } = useAuth();
-  const { isDark } = useDarkMode(); // Initialize dark mode hook
+  useDarkMode(); // Enforce dark mode
   const [prompt, setPrompt] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -41,7 +43,6 @@ function AppContent() {
   const [, setSelectedProject] = useState<VideoListItem | null>(null);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [videoId, setVideoId] = useState<string | null>(null);
   const [animaticUrls, setAnimaticUrls] = useState<string[] | null>(null);
   const [referenceAssets, setReferenceAssets] = useState<StatusResponse['reference_assets'] | null>(null);
@@ -87,17 +88,12 @@ function AppContent() {
   ];
 
   const addNotification = (type: Notification['type'], title: string, message: string) => {
-    const id = Math.random().toString();
-    const notification: Notification = {
-      id,
-      type,
+    const variant = type === 'error' ? 'destructive' : 'default';
+    toast({
+      variant,
       title,
-      message,
-      timestamp: new Date(),
-      read: false,
-    };
-    setNotifications((prev) => [notification, ...prev]);
-    setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 5000);
+      description: message,
+    });
   };
 
   // Get videoId from route params if on processing page, otherwise use state
@@ -347,10 +343,10 @@ function AppContent() {
   // Show loading state while checking auth
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mb-4"></div>
-          <p className="text-slate-600 dark:text-slate-400">Loading...</p>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -367,13 +363,10 @@ function AppContent() {
   const userName = user.displayName || user.email?.split('@')[0] || 'User';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+    <div className="min-h-screen bg-background">
       <Header onLogout={handleLogout} userName={userName} />
 
-      <NotificationCenter
-        notifications={notifications}
-        onDismiss={(id) => setNotifications((prev) => prev.filter((n) => n.id !== id))}
-      />
+      <Toaster />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Navigation buttons - always visible on all pages */}
@@ -495,10 +488,10 @@ function AppContent() {
           <Route path="/projects" element={
             <div className="animate-fade-in">
               <div className="mb-8">
-                <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                <h2 className="text-3xl font-bold text-foreground mb-2">
                   My Projects
                 </h2>
-                <p className="text-slate-600 dark:text-slate-400">
+                <p className="text-muted-foreground">
                   Create and manage your AI-generated videos
                 </p>
               </div>
@@ -506,12 +499,12 @@ function AppContent() {
               {isLoadingProjects ? (
                 <div className="card p-16 text-center">
                   <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mb-4"></div>
-                  <p className="text-slate-500 dark:text-slate-400">Loading projects...</p>
+                  <p className="text-muted-foreground">Loading projects...</p>
                 </div>
               ) : projects.length === 0 ? (
                 <div className="card p-16 text-center">
-                  <Film className="w-16 h-16 mx-auto text-slate-300 mb-4" />
-                  <p className="text-slate-500 dark:text-slate-400 mb-6">No projects yet</p>
+                  <Film className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-6">No projects yet</p>
                   <button
                     onClick={() => navigate('/')}
                     className="btn-primary"
@@ -535,13 +528,13 @@ function AppContent() {
 
           <Route path="/processing/:videoId" element={
             <div className="card p-8 text-center animate-fade-in">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 dark:bg-blue-900 rounded-full mb-6 animate-pulse-subtle">
-                <Video className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-primary/20 rounded-full mb-6 animate-pulse-subtle">
+                <Video className="w-10 h-10 text-primary" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+              <h2 className="text-2xl font-bold text-foreground mb-2">
                 AI is Creating Your Video
               </h2>
-              <p className="text-slate-600 dark:text-slate-400 mb-8">
+              <p className="text-muted-foreground mb-8">
                 Sit back and relax while our AI works its magic...
               </p>
 
@@ -550,16 +543,16 @@ function AppContent() {
               </div>
 
               {animaticUrls && animaticUrls.length > 0 && (
-                <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
+                <div className="mt-8 pt-8 border-t border-border">
                   <div className="flex items-center justify-between mb-6">
                     <div>
-                      <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-1">
+                      <h3 className="text-xl font-bold text-foreground mb-1">
                         🎬 Storyboard Images Generated
                       </h3>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                      <p className="text-sm text-muted-foreground">
                         {animaticUrls.length} storyboard image{animaticUrls.length !== 1 ? 's' : ''} ready for video generation
                         {currentChunkIndex !== null && totalChunks !== null && (
-                          <span className="ml-2 text-blue-600 dark:text-blue-400 font-semibold">
+                          <span className="ml-2 text-primary font-semibold">
                             • Processing chunk {currentChunkIndex + 1} of {totalChunks}
                           </span>
                         )}
@@ -621,18 +614,18 @@ function AppContent() {
 
               {/* Phase 3 (Reference Assets) */}
               {referenceAssets && (
-                <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                <div className="mt-8 pt-8 border-t border-border">
+                  <h3 className="text-lg font-semibold text-foreground mb-4">
                     Reference Assets Generated
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
                     {referenceAssets.style_guide_url && (
-                      <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Style Guide</p>
+                      <div className="bg-card rounded-lg p-4">
+                        <p className="text-sm font-medium text-card-foreground mb-2">Style Guide</p>
                         <img 
                           src={referenceAssets.style_guide_url} 
                           alt="Style Guide"
-                          className="w-full h-48 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
+                          className="w-full h-48 object-cover rounded-lg border border-border"
                           onError={(e) => {
                             e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Style+Guide';
                           }}
@@ -640,12 +633,12 @@ function AppContent() {
                       </div>
                     )}
                     {referenceAssets.product_reference_url && (
-                      <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Product Reference</p>
+                      <div className="bg-card rounded-lg p-4">
+                        <p className="text-sm font-medium text-card-foreground mb-2">Product Reference</p>
                         <img 
                           src={referenceAssets.product_reference_url} 
                           alt="Product Reference"
-                          className="w-full h-48 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
+                          className="w-full h-48 object-cover rounded-lg border border-border"
                           onError={(e) => {
                             e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Product+Reference';
                           }}
@@ -655,7 +648,7 @@ function AppContent() {
                   </div>
                   {referenceAssets.uploaded_assets && referenceAssets.uploaded_assets.length > 0 && (
                     <div className="mt-4">
-                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                      <p className="text-sm font-medium text-card-foreground mb-2">
                         Uploaded Assets ({referenceAssets.uploaded_assets.length})
                       </p>
                       <div className="grid grid-cols-3 gap-2">
@@ -664,7 +657,7 @@ function AppContent() {
                             key={idx}
                             src={asset.s3_url}
                             alt={`Uploaded asset ${idx + 1}`}
-                            className="w-full h-24 object-cover rounded border border-slate-200 dark:border-slate-700"
+                            className="w-full h-24 object-cover rounded border border-border"
                             onError={(e) => {
                               e.currentTarget.src = 'https://via.placeholder.com/200x200?text=Asset';
                             }}
@@ -702,24 +695,24 @@ function AppContent() {
               </div>
               <div className="p-8 space-y-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                  <h2 className="text-2xl font-bold text-foreground mb-2">
                     {title}
                   </h2>
                   {description && (
-                    <p className="text-slate-600 dark:text-slate-400">
+                    <p className="text-muted-foreground">
                       {description}
                     </p>
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
+                <div className="grid grid-cols-2 gap-4 p-4 bg-card rounded-lg">
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Duration</p>
-                    <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">2:45</p>
+                    <p className="text-xs text-muted-foreground">Duration</p>
+                    <p className="text-lg font-semibold text-foreground">2:45</p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Resolution</p>
-                    <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">1080p</p>
+                    <p className="text-xs text-muted-foreground">Resolution</p>
+                    <p className="text-lg font-semibold text-foreground">1080p</p>
                   </div>
                 </div>
 
@@ -773,13 +766,13 @@ function AppContent() {
           <Route path="/download" element={
             <div className="space-y-6 animate-fade-in">
               <div className="card p-8 text-center">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 dark:bg-green-900 rounded-full mb-6">
-                  <Download className="w-10 h-10 text-green-600 dark:text-green-400" />
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-primary/20 rounded-full mb-6">
+                  <Download className="w-10 h-10 text-primary" />
                 </div>
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                <h2 className="text-2xl font-bold text-foreground mb-2">
                   Your Video is Ready!
                 </h2>
-                <p className="text-slate-600 dark:text-slate-400 mb-8">
+                <p className="text-muted-foreground mb-8">
                   Download your video or create another one
                 </p>
                 

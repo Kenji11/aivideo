@@ -1,6 +1,9 @@
 import { Upload, AlertCircle, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { api } from '../lib/api';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface UploadZoneProps {
   onAssetsUploaded?: (assetIds: string[]) => void;
@@ -171,12 +174,12 @@ export function UploadZone({ onAssetsUploaded, disabled = false }: UploadZonePro
               key={idx}
               className={`p-3 rounded-lg border ${
                 state.status === 'success'
-                  ? 'bg-green-50 border-green-200'
+                  ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800'
                   : state.status === 'error'
-                  ? 'bg-red-50 border-red-200'
+                  ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
                   : state.status === 'uploading'
-                  ? 'bg-blue-50 border-blue-200'
-                  : 'bg-slate-50 border-slate-200'
+                  ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800'
+                  : 'bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700'
               }`}
             >
               <div className="flex items-center justify-between mb-2">
@@ -195,21 +198,18 @@ export function UploadZone({ onAssetsUploaded, disabled = false }: UploadZonePro
                   </p>
                 </div>
                 {state.status !== 'uploading' && (
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setUploadStates(uploadStates.filter((_, i) => i !== idx))}
-                    className="ml-3 text-slate-400 hover:text-slate-600 dark:text-slate-400 flex-shrink-0"
+                    className="ml-3 h-6 w-6"
                   >
                     ×
-                  </button>
+                  </Button>
                 )}
               </div>
               {state.status === 'uploading' && (
-                <div className="w-full bg-slate-200 rounded-full h-2 mb-1">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${state.progress}%` }}
-                  />
-                </div>
+                <Progress value={state.progress} className="mb-1" />
               )}
               <div className="flex items-center justify-between">
                 <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -224,12 +224,12 @@ export function UploadZone({ onAssetsUploaded, disabled = false }: UploadZonePro
         </div>
       )}
 
-      <div className="flex items-start space-x-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
-        <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-amber-800">
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
           For best results, upload clear, high-quality reference materials
-        </p>
-      </div>
+        </AlertDescription>
+      </Alert>
     </div>
   );
 }
