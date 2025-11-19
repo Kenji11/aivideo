@@ -64,6 +64,16 @@
 - [x] S3 upload for chunks and stitched video
 - [x] Cost tracking per chunk
 
+### Infrastructure & Performance
+- [x] **PR #10**: Redis-based progress tracking with SSE ✅
+- [x] Redis client service (singleton pattern)
+- [x] Mid-pipeline progress updates via Redis (60min TTL)
+- [x] Database writes only at start/failure/completion
+- [x] Server-Sent Events (SSE) for real-time status updates
+- [x] Frontend SSE hook with automatic polling fallback
+- [x] Presigned URL caching in Redis
+- [x] StatusResponse schema with current_chunk_index and total_chunks
+
 ### Phase 5: Refinement
 - [x] Basic implementation complete
 - [ ] **S3 path issue**: Stitched video not found (404 error) - IN PROGRESS
@@ -95,6 +105,7 @@
 7. ✅ **PR #7**: Actual chunk duration to model configs
 8. ✅ **PR #8**: Last-frame continuation for temporal coherence
 9. ✅ **PR #9**: Parallel chunk generation with LangChain RunnableParallel
+10. ✅ **PR #10**: Redis-based progress tracking with Server-Sent Events (SSE)
 
 ---
 
