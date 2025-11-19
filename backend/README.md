@@ -1,5 +1,9 @@
 # Backend README
 
+## Recent Changes
+
+**November 17, 2025**: Migrated from Alembic to raw SQL migrations for better control and to eliminate race conditions in multi-container setups. All migrations are now in `migrations/*.sql` and run via `python migrate.py`.
+
 ## Environment Variables
 
 Create a `.env` file in the `backend/` directory with the following variables:
@@ -20,9 +24,42 @@ AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
 S3_BUCKET=ai-video-assets-dev
 AWS_REGION=us-east-2
+
+# Firebase (for authentication)
+# Option 1: JSON file with private_key from env var (recommended)
+# Copy firebase-credentials.json.example to firebase-credentials.json and fill in values (except private_key)
+# Then set the private_key here:
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour private key here\n-----END PRIVATE KEY-----\n"
+# And set the path to the JSON file (or use GOOGLE_APPLICATION_CREDENTIALS env var)
+FIREBASE_CREDENTIALS_PATH=./firebase-credentials.json
+
+# Option 2: Use GOOGLE_APPLICATION_CREDENTIALS env var pointing to JSON file
+# GOOGLE_APPLICATION_CREDENTIALS=/path/to/firebase-credentials.json
+# FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour private key here\n-----END PRIVATE KEY-----\n"
+
+# Option 3: Use individual environment variables (alternative)
+# FIREBASE_PROJECT_ID=your-project-id
+# FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour private key here\n-----END PRIVATE KEY-----\n"
+# FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com
 ```
 
 **Note:** The `.env` file is gitignored and should never be committed. Copy these variables and fill in your actual API keys and credentials.
+
+### Firebase Credentials Setup
+
+**Recommended Approach: JSON file with private_key in .env**
+
+1. Go to [Firebase Console](https://console.firebase.google.com/) → Your Project → Project Settings → Service Accounts
+2. Click "Generate new private key" to download a JSON file
+3. Copy `firebase-credentials.json.example` to `firebase-credentials.json`
+4. Copy all fields from the downloaded JSON **except `private_key`** into `firebase-credentials.json`
+5. Extract the `private_key` value and add it to `.env` as `FIREBASE_PRIVATE_KEY`
+6. Set `FIREBASE_CREDENTIALS_PATH=./firebase-credentials.json` in `.env` (or use `GOOGLE_APPLICATION_CREDENTIALS`)
+
+**Important:** 
+- `firebase-credentials.json` can be committed (it doesn't contain the private key)
+- `FIREBASE_PRIVATE_KEY` in `.env` is gitignored and should never be committed
+- The `FIREBASE_PRIVATE_KEY` in `.env` should be in quotes and include `\n` for newlines
 
 ## Docker Setup
 
@@ -65,51 +102,52 @@ Expected response: `{"status": "ok"}`
 
 ## Database Migrations
 
-This project uses Alembic for database schema management.
+This project uses raw SQL migrations for database schema management.
 
-> 📖 **Detailed guide**: See [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) for comprehensive migration documentation
+> 📖 **Detailed guide**: See [migrations/README.md](migrations/README.md) for comprehensive migration documentation
 
 ### Running Migrations
 
-**First time setup:**
+**From your local machine:**
 ```bash
-# Run migrations to create tables
-alembic upgrade head
+# Check migration status
+python migrate.py status
+
+# Run all pending migrations
+python migrate.py up
 ```
 
-**After pulling new code:**
+**From Docker:**
 ```bash
-# Check current migration status
-alembic current
+# Check migration status
+docker compose exec api python migrate.py status
 
-# Apply new migrations
-alembic upgrade head
+# Run all pending migrations
+docker compose exec api python migrate.py up
 ```
 
 ### Creating New Migrations
 
-When you modify the SQLAlchemy models in `app/common/models.py`:
+When you need to modify the database schema:
 
-```bash
-# Generate a new migration automatically
-alembic revision --autogenerate -m "description of changes"
+1. Create a new SQL file in `migrations/` with the next number:
+   ```bash
+   migrations/004_your_description.sql
+   ```
 
-# Review the generated migration file in alembic/versions/
-# Edit if needed, then apply it
-alembic upgrade head
-```
+2. Write your SQL (use `DO $$ BEGIN ... END $$;` for conditional logic):
+   ```sql
+   -- Description of what this migration does
+   -- Migration: 004_your_description
+   -- Date: YYYY-MM-DD
+   
+   ALTER TABLE video_generations ADD COLUMN new_field VARCHAR;
+   ```
 
-### Docker Setup
-
-When using Docker, migrations run automatically on container startup. If you need to run them manually:
-
-```bash
-# Access the API container
-docker-compose exec api bash
-
-# Run migrations
-alembic upgrade head
-```
+3. Apply the migration:
+   ```bash
+   python migrate.py up
+   ```
 
 ### Migration Best Practices
 

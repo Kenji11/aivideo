@@ -2,18 +2,22 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.common.schemas import VideoResponse, VideoListResponse, VideoListItem
 from app.common.models import VideoGeneration
+from app.common.auth import get_current_user
 from app.database import get_db
 
 router = APIRouter()
 
 @router.get("/api/videos")
 async def list_videos(
+    user_id: str = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> VideoListResponse:
-    """Get list of all videos"""
+    """Get list of videos for the authenticated user"""
     
-    # Order by most recent first
-    videos = db.query(VideoGeneration).order_by(VideoGeneration.created_at.desc()).all()
+    # Only return videos owned by the authenticated user, ordered by most recent first
+    videos = db.query(VideoGeneration).filter(
+        VideoGeneration.user_id == user_id
+    ).order_by(VideoGeneration.created_at.desc()).all()
     
     video_items = []
     for video in videos:
@@ -54,10 +58,18 @@ async def list_videos(
     )
 
 @router.get("/api/video/{video_id}")
-async def get_video(video_id: str, db: Session = Depends(get_db)) -> VideoResponse:
+async def get_video(
+    video_id: str,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> VideoResponse:
     """Get video details"""
     
-    video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+    # Only allow access to videos owned by the authenticated user
+    video = db.query(VideoGeneration).filter(
+        VideoGeneration.id == video_id,
+        VideoGeneration.user_id == user_id
+    ).first()
     
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")

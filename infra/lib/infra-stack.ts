@@ -4,6 +4,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
@@ -88,6 +89,11 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     if (!dbPassword) {
       throw new Error("DB_PASSWORD must be set in your .env file");
     }
+
+    // Load Firebase credentials from environment variables
+    const firebaseProjectId = process.env.FIREBASE_PROJECT_ID || '';
+    const firebasePrivateKey = process.env.FIREBASE_PRIVATE_KEY || '';
+    const firebaseClientEmail = process.env.FIREBASE_CLIENT_EMAIL || '';
 
     // Create Aurora Serverless v2 cluster
     const auroraCluster = new rds.DatabaseCluster(this, 'AuroraCluster', {
@@ -225,11 +231,21 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         name: 'redis',
         cloudMapNamespace: namespace,
       },
+      minHealthyPercent: 100,
+      maxHealthyPercent: 300,
     });
 
     // API Service
     // Get image URI from environment variable (set by GitHub Actions)
     const imageUri = process.env.IMAGE_URI || `971422717446.dkr.ecr.us-east-1.amazonaws.com/aivideo/backend:latest`;
+    
+    // Parse ECR repository from image URI
+    // Format: <account>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>
+    const ecrRepository = ecr.Repository.fromRepositoryName(
+      this,
+      'BackendECRRepository',
+      'aivideo/backend'
+    );
 
     const apiTaskDefinition = new ecs.FargateTaskDefinition(this, 'APITaskDefinition', {
       memoryLimitMiB: 512,
@@ -237,8 +253,10 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       executionRole: taskExecutionRole,
     });
 
+    // Extract tag from image URI (default to 'latest')
+    const imageTag = imageUri.includes(':') ? imageUri.split(':')[1] : 'latest';
     const apiContainer = apiTaskDefinition.addContainer('APIContainer', {
-      image: ecs.ContainerImage.fromRegistry(imageUri),
+      image: ecs.ContainerImage.fromEcrRepository(ecrRepository, imageTag),
       memoryLimitMiB: 512,
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'api',
@@ -256,6 +274,13 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         // AWS Credentials - from environment variables (set by GitHub Actions)
         AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || '',
         AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || '',
+        // Firebase credentials - from environment variables (set by GitHub Actions)
+        FIREBASE_PROJECT_ID: firebaseProjectId,
+        FIREBASE_PRIVATE_KEY: firebasePrivateKey,
+        FIREBASE_CLIENT_EMAIL: firebaseClientEmail,
+        // Application environment - explicitly set for production
+        ENVIRONMENT: 'production',
+        DEBUG: 'false',
       },
       portMappings: [
         {
@@ -282,21 +307,28 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       },
       assignPublicIp: true,
       enableExecuteCommand: true,
+      minHealthyPercent: 100,
+      maxHealthyPercent: 300,
     });
 
     // Ensure Redis is ready before starting API
     apiService.node.addDependency(redisService);
 
     // Worker Service
+    // Increased memory to 4GB to handle video processing workloads
+    // Video processing (image downloads, PIL operations, video generation, frame extraction)
+    // with 2 concurrent workers requires significant memory
     const workerTaskDefinition = new ecs.FargateTaskDefinition(this, 'WorkerTaskDefinition', {
-      memoryLimitMiB: 512,
-      cpu: 256,
+      memoryLimitMiB: 4096,  // 4GB - increased from 512MB to prevent OOM kills
+      cpu: 1024,  // 1 vCPU - increased to match memory (Fargate requires CPU:Memory ratio)
       executionRole: taskExecutionRole,
     });
 
+    // Extract tag from image URI (default to 'latest')
+    const workerImageTag = imageUri.includes(':') ? imageUri.split(':')[1] : 'latest';
     const workerContainer = workerTaskDefinition.addContainer('WorkerContainer', {
-      image: ecs.ContainerImage.fromRegistry(imageUri),
-      memoryLimitMiB: 512,
+      image: ecs.ContainerImage.fromEcrRepository(ecrRepository, workerImageTag),
+      memoryLimitMiB: 4096,  // 4GB - increased from 512MB
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'worker',
         logGroup,
@@ -308,7 +340,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         'app.orchestrator.celery_app',
         'worker',
         '--loglevel=info',
-        '--concurrency=4',
+        '--concurrency=2',  // Reduced from 4 to 2 to reduce memory pressure per worker
       ],
 
       // MERGED environment block (only one allowed)
@@ -324,6 +356,13 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         // AWS Credentials - from environment variables (set by GitHub Actions)
         AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || '',
         AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || '',
+        // Firebase credentials - from environment variables (set by GitHub Actions)
+        FIREBASE_PROJECT_ID: firebaseProjectId,
+        FIREBASE_PRIVATE_KEY: firebasePrivateKey,
+        FIREBASE_CLIENT_EMAIL: firebaseClientEmail,
+        // Application environment - explicitly set for production
+        ENVIRONMENT: 'production',
+        DEBUG: 'false',
       },
 
       healthCheck: {
@@ -348,6 +387,8 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       },
       assignPublicIp: true,
       enableExecuteCommand: true,
+      minHealthyPercent: 100,
+      maxHealthyPercent: 300,
     });
 
     // Ensure Redis is ready before starting Worker
