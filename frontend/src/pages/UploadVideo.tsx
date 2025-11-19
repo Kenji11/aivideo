@@ -1,33 +1,60 @@
 import { Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { UploadZone } from '../components/UploadZone';
+import { generateVideo } from '../lib/api';
 
 interface UploadVideoProps {
   title: string;
   description: string;
   prompt: string;
-  isProcessing: boolean;
   selectedModel: string;
+  uploadedAssetIds: string[];
   onTitleChange: (title: string) => void;
   onDescriptionChange: (description: string) => void;
   onPromptChange: (prompt: string) => void;
   onModelChange: (model: string) => void;
   onAssetsUploaded: (assetIds: string[]) => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onNotification?: (type: 'success' | 'error', title: string, message: string) => void;
 }
 
 export function UploadVideo({
   title,
   description,
   prompt,
-  isProcessing,
   selectedModel,
+  uploadedAssetIds,
   onTitleChange,
   onDescriptionChange,
   onPromptChange,
   onModelChange,
   onAssetsUploaded,
-  onSubmit,
+  onNotification,
 }: UploadVideoProps) {
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      console.log('[UploadVideo] handleSubmit called, generating video...');
+      const response = await generateVideo({
+        title: title || 'Untitled Video',
+        description: description || undefined,
+        prompt: prompt,
+        reference_assets: uploadedAssetIds,
+        model: selectedModel
+      });
+      
+      console.log('[UploadVideo] Video generation started, navigating to:', `/processing/${response.video_id}`);
+      // Navigate to processing page with videoId in route
+      navigate(`/processing/${response.video_id}`);
+      onNotification?.('success', 'Generation Started', 'Your video is being created...');
+    } catch (error) {
+      console.error('[UploadVideo] Failed to generate video:', error);
+      onNotification?.('error', 'Generation Failed', error instanceof Error ? error.message : 'Unknown error');
+    }
+  };
+
   return (
     <div className="card p-8 animate-fade-in">
       <div className="mb-8">
@@ -39,7 +66,7 @@ export function UploadVideo({
         </p>
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Project Title
@@ -84,7 +111,6 @@ export function UploadVideo({
             Reference Materials
           </label>
           <UploadZone 
-            disabled={isProcessing} 
             onAssetsUploaded={onAssetsUploaded}
           />
         </div>
@@ -97,7 +123,6 @@ export function UploadVideo({
             value={selectedModel}
             onChange={(e) => onModelChange(e.target.value)}
             className="input-field"
-            disabled={isProcessing}
           >
             <option value="veo_fast">Google Veo 3.1 Fast (Recommended)</option>
             <option value="veo">Google Veo 3.1</option>
@@ -113,11 +138,11 @@ export function UploadVideo({
 
         <button
           type="submit"
-          disabled={!prompt || !title || isProcessing}
+          disabled={!prompt || !title}
           className="w-full btn-primary flex items-center justify-center space-x-2"
         >
           <Sparkles className="w-5 h-5" />
-          <span>{isProcessing ? 'Processing...' : 'Start Creating'}</span>
+          <span>Start Creating</span>
         </button>
       </form>
     </div>
