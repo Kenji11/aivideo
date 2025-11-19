@@ -1,6 +1,6 @@
 import { Film, LogOut, Menu, X, Sparkles } from 'lucide-react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   userName?: string;
@@ -27,19 +27,25 @@ export function Header({ userName, onLogout }: HeaderProps) {
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
-            <button
-              onClick={() => navigate('/')}
+            <Link
+              to="/"
               className="flex items-center space-x-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors shadow-sm hover:shadow-md"
             >
               <Sparkles className="w-4 h-4" />
               <span>Generate Video</span>
-            </button>
-            <button
-              onClick={() => navigate('/projects')}
+            </Link>
+            <Link
+              to="/projects"
               className="text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-300 hover:text-slate-900 dark:text-slate-100 dark:hover:text-slate-100 px-4 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-700 transition-colors"
             >
               My Projects
-            </button>
+            </Link>
+            <Link
+              to="/asset-library"
+              className="text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-300 hover:text-slate-900 dark:text-slate-100 dark:hover:text-slate-100 px-4 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-700 transition-colors"
+            >
+              Asset Library
+            </Link>
             {userName && (
               <div className="flex items-center space-x-3 pl-4 border-l border-slate-200 dark:border-slate-700 dark:border-slate-700">
                 <div className="text-right">
@@ -73,25 +79,28 @@ export function Header({ userName, onLogout }: HeaderProps) {
 
         {mobileMenuOpen && (
           <div className="md:hidden pb-4 space-y-2 border-t border-slate-200 dark:border-slate-700 dark:border-slate-700 pt-4 animate-slide-in">
-            <button
-              onClick={() => {
-                navigate('/');
-                setMobileMenuOpen(false);
-              }}
+            <Link
+              to="/"
+              onClick={() => setMobileMenuOpen(false)}
               className="w-full flex items-center space-x-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors shadow-sm"
             >
               <Sparkles className="w-4 h-4" />
               <span>Generate Video</span>
-            </button>
-            <button
-              onClick={() => {
-                navigate('/projects');
-                setMobileMenuOpen(false);
-              }}
+            </Link>
+            <Link
+              to="/projects"
+              onClick={() => setMobileMenuOpen(false)}
               className="w-full text-left text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-300 px-4 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-700 transition-colors"
             >
               My Projects
-            </button>
+            </Link>
+            <Link
+              to="/asset-library"
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-full text-left text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-300 px-4 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-700 transition-colors"
+            >
+              Asset Library
+            </Link>
             {userName && (
               <>
                 <div className="px-4 py-2 text-sm">
