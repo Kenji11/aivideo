@@ -1,18 +1,18 @@
-import { useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Sparkles, Video, Film, Download, BarChart3 } from 'lucide-react';
 // Commented out - may use later
 // import { Settings, Zap, Library, CreditCard, Code2 } from 'lucide-react';
 import { Header } from './components/Header';
 import { StepIndicator } from './components/StepIndicator';
 import { ProjectCard } from './components/ProjectCard';
-import { ProcessingSteps } from './components/ProcessingSteps';
 import { NotificationCenter, Notification } from './components/NotificationCenter';
-import type { Template } from './components/TemplateGallery';
+// import type { Template } from './components/TemplateGallery';
 import { ExportPanel } from './components/ExportPanel';
 import { Auth } from './pages/Auth';
 import { AssetLibrary } from './pages/AssetLibrary';
 import { UploadVideo } from './pages/UploadVideo';
+import { VideoStatus } from './pages/VideoStatus';
 // Commented out - may use later
 // import { Settings as SettingsPage } from './pages/Settings';
 // import { Analytics } from './pages/Analytics';
@@ -21,9 +21,8 @@ import { UploadVideo } from './pages/UploadVideo';
 // import { VideoLibraryUnused } from './pages/VideoLibraryUnused ';
 // import { Billing } from './pages/Billing';
 // import { API } from './pages/API';
-import { generateVideo, getVideoStatus, StatusResponse, listVideos, VideoListItem } from './lib/api';
+import { listVideos, VideoListItem } from './lib/api';
 import { useAuth } from './contexts/AuthContext';
-import { useVideoStatusStream } from './lib/useVideoStatusStream';
 import { useDarkMode } from './lib/useDarkMode';
 
 // Main App Content (inside router)
@@ -31,59 +30,23 @@ function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading: authLoading, signOut } = useAuth();
-  const { isDark } = useDarkMode(); // Initialize dark mode hook
+  useDarkMode(); // Initialize dark mode hook
   const [prompt, setPrompt] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [elapsedTime, setElapsedTime] = useState(0);
   const [projects, setProjects] = useState<VideoListItem[]>([]);
   const [, setSelectedProject] = useState<VideoListItem | null>(null);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
-  const [processingProgress, setProcessingProgress] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [videoId, setVideoId] = useState<string | null>(null);
-  const [animaticUrls, setAnimaticUrls] = useState<string[] | null>(null);
-  const [referenceAssets, setReferenceAssets] = useState<StatusResponse['reference_assets'] | null>(null);
   const [stitchedVideoUrl, setStitchedVideoUrl] = useState<string | null>(null);
   const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('veo_fast');
-  const [currentChunkIndex, setCurrentChunkIndex] = useState<number | null>(null);
-  const [totalChunks, setTotalChunks] = useState<number | null>(null);
-  const [currentPhase, setCurrentPhase] = useState<string | undefined>(undefined);
 
   const steps = [
     { id: 1, name: 'Create', icon: Sparkles },
     { id: 2, name: 'Generate', icon: Video },
     { id: 3, name: 'Preview', icon: Film },
     { id: 4, name: 'Download', icon: Download },
-  ];
-
-  // Map current_phase to processing step index
-  // Phase 3 (References) is disabled - skipped in pipeline
-  const getProcessingStepFromPhase = (phase: string | undefined, progress: number): number => {
-    if (!phase) return 0;
-    if (phase === 'phase1_validate') return 0;
-    if (phase === 'phase2_storyboard' || phase === 'phase2_animatic') return 1; // Support both new and legacy phase names
-    // Phase 3 (references) is disabled - skip to Phase 4
-    if (phase === 'phase3_references') return 2; // Should not occur, but handle gracefully
-    if (phase === 'phase4_chunks') return 2; // Moved from 3 to 2 (Phase 3 removed)
-    if (phase === 'phase4_refine') return 2; // Phase 5 is part of chunk generation/refinement, keep at step 2
-    return Math.min(Math.floor(progress / 25), 2); // Cap at 2 (max step index)
-  };
-
-  const getStepStatus = (stepIndex: number): 'completed' | 'processing' | 'pending' => {
-    if (processingProgress > stepIndex) return 'completed';
-    if (processingProgress === stepIndex) return 'processing';
-    return 'pending';
-  };
-
-  const processingSteps = [
-    { name: 'Content planning with AI', status: getStepStatus(0) },
-    { name: 'Generating storyboard images', status: getStepStatus(1) },
-    // Phase 3 (Creating reference images) is disabled - commented out
-    // { name: 'Creating reference images', status: getStepStatus(2) },
-    { name: 'Generating & stitching video chunks', status: getStepStatus(2) }, // Moved from 3 to 2
   ];
 
   const addNotification = (type: Notification['type'], title: string, message: string) => {
@@ -100,187 +63,7 @@ function AppContent() {
     setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 5000);
   };
 
-  // Get videoId from route params if on processing page, otherwise use state
-  const routeParams = useParams<{ videoId?: string }>();
-  const activeVideoId = location.pathname.startsWith('/processing/') 
-    ? routeParams.videoId || null 
-    : videoId || null;
 
-  // Use SSE stream for real-time status updates (with automatic fallback to polling)
-  const { status: streamStatus, error: streamError, isConnected } = useVideoStatusStream(
-    activeVideoId,
-    isProcessing
-  );
-
-  // Use refs to track notification state across renders
-  const hasShownAnimaticNotificationRef = useRef(false);
-  const hasShownStitchedNotificationRef = useRef(false);
-
-  // Reset notification flags and state when activeVideoId changes
-  useEffect(() => {
-    if (activeVideoId) {
-      hasShownAnimaticNotificationRef.current = false;
-      hasShownStitchedNotificationRef.current = false;
-      // Reset state when navigating to a new video
-      setAnimaticUrls(null);
-      setStitchedVideoUrl(null);
-      setCurrentChunkIndex(null);
-      setTotalChunks(null);
-      setCurrentPhase(undefined);
-      setProcessingProgress(0);
-      setElapsedTime(0);
-      setIsProcessing(true);
-    }
-  }, [activeVideoId]);
-
-  // Handle status updates from SSE stream
-  useEffect(() => {
-    if (!streamStatus || !isProcessing) return;
-
-    const status = streamStatus;
-    
-    console.log('[App] Processing status update:', {
-      video_id: status.video_id,
-      status: status.status,
-      progress: status.progress,
-      current_phase: status.current_phase,
-      has_animatic_urls: !!status.animatic_urls?.length,
-      has_video_url: !!(status.final_video_url || status.stitched_video_url),
-      chunk_progress: status.current_chunk_index !== undefined 
-        ? `${status.current_chunk_index + 1}/${status.total_chunks}` 
-        : null,
-      timestamp: new Date().toISOString()
-    });
-    
-    const currentStep = getProcessingStepFromPhase(status.current_phase, status.progress);
-    setProcessingProgress(currentStep);
-    setCurrentPhase(status.current_phase);
-    
-    // Update animatic URLs (allow updates if they change)
-    if (status.animatic_urls && status.animatic_urls.length > 0) {
-      // Only show notification on first set, but allow updates
-      setAnimaticUrls(prev => {
-        const isFirstTime = !prev;
-        if (isFirstTime && !hasShownAnimaticNotificationRef.current) {
-          hasShownAnimaticNotificationRef.current = true;
-          addNotification('success', 'Storyboard Images Generated', `${status.animatic_urls!.length} storyboard image${status.animatic_urls!.length !== 1 ? 's' : ''} ready!`);
-        }
-        return status.animatic_urls!;
-      });
-    }
-    
-    // Phase 3 (Reference Assets) is disabled - commented out
-    // if (status.reference_assets && !referenceAssets) {
-    //   setReferenceAssets(status.reference_assets);
-    //   addNotification('success', 'Reference Assets Generated', 'Style guide and product references are ready!');
-    // }
-    
-    // Update current chunk progress for Phase 4
-    if (status.current_phase === 'phase4_chunks') {
-      if (status.current_chunk_index !== undefined) {
-        setCurrentChunkIndex(status.current_chunk_index);
-      }
-      if (status.total_chunks !== undefined) {
-        setTotalChunks(status.total_chunks);
-      }
-    } else {
-      // Clear chunk progress when Phase 4 is done
-      setCurrentChunkIndex(null);
-      setTotalChunks(null);
-    }
-    
-    // Update video URLs - prefer final_video_url, fallback to stitched_video_url
-    // For Veo models, Phase 5 is skipped, so final_video_url might not be set
-    const videoUrl = status.final_video_url || status.stitched_video_url;
-    if (videoUrl) {
-      setStitchedVideoUrl(prev => {
-        const isFirstTime = !prev;
-        const urlChanged = prev && prev !== videoUrl;
-        const isFinalVideo = !!status.final_video_url;
-        
-        if (isFirstTime) {
-          // First time we get a video URL
-          if (!hasShownStitchedNotificationRef.current) {
-            hasShownStitchedNotificationRef.current = true;
-            if (isFinalVideo) {
-              addNotification('success', 'Video Complete', 'Your video with audio is ready!');
-            } else {
-              addNotification('success', 'Video Chunks Generated', 'Video chunks are being stitched together!');
-            }
-          }
-        } else if (urlChanged && isFinalVideo) {
-          // URL changed from stitched to final (Phase 5 completed for non-Veo models)
-          if (!hasShownStitchedNotificationRef.current) {
-            hasShownStitchedNotificationRef.current = true;
-            addNotification('success', 'Video Complete', 'Your video with audio is ready!');
-          }
-        }
-        
-        return videoUrl;
-      });
-    }
-    
-    if (status.status === 'complete') {
-      setIsProcessing(false);
-      navigate('/preview');
-    } else if (status.status === 'failed') {
-      setIsProcessing(false);
-      addNotification('error', 'Generation Failed', status.error || 'Unknown error');
-    }
-  }, [streamStatus, isProcessing, navigate]);
-
-  // Handle SSE errors (fallback to polling is automatic, but log errors)
-  useEffect(() => {
-    if (streamError) {
-      console.error('SSE stream error:', streamError);
-      // Fallback to polling happens automatically in the hook
-    }
-  }, [streamError]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isProcessing) {
-      interval = setInterval(() => {
-        setElapsedTime(t => t + 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isProcessing]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      setIsProcessing(true);
-      setElapsedTime(0);
-      setProcessingProgress(0);
-      // Reset all state for new video generation
-      setAnimaticUrls(null);
-      setStitchedVideoUrl(null);
-      setCurrentChunkIndex(null);
-      setTotalChunks(null);
-      setCurrentPhase(undefined);
-      // Phase 3 disabled - reference assets not used
-      // setReferenceAssets(null);
-      
-      const response = await generateVideo({
-        title: title || 'Untitled Video',
-        description: description || undefined,
-        prompt: prompt,
-        reference_assets: uploadedAssetIds,
-        model: selectedModel
-      });
-      
-      // Navigate to processing page with videoId in route
-      navigate(`/processing/${response.video_id}`);
-      setVideoId(response.video_id);
-      addNotification('success', 'Generation Started', 'Your video is being created...');
-    } catch (error) {
-      addNotification('error', 'Generation Failed', error instanceof Error ? error.message : 'Unknown error');
-      setIsProcessing(false);
-      navigate('/');
-    }
-  };
 
   const handleProjectSelect = (project: VideoListItem) => {
     setSelectedProject(project);
@@ -289,8 +72,7 @@ function AppContent() {
       setTitle(project.title);
       navigate('/preview');
     } else if (project.status !== 'complete' && project.status !== 'failed') {
-      setVideoId(project.video_id);
-      setIsProcessing(true);
+      // Navigate to processing page for videos that are still processing
       navigate(`/processing/${project.video_id}`);
     }
   };
@@ -316,18 +98,19 @@ function AppContent() {
   }, [location.pathname, projects.length]);
 
   const getCurrentStep = () => {
-    if (location.pathname === '/processing') return 2;
+    if (location.pathname.startsWith('/processing')) return 2;
     if (location.pathname === '/preview') return 3;
     if (location.pathname === '/download') return 4;
     return 1;
   };
 
-  const handleSelectTemplate = (template: Template) => {
-    setTitle(template.name);
-    setDescription(template.description);
-    navigate('/');
-    addNotification('success', 'Template Selected', `Started with ${template.name} template`);
-  };
+  // Template selection handler - commented out for now
+  // const handleSelectTemplate = (template: Template) => {
+  //   setTitle(template.name);
+  //   setDescription(template.description);
+  //   navigate('/');
+  //   addNotification('success', 'Template Selected', `Started with ${template.name} template`);
+  // };
 
   const handleAuthSuccess = () => {
     navigate('/');
@@ -361,7 +144,9 @@ function AppContent() {
     return <Auth onAuthSuccess={handleAuthSuccess} />;
   }
 
-  const showStepIndicator = ['/processing', '/preview', '/download'].includes(location.pathname);
+  const showStepIndicator = location.pathname.startsWith('/processing') || 
+                           location.pathname === '/preview' || 
+                           location.pathname === '/download';
 
   // Get user display name or email
   const userName = user.displayName || user.email?.split('@')[0] || 'User';
@@ -478,8 +263,8 @@ function AppContent() {
               title={title}
               description={description}
               prompt={prompt}
-              isProcessing={isProcessing}
               selectedModel={selectedModel}
+              uploadedAssetIds={uploadedAssetIds}
               onTitleChange={setTitle}
               onDescriptionChange={setDescription}
               onPromptChange={setPrompt}
@@ -488,7 +273,7 @@ function AppContent() {
                 setUploadedAssetIds(assetIds);
                 addNotification('success', 'Files Uploaded', `${assetIds.length} file(s) uploaded successfully!`);
               }}
-              onSubmit={handleSubmit}
+              onNotification={addNotification}
             />
           } />
 
@@ -533,150 +318,7 @@ function AppContent() {
             </div>
           } />
 
-          <Route path="/processing/:videoId" element={
-            <div className="card p-8 text-center animate-fade-in">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 dark:bg-blue-900 rounded-full mb-6 animate-pulse-subtle">
-                <Video className="w-10 h-10 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                AI is Creating Your Video
-              </h2>
-              <p className="text-slate-600 dark:text-slate-400 mb-8">
-                Sit back and relax while our AI works its magic...
-              </p>
-
-              <div className="max-w-md mx-auto text-left mb-8">
-                <ProcessingSteps steps={processingSteps} elapsedTime={elapsedTime} />
-              </div>
-
-              {animaticUrls && animaticUrls.length > 0 && (
-                <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-1">
-                        🎬 Storyboard Images Generated
-                      </h3>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        {animaticUrls.length} storyboard image{animaticUrls.length !== 1 ? 's' : ''} ready for video generation
-                        {currentChunkIndex !== null && totalChunks !== null && (
-                          <span className="ml-2 text-blue-600 dark:text-blue-400 font-semibold">
-                            • Processing chunk {currentChunkIndex + 1} of {totalChunks}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-                    {animaticUrls.map((url, idx) => {
-                      const isProcessing = currentChunkIndex === idx && currentPhase === 'phase4_chunks';
-                      // Chunk is completed if currentChunkIndex is past this chunk's index
-                      // Or if Phase 4 is complete (currentPhase is not phase4_chunks and we have a final video)
-                      const isCompleted = (currentChunkIndex !== null && idx < currentChunkIndex) ||
-                                         (currentPhase !== 'phase4_chunks' && currentChunkIndex !== null && idx <= currentChunkIndex) ||
-                                         (stitchedVideoUrl && currentPhase !== 'phase4_chunks');
-                      
-                      return (
-                        <div key={idx} className="relative group">
-                          <div className={`relative ${isProcessing ? 'animate-pulse' : ''}`}>
-                            <img
-                              src={url}
-                              alt={`Storyboard image ${idx + 1}`}
-                              className={`w-full h-32 object-cover rounded-lg border-2 shadow-md group-hover:scale-105 transition-transform cursor-pointer ${
-                                isProcessing
-                                  ? 'border-blue-500 dark:border-blue-400 ring-4 ring-blue-300 dark:ring-blue-600'
-                                  : isCompleted
-                                  ? 'border-green-500 dark:border-green-400'
-                                  : 'border-slate-200 dark:border-slate-700'
-                              }`}
-                              onClick={() => window.open(url, '_blank')}
-                              onError={(e) => {
-                                e.currentTarget.src = 'https://via.placeholder.com/200x200?text=Image+Not+Available';
-                              }}
-                            />
-                            {isProcessing && (
-                              <div className="absolute inset-0 bg-blue-500 bg-opacity-20 rounded-lg flex items-center justify-center">
-                                <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
-                              </div>
-                            )}
-                            {isCompleted && (
-                              <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1">
-                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                              </div>
-                            )}
-                          </div>
-                          <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                            Beat {idx + 1}
-                            {isProcessing && ' • Processing...'}
-                            {isCompleted && ' • Complete'}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Phase 3 (Reference Assets) */}
-              {referenceAssets && (
-                <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
-                    Reference Assets Generated
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-                    {referenceAssets.style_guide_url && (
-                      <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Style Guide</p>
-                        <img 
-                          src={referenceAssets.style_guide_url} 
-                          alt="Style Guide"
-                          className="w-full h-48 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
-                          onError={(e) => {
-                            e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Style+Guide';
-                          }}
-                        />
-                      </div>
-                    )}
-                    {referenceAssets.product_reference_url && (
-                      <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Product Reference</p>
-                        <img 
-                          src={referenceAssets.product_reference_url} 
-                          alt="Product Reference"
-                          className="w-full h-48 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
-                          onError={(e) => {
-                            e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Product+Reference';
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  {referenceAssets.uploaded_assets && referenceAssets.uploaded_assets.length > 0 && (
-                    <div className="mt-4">
-                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                        Uploaded Assets ({referenceAssets.uploaded_assets.length})
-                      </p>
-                      <div className="grid grid-cols-3 gap-2">
-                        {referenceAssets.uploaded_assets.map((asset, idx) => (
-                          <img
-                            key={idx}
-                            src={asset.s3_url}
-                            alt={`Uploaded asset ${idx + 1}`}
-                            className="w-full h-24 object-cover rounded border border-slate-200 dark:border-slate-700"
-                            onError={(e) => {
-                              e.currentTarget.src = 'https://via.placeholder.com/200x200?text=Asset';
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          } />
+          <Route path="/processing/:videoId" element={<VideoStatus />} />
 
           <Route path="/preview" element={
             <div className="card overflow-hidden animate-fade-in">
