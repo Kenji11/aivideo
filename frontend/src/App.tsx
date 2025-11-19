@@ -74,8 +74,8 @@ function AppContent() {
 
   useEffect(() => {
     const fetchProjects = async () => {
-      // Only fetch projects when on the projects page AND state is empty
-      if (location.pathname === '/projects' && projects.length === 0) {
+      // Only fetch projects when on the projects page
+      if (location.pathname === '/projects') {
         setIsLoadingProjects(true);
         try {
           const response = await listVideos();
@@ -90,7 +90,7 @@ function AppContent() {
     };
 
     fetchProjects();
-  }, [location.pathname, projects]);
+  }, [location.pathname]);
 
   const getCurrentStep = () => {
     if (location.pathname.startsWith('/processing')) return 2;
