@@ -149,9 +149,12 @@ def initialize_firebase() -> None:
                 logger.warning(f"Failed to initialize with default credentials: {e}")
                 logger.warning("Falling back to manual credential configuration")
         else:
-            logger.warning("Firebase credentials not found. Authentication will fail.")
-            logger.warning("Set GOOGLE_APPLICATION_CREDENTIALS environment variable or firebase_credentials_path in settings")
-            return
+            logger.error("Firebase credentials not found. Authentication will fail.")
+            logger.error("Set one of the following:")
+            logger.error("  1. GOOGLE_APPLICATION_CREDENTIALS environment variable pointing to JSON file + FIREBASE_PRIVATE_KEY")
+            logger.error("  2. FIREBASE_CREDENTIALS_PATH + FIREBASE_PRIVATE_KEY")
+            logger.error("  3. FIREBASE_PROJECT_ID + FIREBASE_PRIVATE_KEY + FIREBASE_CLIENT_EMAIL")
+            raise ValueError("Firebase credentials not configured. Set FIREBASE_PRIVATE_KEY and other required Firebase environment variables.")
         
         # Initialize with credentials
         if cred:
