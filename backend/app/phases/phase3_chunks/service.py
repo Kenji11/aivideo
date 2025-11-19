@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from typing import List, Dict
 from celery import group
-from app.phases.phase4_chunks_storyboard.chunk_generator import (
+from app.phases.phase3_chunks.chunk_generator import (
     generate_single_chunk_with_storyboard,
     build_chunk_specs_with_storyboard
 )
@@ -47,7 +47,7 @@ class ChunkGenerationService:
         beats = spec.get('beats', [])
         if not self.chunk_to_beat_map:
             # Build reverse mapping: chunk_idx -> beat_idx for all chunks
-            from app.phases.phase4_chunks_storyboard.model_config import get_default_model, get_model_config
+            from app.phases.phase3_chunks.model_config import get_default_model, get_model_config
             selected_model = spec.get('model', 'hailuo')
             try:
                 model_config = get_model_config(selected_model)
@@ -165,7 +165,7 @@ class ChunkGenerationService:
                         video_id,
                         "generating_chunks",
                         chunk_progress,
-                        current_phase="phase4_chunks"
+                        current_phase="phase3_chunks"
                     )
                     
                     # Update previous_chunk_last_frame only if this chunk is part of a beat that spans multiple chunks
@@ -338,7 +338,7 @@ class ChunkGenerationService:
                         # Only store last_frame_url if it will be used by next chunk
                         # (i.e., if next chunk is part of same beat)
                         # We need to determine the total number of chunks to check if there's a next chunk
-                        from app.phases.phase4_chunks_storyboard.model_config import get_default_model, get_model_config
+                        from app.phases.phase3_chunks.model_config import get_default_model, get_model_config
                         import math
                         selected_model = spec.get('model', 'hailuo')
                         try:

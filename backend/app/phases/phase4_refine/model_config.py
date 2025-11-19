@@ -18,7 +18,7 @@ Model Config Fields:
 - input_params: Required input parameters for the model
 
 Usage:
-    from app.phases.phase5_refine.model_config import get_default_music_model, get_music_model_config
+    from app.phases.phase4_refine.model_config import get_default_music_model, get_music_model_config
     
     # Get default model config
     model = get_default_music_model()

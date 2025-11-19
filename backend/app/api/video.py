@@ -21,13 +21,13 @@ async def list_videos(
     
     video_items = []
     for video in videos:
-        # Get stitched_video_url from phase_outputs if available (Phase 4 output)
+        # Get stitched_video_url from phase_outputs if available (Phase 3 output)
         stitched_url = video.stitched_url
         if not stitched_url and video.phase_outputs:
-            phase4_output = video.phase_outputs.get('phase4_chunks')
-            if phase4_output and phase4_output.get('status') == 'success':
-                phase4_data = phase4_output.get('output_data', {})
-                stitched_url = phase4_data.get('stitched_video_url')
+            phase3_output = video.phase_outputs.get('phase3_chunks')
+            if phase3_output and phase3_output.get('status') == 'success':
+                phase3_data = phase3_output.get('output_data', {})
+                stitched_url = phase3_data.get('stitched_video_url')
         
         # Use stitched_url as final_video_url if final_video_url is not set
         final_url = video.final_video_url or stitched_url

@@ -9,34 +9,34 @@
 **Status**: ✅ All critical bugs fixed, architecture documented
 
 ## What Just Happened
-1. ✅ **PR #10 Complete**: Redis-based progress tracking with Server-Sent Events (SSE)
-2. ✅ **Redis Integration**: Mid-pipeline progress updates now use Redis (60min TTL) instead of DB
-3. ✅ **SSE Implementation**: Real-time status updates via SSE stream with automatic polling fallback
-4. ✅ **Database Load Reduction**: 90%+ reduction in DB writes during pipeline execution
-5. ✅ **Frontend Integration**: SSE hook with automatic fallback to GET endpoint
-6. ✅ **Status Response Schema**: Added current_chunk_index and total_chunks fields
-7. ✅ **Presigned URL Caching**: S3 presigned URLs cached in Redis (60min TTL)
-8. ✅ **Memory Bank Updated**: All documentation reflects PR #10 completion
+1. ✅ **PR #11 Complete**: Phase cleanup and renaming - removed unused phases and created sequential structure
+2. ✅ **Removed Unused Phases**: Deleted phase6_export, phase2_animatic, phase3_references, and old phase4_chunks
+3. ✅ **Renamed Phases**: phase4_chunks_storyboard → phase3_chunks, phase5_refine → phase4_refine
+4. ✅ **Sequential Structure**: Pipeline now uses phase1 → phase2 → phase3 → phase4 (clean numbering)
+5. ✅ **Code Cleanup**: Removed ~50% of unused phase code, updated all references
+6. ✅ **Pipeline Updated**: Chain now goes directly from phase2 to phase3 (removed phase3_references)
+7. ✅ **All References Updated**: Imports, Celery tasks, progress tracking, status builder, API endpoints
+8. ✅ **Memory Bank Updated**: All documentation reflects PR #11 completion
 
 ## Current Focus
 **System Stabilization & Infrastructure Improvements**
 
 ### Recent Achievements
-1. ✅ **PR #10**: Redis-based progress tracking with Server-Sent Events (SSE)
-2. ✅ **Performance**: 90%+ reduction in database writes during pipeline execution
-3. ✅ **Real-Time Updates**: SSE stream provides instant status updates without polling overhead
-4. ✅ **Architecture**: Redis for mid-pipeline cache, DB for persistence (start/failure/completion)
-5. ✅ **Frontend**: SSE hook with automatic fallback to polling if SSE fails
-6. ✅ **Caching**: Presigned URLs cached in Redis to avoid regeneration on each request
-7. ✅ **Graceful Degradation**: Complete fallback to DB if Redis unavailable
+1. ✅ **PR #11**: Phase cleanup and renaming - sequential phase structure (phase1 → phase2 → phase3 → phase4)
+2. ✅ **Code Cleanup**: Removed 4 unused phases (phase6_export, phase2_animatic, phase3_references, old phase4_chunks)
+3. ✅ **Sequential Naming**: Phases now numbered 1-4 sequentially for clarity
+4. ✅ **Simplified Pipeline**: Removed phase3_references from chain (phase2 → phase3 directly)
+5. ✅ **All References Updated**: Imports, Celery tasks, progress tracking, status builder, API endpoints
+6. ✅ **PR #10**: Redis-based progress tracking with Server-Sent Events (SSE)
+7. ✅ **Performance**: 90%+ reduction in database writes during pipeline execution
 
 ### System Status
-- ✅ **Pipeline**: Fully functional end-to-end
-- ✅ **Phase 1**: Working (GPT-4 validation)
+- ✅ **Pipeline**: Fully functional end-to-end (phase1 → phase2 → phase3 → phase4)
+- ✅ **Phase 1**: Working (GPT-4 validation and spec extraction)
 - ✅ **Phase 2**: Working (Storyboard generation)
-- ✅ **Phase 4**: Working (Dynamic chunk generation)
-- ✅ **Phase 5**: Working (Audio integration, with fallback)
-- ✅ **Progress Tracking**: Real-time updates working
+- ✅ **Phase 3**: Working (Chunk generation and stitching) - renamed from phase4_chunks_storyboard
+- ✅ **Phase 4**: Working (Audio integration and refinement) - renamed from phase5_refine
+- ✅ **Progress Tracking**: Real-time updates working (Redis + SSE)
 - ✅ **Cost Tracking**: Per-phase cost monitoring working
 
 ## Recent Decisions
@@ -145,19 +145,19 @@
 
 ## Next Steps
 
-### Immediate (TDD PRs #4-5) - CURRENT
-1. 🔄 Disable Phase 3 explicitly (add comments, return skipped status)
-2. 🔄 Create Phase 2 directory structure
-3. 🔄 Implement Phase 2 storyboard generation (1 image per beat)
-4. 🔄 Update Phase 4 to calculate beat-to-chunk mapping
-5. 🔄 Update Phase 4 to use storyboard images at beat boundaries
+### Immediate (Testing PR #11) - CURRENT
+1. 🔄 Test full pipeline with new sequential structure (phase1 → phase2 → phase3 → phase4)
+2. 🔄 Verify all phase transitions work correctly
+3. 🔄 Verify phase output keys are correct (phase3_chunks, phase4_refine)
+4. 🔄 Test status endpoint returns correct phase information
+5. 🔄 Verify progress tracking uses correct phase names
 
-### Short Term (After PRs #4-5)
-1. Test Phase 1 → Phase 2 → Phase 4 pipeline
-2. Verify beat boundary images working correctly
-3. Verify last-frame continuation within beats
-4. Update orchestrator/pipeline to call Phase 2 (not Phase 3)
-5. End-to-end test with various beat sequences
+### Short Term (After PR #11 Testing)
+1. Fix any issues discovered during testing
+2. Verify end-to-end video generation works
+3. Test with various video durations and beat sequences
+4. Verify cost tracking works correctly
+5. Check for any remaining references to old phase names
 
 ### Medium Term (TDD Completion)
 1. Add comprehensive test suite
@@ -224,13 +224,16 @@
 - [ ] Performance optimization (parallel after chunk 0) - Future enhancement
 
 ## Notes
+- ✅ **PR #11 Complete**: Phase cleanup and renaming - sequential structure (phase1 → phase2 → phase3 → phase4)
+- ✅ **Removed Unused Phases**: phase6_export, phase2_animatic, phase3_references, old phase4_chunks
+- ✅ **Renamed Phases**: phase4_chunks_storyboard → phase3_chunks, phase5_refine → phase4_refine
 - ✅ **All Critical Bugs Fixed**: generation_time, Phase 5 DB updates, duplicate exceptions
-- ✅ **Dynamic Storyboard Mapping**: Phase 4 now fully adapts to any number of images
+- ✅ **Dynamic Storyboard Mapping**: Phase 3 now fully adapts to any number of images
 - ✅ **Accurate Beat Mapping**: Uses actual beat start times from Phase 1
-- ✅ **Pipeline Complete**: Phase 1 → Phase 2 → Phase 4 → Phase 5 working end-to-end
+- ✅ **Pipeline Complete**: Phase 1 → Phase 2 → Phase 3 → Phase 4 working end-to-end
 - ✅ **Documentation**: Comprehensive architecture docs and README created
 - ✅ **Model Flexibility**: Supports multiple models (hailuo, veo_fast, veo, etc.)
 - Sequential generation ensures temporal coherence (acceptable trade-off)
 - User-specified durations respected by Phase 1
-- Phase 3 disabled (replaced by Phase 2 storyboard images)
+- Phase 3 (references) removed - Phase 2 storyboard images go directly to Phase 3 (chunks)
 
