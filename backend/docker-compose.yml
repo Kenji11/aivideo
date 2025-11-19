@@ -67,7 +67,7 @@ services:
     volumes:
       - ./app:/app/app
       - ./firebase-credentials.json:/app/firebase-credentials.json:ro  # Firebase credentials JSON (without private_key)
-    command: celery -A app.orchestrator.celery_app worker --loglevel=info --concurrency=4
+    command: celery -A app.orchestrator.celery_app worker --loglevel=info --concurrency=2
 
 volumes:
   postgres_data:

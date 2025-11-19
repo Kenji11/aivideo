@@ -9,7 +9,6 @@ import json
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
 
-from app.orchestrator.celery_app import celery_app
 from app.services.replicate import replicate_client
 from app.services.s3 import s3_client
 from app.phases.phase4_chunks_storyboard.schemas import ChunkSpec
@@ -442,9 +441,7 @@ def generate_single_chunk_continuous(chunk_spec_obj: ChunkSpec) -> dict:
         raise PhaseException(f"Failed to generate continuous chunk {chunk_num}: {str(e)}")
 
 
-@celery_app.task(bind=True, name="app.phases.phase4_chunks_storyboard.chunk_generator.generate_single_chunk_with_storyboard")
 def generate_single_chunk_with_storyboard(
-    self,
     chunk_spec: dict, 
     beat_to_chunk_map: dict = None
 ) -> dict:
@@ -454,8 +451,10 @@ def generate_single_chunk_with_storyboard(
     This function determines whether to use a storyboard image (at beat boundaries)
     or last-frame continuation (within beats).
     
+    NOTE: This is a regular function (NOT a Celery task) to allow direct calls
+    from LangChain RunnableParallel for parallel execution.
+    
     Args:
-        self: Celery task instance
         chunk_spec: ChunkSpec dictionary
         beat_to_chunk_map: Optional dictionary mapping chunk_idx -> beat_idx for storyboard detection
         
