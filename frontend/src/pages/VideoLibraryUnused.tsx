@@ -42,7 +42,7 @@ const mockVideos: LibraryVideo[] = [
   },
 ];
 
-export function VideoLibrary() {
+export function VideoLibraryUnused() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 

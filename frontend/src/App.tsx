@@ -1,31 +1,37 @@
 import { useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { Sparkles, Video, Film, Download, Settings, BarChart3, Zap, Library, CreditCard, Code2 } from 'lucide-react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { Sparkles, Video, Film, Download, BarChart3 } from 'lucide-react';
+// Commented out - may use later
+// import { Settings, Zap, Library, CreditCard, Code2 } from 'lucide-react';
 import { Header } from './components/Header';
 import { StepIndicator } from './components/StepIndicator';
-import { UploadZone } from './components/UploadZone';
 import { ProjectCard } from './components/ProjectCard';
 import { ProcessingSteps } from './components/ProcessingSteps';
 import { NotificationCenter, Notification } from './components/NotificationCenter';
 import type { Template } from './components/TemplateGallery';
 import { ExportPanel } from './components/ExportPanel';
 import { Auth } from './pages/Auth';
-import { Settings as SettingsPage } from './pages/Settings';
-import { Analytics } from './pages/Analytics';
-import { Templates } from './pages/Templates';
-import { Dashboard } from './pages/Dashboard';
-import { VideoLibrary } from './pages/VideoLibrary';
-import { Billing } from './pages/Billing';
-import { API } from './pages/API';
+import { AssetLibrary } from './pages/AssetLibrary';
+import { UploadVideo } from './pages/UploadVideo';
+// Commented out - may use later
+// import { Settings as SettingsPage } from './pages/Settings';
+// import { Analytics } from './pages/Analytics';
+// import { Templates } from './pages/Templates';
+// import { Dashboard } from './pages/Dashboard';
+// import { VideoLibraryUnused } from './pages/VideoLibraryUnused ';
+// import { Billing } from './pages/Billing';
+// import { API } from './pages/API';
 import { generateVideo, getVideoStatus, StatusResponse, listVideos, VideoListItem } from './lib/api';
 import { useAuth } from './contexts/AuthContext';
 import { useVideoStatusStream } from './lib/useVideoStatusStream';
+import { useDarkMode } from './lib/useDarkMode';
 
 // Main App Content (inside router)
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading: authLoading, signOut } = useAuth();
+  const { isDark } = useDarkMode(); // Initialize dark mode hook
   const [prompt, setPrompt] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -94,9 +100,15 @@ function AppContent() {
     setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 5000);
   };
 
+  // Get videoId from route params if on processing page, otherwise use state
+  const routeParams = useParams<{ videoId?: string }>();
+  const activeVideoId = location.pathname.startsWith('/processing/') 
+    ? routeParams.videoId || null 
+    : videoId || null;
+
   // Use SSE stream for real-time status updates (with automatic fallback to polling)
   const { status: streamStatus, error: streamError, isConnected } = useVideoStatusStream(
-    videoId || null,
+    activeVideoId,
     isProcessing
   );
 
@@ -104,13 +116,22 @@ function AppContent() {
   const hasShownAnimaticNotificationRef = useRef(false);
   const hasShownStitchedNotificationRef = useRef(false);
 
-  // Reset notification flags when videoId changes
+  // Reset notification flags and state when activeVideoId changes
   useEffect(() => {
-    if (videoId) {
+    if (activeVideoId) {
       hasShownAnimaticNotificationRef.current = false;
       hasShownStitchedNotificationRef.current = false;
+      // Reset state when navigating to a new video
+      setAnimaticUrls(null);
+      setStitchedVideoUrl(null);
+      setCurrentChunkIndex(null);
+      setTotalChunks(null);
+      setCurrentPhase(undefined);
+      setProcessingProgress(0);
+      setElapsedTime(0);
+      setIsProcessing(true);
     }
-  }, [videoId]);
+  }, [activeVideoId]);
 
   // Handle status updates from SSE stream
   useEffect(() => {
@@ -241,7 +262,6 @@ function AppContent() {
       setCurrentPhase(undefined);
       // Phase 3 disabled - reference assets not used
       // setReferenceAssets(null);
-      navigate('/processing');
       
       const response = await generateVideo({
         title: title || 'Untitled Video',
@@ -251,6 +271,8 @@ function AppContent() {
         model: selectedModel
       });
       
+      // Navigate to processing page with videoId in route
+      navigate(`/processing/${response.video_id}`);
       setVideoId(response.video_id);
       addNotification('success', 'Generation Started', 'Your video is being created...');
     } catch (error) {
@@ -269,13 +291,14 @@ function AppContent() {
     } else if (project.status !== 'complete' && project.status !== 'failed') {
       setVideoId(project.video_id);
       setIsProcessing(true);
-      navigate('/processing');
+      navigate(`/processing/${project.video_id}`);
     }
   };
 
   useEffect(() => {
     const fetchProjects = async () => {
-      if (location.pathname === '/projects' || location.pathname === '/') {
+      // Only fetch projects when on the projects page AND state is empty
+      if (location.pathname === '/projects' && projects.length === 0) {
         setIsLoadingProjects(true);
         try {
           const response = await listVideos();
@@ -290,7 +313,7 @@ function AppContent() {
     };
 
     fetchProjects();
-  }, [location.pathname]);
+  }, [location.pathname, projects.length]);
 
   const getCurrentStep = () => {
     if (location.pathname === '/processing') return 2;
@@ -356,7 +379,8 @@ function AppContent() {
         {/* Navigation buttons - always visible on all pages */}
         <div className="flex items-center justify-between mb-8 overflow-x-auto pb-2">
           <div className="space-x-2 flex flex-shrink-0">
-            <button
+            {/* Commented out - may use later */}
+            {/* <button
               onClick={() => navigate('/dashboard')}
               className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
                 location.pathname === '/dashboard' 
@@ -439,7 +463,7 @@ function AppContent() {
             >
               <Settings className="w-5 h-5" />
               <span className="hidden sm:inline">Settings</span>
-            </button>
+            </button> */}
           </div>
         </div>
 
@@ -450,101 +474,22 @@ function AppContent() {
 
         <Routes>
           <Route path="/" element={
-            <div className="card p-8 animate-fade-in">
-              <div className="mb-8">
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                  Create Your Video
-                </h2>
-                <p className="text-slate-600 dark:text-slate-400">
-                  Describe your vision and let AI bring it to life, or choose a template to get started
-                </p>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Project Title
-                  </label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="E.g., Summer Travel Vlog"
-                    className="input-field"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Description (optional)
-                  </label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Add more context about your project..."
-                    className="input-field resize-none h-20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    What would you like to create?
-                  </label>
-                  <textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Describe your video in detail. E.g., Create a promotional video about sustainable living with nature scenes, uplifting music, and inspirational quotes..."
-                    className="input-field resize-none h-32"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Reference Materials
-                  </label>
-                  <UploadZone 
-                    disabled={isProcessing} 
-                    onAssetsUploaded={(assetIds) => {
-                      setUploadedAssetIds(assetIds);
-                      addNotification('success', 'Files Uploaded', `${assetIds.length} file(s) uploaded successfully!`);
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Video Model
-                  </label>
-                  <select
-                    value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    className="input-field"
-                    disabled={isProcessing}
-                  >
-                    <option value="veo_fast">Google Veo 3.1 Fast (Recommended)</option>
-                    <option value="veo">Google Veo 3.1</option>
-                    <option value="hailuo">Hailuo 2.3 Fast</option>
-                    <option value="hailuo_23">Minimax Hailuo 2.3</option>
-                    <option value="runway_gen4_turbo">Runway Gen-4 Turbo (Test)</option>
-                    <option value="runway">Runway Gen-2</option>
-                  </select>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Choose the AI model for video generation. Different models have different quality, speed, and cost characteristics.
-                  </p>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={!prompt || !title || isProcessing}
-                  className="w-full btn-primary flex items-center justify-center space-x-2"
-                >
-                  <Sparkles className="w-5 h-5" />
-                  <span>{isProcessing ? 'Processing...' : 'Start Creating'}</span>
-                </button>
-              </form>
-            </div>
+            <UploadVideo
+              title={title}
+              description={description}
+              prompt={prompt}
+              isProcessing={isProcessing}
+              selectedModel={selectedModel}
+              onTitleChange={setTitle}
+              onDescriptionChange={setDescription}
+              onPromptChange={setPrompt}
+              onModelChange={setSelectedModel}
+              onAssetsUploaded={(assetIds) => {
+                setUploadedAssetIds(assetIds);
+                addNotification('success', 'Files Uploaded', `${assetIds.length} file(s) uploaded successfully!`);
+              }}
+              onSubmit={handleSubmit}
+            />
           } />
 
           <Route path="/projects" element={
@@ -588,7 +533,7 @@ function AppContent() {
             </div>
           } />
 
-          <Route path="/processing" element={
+          <Route path="/processing/:videoId" element={
             <div className="card p-8 text-center animate-fade-in">
               <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 dark:bg-blue-900 rounded-full mb-6 animate-pulse-subtle">
                 <Video className="w-10 h-10 text-blue-600 dark:text-blue-400" />
@@ -674,8 +619,8 @@ function AppContent() {
                 </div>
               )}
 
-              {/* Phase 3 (Reference Assets) is disabled - commented out */}
-              {/* {referenceAssets && (
+              {/* Phase 3 (Reference Assets) */}
+              {referenceAssets && (
                 <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
                     Reference Assets Generated
@@ -729,7 +674,7 @@ function AppContent() {
                     </div>
                   )}
                 </div>
-              )} */}
+              )}
             </div>
           } />
 
@@ -904,13 +849,16 @@ function AppContent() {
             />
           } />
 
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/templates" element={<Templates onSelectTemplate={handleSelectTemplate} />} />
-          <Route path="/library" element={<VideoLibrary />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/billing" element={<Billing />} />
-          <Route path="/api" element={<API />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/asset-library" element={<AssetLibrary />} />
+
+          {/* Commented out - may use later */}
+          {/* <Route path="/dashboard" element={<Dashboard />} /> */}
+          {/* <Route path="/templates" element={<Templates onSelectTemplate={handleSelectTemplate} />} /> */}
+          {/* <Route path="/library" element={<VideoLibraryUnused />} /> */}
+          {/* <Route path="/analytics" element={<Analytics />} /> */}
+          {/* <Route path="/billing" element={<Billing />} /> */}
+          {/* <Route path="/api" element={<API />} /> */}
+          {/* <Route path="/settings" element={<SettingsPage />} /> */}
         </Routes>
       </div>
     </div>
