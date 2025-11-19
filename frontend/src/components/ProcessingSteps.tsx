@@ -1,4 +1,5 @@
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 
 interface ProcessingStep {
   name: string;
@@ -20,43 +21,47 @@ export function ProcessingSteps({ steps, elapsedTime = 0 }: ProcessingStepsProps
   return (
     <div className="space-y-3">
       {steps.map((step, idx) => (
-        <div
+        <Card
           key={idx}
-          className="flex items-center space-x-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700 animate-slide-in"
+          className="animate-slide-in border-slate-200 dark:border-slate-700"
           style={{ animationDelay: `${idx * 100}ms` }}
         >
-          <div className="flex-shrink-0">
-            {step.status === 'completed' && (
-              <CheckCircle2 className="w-6 h-6 text-green-500" />
-            )}
-            {step.status === 'processing' && (
-              <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
-            )}
-            {step.status === 'failed' && (
-              <AlertCircle className="w-6 h-6 text-red-500" />
-            )}
-            {step.status === 'pending' && (
-              <div className="w-6 h-6 rounded-full bg-slate-300" />
-            )}
-          </div>
-          <span
-            className={`text-sm font-medium ${
-              step.status === 'pending'
-                ? 'text-slate-400'
-                : step.status === 'processing'
-                  ? 'text-slate-900 dark:text-slate-100'
-                  : step.status === 'completed'
-                    ? 'text-slate-700 dark:text-slate-300'
-                    : 'text-red-700'
-            }`}
-          >
-            {step.name}
-          </span>
-        </div>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-4">
+              <div className="flex-shrink-0">
+                {step.status === 'completed' && (
+                  <CheckCircle2 className="w-6 h-6 text-green-500" />
+                )}
+                {step.status === 'processing' && (
+                  <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                )}
+                {step.status === 'failed' && (
+                  <AlertCircle className="w-6 h-6 text-red-500" />
+                )}
+                {step.status === 'pending' && (
+                  <div className="w-6 h-6 rounded-full bg-slate-300 dark:bg-slate-600" />
+                )}
+              </div>
+              <span
+                className={`text-sm font-medium ${
+                  step.status === 'pending'
+                    ? 'text-muted-foreground'
+                    : step.status === 'processing'
+                      ? 'text-foreground'
+                      : step.status === 'completed'
+                        ? 'text-muted-foreground'
+                        : 'text-red-700 dark:text-red-400'
+                }`}
+              >
+                {step.name}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       ))}
 
       {elapsedTime > 0 && (
-        <div className="text-center text-sm text-slate-500 dark:text-slate-400 mt-4">
+        <div className="text-center text-sm text-muted-foreground mt-4">
           Elapsed time: {formatTime(elapsedTime)}
         </div>
       )}

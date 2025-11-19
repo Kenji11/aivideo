@@ -1,13 +1,31 @@
-import { X, Mail, Copy, Check } from 'lucide-react';
+import { Mail, Copy, Check, X } from 'lucide-react';
 import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 interface ShareModalProps {
   projectId: string;
   projectTitle: string;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
-export function ShareModal({ projectId, onClose }: ShareModalProps) {
+export function ShareModal({ projectId, open, onOpenChange }: ShareModalProps) {
   const [sharedEmails, setSharedEmails] = useState<string[]>([]);
   const [newEmail, setNewEmail] = useState('');
   const [permission, setPermission] = useState<'view' | 'comment' | 'edit'>('view');
@@ -29,78 +47,67 @@ export function ShareModal({ projectId, onClose }: ShareModalProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // const permissionLabels = { // Unused for now
-  //   view: 'Can view',
-  //   comment: 'Can comment',
-  //   edit: 'Can edit',
-  // };
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full animate-fade-in">
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Share Project</h2>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:text-slate-400 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Share Project</DialogTitle>
+        </DialogHeader>
 
-        <div className="p-6 space-y-6">
-          <div>
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Share via Link</p>
+        <div className="space-y-6 py-4">
+          <div className="space-y-3">
+            <Label>Share via Link</Label>
             <div className="flex items-center space-x-2">
-              <input
+              <Input
                 type="text"
                 value={shareLink}
                 readOnly
-                className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700/50 text-sm text-slate-600 dark:text-slate-400"
+                className="flex-1 bg-muted"
               />
-              <button
+              <Button
                 onClick={handleCopyLink}
-                className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 rounded-lg transition-colors"
+                variant="outline"
+                size="icon"
               >
                 {copied ? (
-                  <Check className="w-5 h-5 text-green-600" />
+                  <Check className="h-4 w-4 text-green-600" />
                 ) : (
-                  <Copy className="w-5 h-5" />
+                  <Copy className="h-4 w-4" />
                 )}
-              </button>
+              </Button>
             </div>
           </div>
 
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Share with Collaborators</p>
+          <div className="space-y-3 border-t pt-6">
+            <Label>Share with Collaborators</Label>
             <form onSubmit={handleAddEmail} className="space-y-3">
               <div className="flex items-center space-x-2">
                 <div className="flex-1 relative">
-                  <Mail className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
-                  <input
+                  <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
                     type="email"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
                     placeholder="Enter email"
-                    className="input-field pl-10"
+                    className="pl-10"
                   />
                 </div>
-                <select
-                  value={permission}
-                  onChange={(e) => setPermission(e.target.value as 'view' | 'comment' | 'edit')}
-                  className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="view">View</option>
-                  <option value="comment">Comment</option>
-                  <option value="edit">Edit</option>
-                </select>
-                <button
+                <Select value={permission} onValueChange={(value) => setPermission(value as 'view' | 'comment' | 'edit')}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="view">View</SelectItem>
+                    <SelectItem value="comment">Comment</SelectItem>
+                    <SelectItem value="edit">Edit</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
                   type="submit"
                   disabled={!newEmail}
-                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
                 >
                   Add
-                </button>
+                </Button>
               </div>
             </form>
 
@@ -109,17 +116,18 @@ export function ShareModal({ projectId, onClose }: ShareModalProps) {
                 {sharedEmails.map((email) => (
                   <div
                     key={email}
-                    className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg"
+                    className="flex items-center justify-between p-3 bg-muted rounded-lg"
                   >
-                    <span className="text-sm text-slate-700 dark:text-slate-300">{email}</span>
-                    <button
+                    <span className="text-sm">{email}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() =>
                         setSharedEmails(sharedEmails.filter((e) => e !== email))
                       }
-                      className="text-slate-400 hover:text-slate-600 dark:text-slate-400"
                     >
-                      <X className="w-4 h-4" />
-                    </button>
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -127,15 +135,12 @@ export function ShareModal({ projectId, onClose }: ShareModalProps) {
           </div>
         </div>
 
-        <div className="flex space-x-3 p-6 border-t border-slate-200 dark:border-slate-700">
-          <button
-            onClick={onClose}
-            className="flex-1 btn-secondary"
-          >
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)} variant="secondary">
             Done
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

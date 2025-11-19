@@ -1,6 +1,22 @@
-import { Film, LogOut, Menu, X, Sparkles } from 'lucide-react';
+import { Film, LogOut, Menu, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 
 interface HeaderProps {
   userName?: string;
@@ -12,7 +28,7 @@ export function Header({ userName, onLogout }: HeaderProps) {
   const navigate = useNavigate();
 
   return (
-    <nav className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 dark:border-slate-700 sticky top-0 z-50 transition-colors">
+    <nav className="bg-background/95 backdrop-blur-sm bg-gradient-to-br from-background via-background/98 to-background/95 border-b border-border sticky top-0 z-50 transition-colors shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-2 cursor-pointer group" onClick={() => navigate('/')}>
@@ -22,102 +38,96 @@ export function Header({ userName, onLogout }: HeaderProps) {
             </div>
             <div>
               <span className="text-xl font-bold gradient-text">VideoAI</span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-400 block">Studio</span>
+              <span className="text-xs text-muted-foreground block">Studio</span>
             </div>
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
-            <Link
-              to="/"
-              className="flex items-center space-x-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors shadow-sm hover:shadow-md"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Generate Video</span>
-            </Link>
-            <Link
-              to="/projects"
-              className="text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-300 hover:text-slate-900 dark:text-slate-100 dark:hover:text-slate-100 px-4 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-700 transition-colors"
-            >
-              My Projects
-            </Link>
-            <Link
-              to="/asset-library"
-              className="text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-300 hover:text-slate-900 dark:text-slate-100 dark:hover:text-slate-100 px-4 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-700 transition-colors"
-            >
-              Asset Library
-            </Link>
+            <Button asChild>
+              <Link to="/" className="flex items-center space-x-2">
+                <Sparkles className="w-4 h-4" />
+                <span>Generate Video</span>
+              </Link>
+            </Button>
+            <Button variant="ghost" asChild>
+              <Link to="/projects">My Projects</Link>
+            </Button>
+            <Button variant="ghost" asChild>
+              <Link to="/asset-library">Asset Library</Link>
+            </Button>
             {userName && (
-              <div className="flex items-center space-x-3 pl-4 border-l border-slate-200 dark:border-slate-700 dark:border-slate-700">
-                <div className="text-right">
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 dark:text-slate-100">
-                    {userName}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-400">Creator</p>
-                </div>
-                <button
-                  onClick={onLogout}
-                  className="p-2 text-slate-600 dark:text-slate-400 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                  title="Logout"
-                >
-                  <LogOut className="w-5 h-5" />
-                </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="flex items-center space-x-3 pl-4 border-l">
+                    <div className="text-right">
+                      <p className="text-sm font-medium">{userName}</p>
+                      <p className="text-xs text-muted-foreground">Creator</p>
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>
+                    <div>
+                      <p className="font-medium">{userName}</p>
+                      <p className="text-xs text-muted-foreground">Creator</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onLogout}>
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="md:hidden">
+                <Menu className="w-6 h-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right">
+              <SheetHeader>
+                <SheetTitle>Menu</SheetTitle>
+              </SheetHeader>
+              <div className="mt-6 space-y-2">
+                <Button asChild className="w-full justify-start" onClick={() => setMobileMenuOpen(false)}>
+                  <Link to="/" className="flex items-center space-x-2">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Generate Video</span>
+                  </Link>
+                </Button>
+                <Button variant="ghost" asChild className="w-full justify-start" onClick={() => setMobileMenuOpen(false)}>
+                  <Link to="/projects">My Projects</Link>
+                </Button>
+                <Button variant="ghost" asChild className="w-full justify-start" onClick={() => setMobileMenuOpen(false)}>
+                  <Link to="/asset-library">Asset Library</Link>
+                </Button>
+                {userName && (
+                  <>
+                    <div className="pt-4 border-t">
+                      <p className="px-2 py-1 text-sm font-medium">{userName}</p>
+                      <p className="px-2 text-xs text-muted-foreground">Creator</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        onLogout?.();
+                        setMobileMenuOpen(false);
+                      }}
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Logout
+                    </Button>
+                  </>
+                )}
               </div>
-            )}
-          </div>
-
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-slate-600 dark:text-slate-400 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-700 rounded-lg"
-          >
-            {mobileMenuOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
-          </button>
+            </SheetContent>
+          </Sheet>
         </div>
-
-        {mobileMenuOpen && (
-          <div className="md:hidden pb-4 space-y-2 border-t border-slate-200 dark:border-slate-700 dark:border-slate-700 pt-4 animate-slide-in">
-            <Link
-              to="/"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full flex items-center space-x-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors shadow-sm"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Generate Video</span>
-            </Link>
-            <Link
-              to="/projects"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full text-left text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-300 px-4 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-700 transition-colors"
-            >
-              My Projects
-            </Link>
-            <Link
-              to="/asset-library"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full text-left text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-300 px-4 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-700 transition-colors"
-            >
-              Asset Library
-            </Link>
-            {userName && (
-              <>
-                <div className="px-4 py-2 text-sm">
-                  <p className="font-medium text-slate-900 dark:text-slate-100 dark:text-slate-100">{userName}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-400">Creator</p>
-                </div>
-                <button
-                  onClick={onLogout}
-                  className="w-full text-left text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-300 px-4 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-700 transition-colors flex items-center space-x-2"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>Logout</span>
-                </button>
-              </>
-            )}
-          </div>
-        )}
       </div>
     </nav>
   );
