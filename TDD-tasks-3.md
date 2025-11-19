@@ -183,107 +183,253 @@ def orchestrate_video(video_id):
 
 ---
 
-## PR #9: Enable Streaming Downloads for Phase 2, Phase 4, and Phase 5
+## PR #9: Parallel Chunk Generation with Dependency-Aware Waves
 
-**Goal:** Implement streaming downloads for all file downloads (images, videos, audio) to reduce memory footprint in containers
+**Goal:** Enable parallel chunk generation while respecting dependencies between reference-based and last-frame-based chunks
 
 **Current Issue:**
-- Large files (images, videos, audio) are loaded entirely into memory before processing
-- Memory usage can spike with large downloads
-- Containers may run out of memory when processing multiple files
+- Phase 4 generates chunks sequentially (slow)
+- Chunks with reference images could be generated in parallel
+- Chunks using last frames need to wait for their predecessor, but can run in parallel with other dependent chunks
 
 **The Solution:**
-- Implement streaming downloads for all file downloads
-- Download files in chunks to avoid loading entire files into memory
-- Stream directly to S3 or temporary files as data arrives
-- Reduce memory footprint significantly
+- Use Celery `chord` pattern for parallel execution
+- Split Phase 4 into two waves:
+  - **Wave 1**: Generate all chunks with reference images (parallel)
+  - **Wave 2**: Generate all chunks using last frames (parallel, after Wave 1 completes)
+- Maintain chain pattern for non-blocking orchestration
 
 **Benefits:**
-- Lower memory usage (streaming instead of buffering entire files)
-- Better container resource utilization
-- More videos can be processed concurrently
-- Prevents memory-related crashes
+- Significant speedup for videos with multiple beats
+- 6 beats with 3 reference images: Wave 1 runs 3 chunks in parallel, Wave 2 runs 3 chunks in parallel
+- Worker threads remain non-blocking
+- Respects chunk generation dependencies
 
-**Investigation Needed:**
-- Review current download implementation in Phase 2 (images)
-- Review current download implementation in Phase 4 (videos)
-- Review current download implementation in Phase 5 (audio/video)
-- Identify all places where files are downloaded
-- Review S3 upload implementation
+**Dependency Structure Example:**
+```
+Wave 1 (Parallel): Beats with reference_image
+- Beat 0 (has ref) → Chunk 0
+- Beat 2 (has ref) → Chunk 2  
+- Beat 4 (has ref) → Chunk 4
+
+Wave 2 (Parallel): Beats using last_frame from previous chunk
+- Beat 1 (uses Chunk 0's last frame) → Chunk 1
+- Beat 3 (uses Chunk 2's last frame) → Chunk 3
+- Beat 5 (uses Chunk 4's last frame) → Chunk 5
+```
+
+**Chord Pattern Example:**
+```python
+from celery import chain, chord
+
+# Individual parallelizable tasks
+@celery_app.task
+def generate_chunk_with_reference(beat, video_id):
+    chunk_url = hailuo_generate(beat["reference_image"])
+    save_chunk_to_db(video_id, beat["beat_id"], chunk_url)
+    return chunk_url
+
+@celery_app.task
+def generate_chunk_with_last_frame(beat, video_id, previous_chunk_id):
+    last_frame = extract_last_frame(previous_chunk_id)
+    chunk_url = hailuo_generate(last_frame)
+    save_chunk_to_db(video_id, beat["beat_id"], chunk_url)
+    return chunk_url
+
+# Wave tasks with chords
+@celery_app.task
+def phase4_wave1_chunks(phase3_result):
+    """Create chord for parallel reference-based chunks."""
+    beats_with_refs = [b for b in beats if b.get("reference_image")]
+    
+    result = chord([
+        generate_chunk_with_reference.s(beat, video_id)
+        for beat in beats_with_refs
+    ])(phase4_wave1_complete.s(phase3_result))
+    
+    # DON'T call .get() - return chord AsyncResult
+    return result
+
+@celery_app.task
+def phase4_wave2_chunks(phase4_wave1_result):
+    """Create chord for parallel last-frame-based chunks."""
+    beats_with_last_frames = [b for b in beats if not b.get("reference_image")]
+    
+    result = chord([
+        generate_chunk_with_last_frame.s(beat, video_id, prev_chunk_id)
+        for beat in beats_with_last_frames
+    ])(phase4_wave2_complete.s(phase4_wave1_result))
+    
+    return result
+
+# Main pipeline
+workflow = chain(
+    phase1_planning.s(video_id, prompt),
+    phase2_storyboards.s(),
+    phase3_references.s(),
+    phase4_wave1_chunks.s(),  # Returns chord (auto-waits)
+    phase4_wave2_chunks.s(),  # Returns chord (auto-waits)
+    phase5_stitch.s(),
+    phase6_music.s()
+).apply_async()
+```
 
 **Files to Review:**
-- `backend/app/phases/phase2_storyboard/image_generation.py` (image downloads)
-- `backend/app/phases/phase4_chunks_storyboard/service.py` (video chunk downloads)
-- `backend/app/phases/phase5_refine/service.py` (audio/video downloads)
-- `backend/app/services/replicate.py` (download implementation)
-- `backend/app/services/s3.py` (S3 upload implementation)
+- `backend/app/phases/phase4_chunks_storyboard/task.py` (main chunk generation logic)
+- `backend/app/orchestrator/pipeline.py` (orchestrator with chain pattern)
+- `backend/app/orchestrator/celery_app.py` (Celery configuration)
 
-### Task 9.1: Investigate Current Download Implementation
+### Task 9.1: Investigate Current Phase 4 Implementation
 
-**Files:** `backend/app/services/replicate.py`, Phase 2/4/5 service files
+**File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
 
-- [ ] Review how Replicate API responses are downloaded
-- [ ] Identify where file bytes are loaded into memory
-- [ ] Check if files are buffered entirely before processing
-- [ ] Document current memory usage pattern for each phase
-- [ ] Review S3 upload implementation
-- [ ] Identify opportunities for streaming
+- [ ] Review current sequential chunk generation loop
+- [ ] Identify how reference images are used vs last frames
+- [ ] Understand chunk dependency structure in spec
+- [ ] Document how beats are marked with `reference_image` field
+- [ ] Trace how last frames are extracted and passed to next chunk
+- [ ] Confirm chunks are saved to DB with proper ordering
 
-### Task 9.2: Implement Streaming Downloads for Phase 2 (Images)
+### Task 9.2: Design Two-Wave Chord Pattern
 
-**File:** `backend/app/phases/phase2_storyboard/image_generation.py`
+**Files:** `backend/app/phases/phase4_chunks_storyboard/task.py`, `backend/app/orchestrator/pipeline.py`
 
-- [ ] Update image download to use `requests.get(stream=True)`
-- [ ] Use `iter_content(chunk_size=8192)` to download in chunks
-- [ ] Stream to BytesIO buffer or directly to S3
-- [ ] Update S3 upload to use `upload_fileobj()` with file-like objects
-- [ ] Remove intermediate file buffering
-- [ ] Test with large images
+- [ ] Design Wave 1 chord: parallel chunks with reference images
+- [ ] Design Wave 2 chord: parallel chunks using last frames
+- [ ] Plan data flow: Wave 1 results → extract last frames → Wave 2 input
+- [ ] Design chord callback structure for each wave
+- [ ] Map how to identify which beats belong to which wave
+- [ ] Plan error handling for partial failures in each wave
+- [ ] Design progress tracking for two-wave execution
 
-### Task 9.3: Implement Streaming Downloads for Phase 4 (Video Chunks)
+**Key Questions:**
+- [ ] How to filter beats by `reference_image` presence?
+- [ ] How to map dependent beats to their predecessor's last frame?
+- [ ] How to merge Wave 1 and Wave 2 results in correct order?
 
-**File:** `backend/app/phases/phase4_chunks_storyboard/service.py`
+### Task 9.3: Create Individual Chunk Generation Tasks
 
-- [ ] Update video chunk download to use `requests.get(stream=True)`
-- [ ] Use `iter_content(chunk_size=8192)` to download in chunks
-- [ ] Stream to temporary file or directly to S3
-- [ ] Use `upload_fileobj()` for S3 uploads
-- [ ] Enable multipart uploads for large video files
-- [ ] Remove intermediate memory buffering
-- [ ] Test with large video chunks
+**File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
 
-### Task 9.4: Implement Streaming Downloads for Phase 5 (Audio/Video)
+- [ ] Create `generate_chunk_with_reference` task (for Wave 1)
+  - Input: beat dict, video_id
+  - Extract reference_image from beat
+  - Call video generation API with reference
+  - Save chunk to DB with beat_index
+  - Return chunk metadata (id, url, beat_index, last_frame_path)
 
-**File:** `backend/app/phases/phase5_refine/service.py`
+- [ ] Create `generate_chunk_with_last_frame` task (for Wave 2)
+  - Input: beat dict, video_id, previous_chunk_id
+  - Fetch last frame from previous chunk
+  - Call video generation API with last frame
+  - Save chunk to DB with beat_index
+  - Return chunk metadata (id, url, beat_index, last_frame_path)
 
-- [ ] Update audio download to use `requests.get(stream=True)`
-- [ ] Update video download to use `requests.get(stream=True)`
-- [ ] Use `iter_content(chunk_size=8192)` for all downloads
-- [ ] Stream to temporary files or directly to S3
-- [ ] Use `upload_fileobj()` for S3 uploads
-- [ ] Remove intermediate memory buffering
-- [ ] Test with large audio/video files
+- [ ] Ensure both tasks are idempotent (can retry safely)
+- [ ] Add proper error handling and logging
+- [ ] Extract last frame after generation for next wave
 
-### Task 9.5: Update S3 Service for Streaming
+### Task 9.4: Create Wave 1 Chord (Reference-Based Chunks)
 
-**File:** `backend/app/services/s3.py`
+**File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
 
-- [ ] Ensure `upload_fileobj()` method exists and works correctly
-- [ ] Support file-like objects (BytesIO, file handles)
-- [ ] Enable multipart uploads for large files
-- [ ] Add proper content-type handling
-- [ ] Test with various file sizes
+- [ ] Create `phase4_wave1_chunks` task
+  - Input: phase3_result (contains beats and storyboard data)
+  - Filter beats with `reference_image` field
+  - Build chord with `generate_chunk_with_reference` for each beat
+  - Attach `phase4_wave1_complete` callback
+  - Return chord AsyncResult (Celery auto-waits)
 
-### Task 9.6: Testing and Verification
+- [ ] Create `phase4_wave1_complete` callback task
+  - Input: list of chunk results, phase3_result
+  - Merge results with phase3_result
+  - Return updated result dict with wave1_chunks
+  - Log completion and chunk count
 
-- [ ] Test Phase 2 with multiple large images
-- [ ] Test Phase 4 with multiple large video chunks
-- [ ] Test Phase 5 with large audio/video files
-- [ ] Monitor memory usage during downloads (should be constant, not growing)
-- [ ] Verify streaming reduces memory footprint significantly
-- [ ] Test with slow network to verify streaming works
-- [ ] Test error handling for partial downloads
-- [ ] Verify all files are correctly uploaded to S3
+### Task 9.5: Create Wave 2 Chord (Last-Frame-Based Chunks)
+
+**File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
+
+- [ ] Create `phase4_wave2_chunks` task
+  - Input: phase4_wave1_result (contains wave1 chunks)
+  - Filter beats without `reference_image` field
+  - Map each dependent beat to its predecessor chunk (by beat_index - 1)
+  - Build chord with `generate_chunk_with_last_frame` for each beat
+  - Attach `phase4_wave2_complete` callback
+  - Return chord AsyncResult
+
+- [ ] Create `phase4_wave2_complete` callback task
+  - Input: list of chunk results, phase4_wave1_result
+  - Merge Wave 1 and Wave 2 results in correct beat order
+  - Return complete phase4_result with all chunks
+  - Log completion and total chunk count
+
+### Task 9.6: Update Orchestrator Chain
+
+**File:** `backend/app/orchestrator/pipeline.py`
+
+- [ ] Update `run_pipeline` to use two-wave Phase 4:
+  ```python
+  workflow = chain(
+      phase1_planning.s(...),
+      phase2_storyboards.s(),
+      phase3_references.s(),
+      phase4_wave1_chunks.s(),  # Returns chord (auto-waits)
+      phase4_wave2_chunks.s(),  # Returns chord (auto-waits)
+      phase5_stitch.s(),
+      phase6_music.s()
+  ).apply_async()
+  ```
+- [ ] Remove old blocking `phase4_chunks` task
+- [ ] Update progress tracking to account for two waves
+- [ ] Test chain execution flows correctly
+
+### Task 9.7: Handle Edge Cases
+
+**File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
+
+- [ ] Handle case where all beats have reference images (Wave 2 is empty)
+  - Wave 2 chord should be skipped or return empty list gracefully
+  
+- [ ] Handle case where no beats have reference images (Wave 1 is empty)
+  - This shouldn't happen (first beat should always have reference)
+  - Add validation and error if this occurs
+
+- [ ] Handle case with single beat (no parallelization needed)
+  - Still use chord pattern for consistency
+
+- [ ] Ensure beat_index ordering is preserved in final results
+  - Sort chunks by beat_index before returning
+
+### Task 9.8: Update Progress Tracking
+
+**Files:** `backend/app/orchestrator/progress.py`, chunk generation tasks
+
+- [ ] Update progress for Wave 1 start
+- [ ] Update progress for each Wave 1 chunk completion
+- [ ] Update progress for Wave 1 completion
+- [ ] Update progress for Wave 2 start
+- [ ] Update progress for each Wave 2 chunk completion
+- [ ] Update progress for Wave 2 completion
+- [ ] Calculate progress percentage accounting for two waves
+
+### Task 9.9: Testing and Verification
+
+- [ ] Test with 2 beats (1 reference, 1 last-frame): should run sequentially as 2 waves
+- [ ] Test with 4 beats (2 reference, 2 last-frame): Wave 1 runs 2 parallel, Wave 2 runs 2 parallel
+- [ ] Test with 6 beats (3 reference, 3 last-frame): Wave 1 runs 3 parallel, Wave 2 runs 3 parallel
+- [ ] Test with all reference images: Wave 2 should handle empty case gracefully
+- [ ] Verify chunks are saved to DB in correct beat_index order
+- [ ] Verify last frames are correctly extracted and passed to Wave 2
+- [ ] Test error handling: if 1 chunk in Wave 1 fails, how does Wave 2 handle missing last frame?
+- [ ] Verify progress tracking shows both waves correctly
+- [ ] Test with concurrent video generations to verify true parallelization
+
+**Key Implementation Notes:**
+1. **No `.get()` calls** - return chord AsyncResults, let Celery handle waiting
+2. **Wave dependencies** - Wave 2 task receives Wave 1 results via chain
+3. **Beat ordering** - preserve beat_index throughout both waves
+4. **Last frame extraction** - must happen in Wave 1 before Wave 2 starts
+5. **Error isolation** - failure in one chord doesn't block others (within same wave)
 
 ---
-
