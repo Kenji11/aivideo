@@ -5,9 +5,13 @@ from app.common.models import VideoGeneration, VideoStatus, Asset
 from app.common.auth import get_current_user
 from app.database import get_db
 from app.orchestrator.pipeline import run_pipeline
+from app.services.redis import RedisClient
 import uuid
 
 router = APIRouter()
+
+# Initialize Redis client
+redis_client = RedisClient()
 
 @router.post("/api/generate")
 async def generate_video(
@@ -55,6 +59,24 @@ async def generate_video(
     db.add(video_record)
     db.commit()
     db.refresh(video_record)
+    
+    # CRITICAL POINT 1: Write to Redis immediately after DB creation
+    if redis_client._client:
+        try:
+            redis_client.set_video_progress(video_id, 0.0)
+            redis_client.set_video_status(video_id, VideoStatus.QUEUED.value)
+            redis_client.set_video_phase(video_id, None)  # No phase yet
+            redis_client.set_video_user_id(video_id, user_id)  # Store user_id for access checks
+            redis_client.set_video_metadata(video_id, {
+                "title": video_record.title,
+                "prompt": video_record.prompt,
+                "description": video_record.description,
+                "total_cost": 0.0,
+            })
+            print(f"✅ Initialized video {video_id} in Redis")
+        except Exception as e:
+            print(f"⚠️  Failed to initialize Redis for video {video_id}: {e}")
+            # Continue anyway - Redis is optional, DB write succeeded
     
     # Enqueue job
     try:
