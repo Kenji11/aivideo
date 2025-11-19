@@ -192,7 +192,12 @@ export function VideoStatus() {
     if (status.status === 'complete') {
       console.log('[VideoStatus] Video generation complete, navigating to preview');
       setIsProcessing(false);
-      navigate('/preview');
+      if (videoId) {
+        navigate(`/preview/${videoId}`);
+      } else {
+        console.error('[VideoStatus] No videoId available, cannot navigate to preview');
+        navigate('/projects');
+      }
     } else if (status.status === 'failed') {
       console.error('[VideoStatus] Video generation failed:', status.error);
       setIsProcessing(false);

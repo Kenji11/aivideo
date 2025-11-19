@@ -271,6 +271,13 @@ export async function listVideos(): Promise<VideoListResponse> {
 }
 
 /**
+ * Get video details
+ */
+export async function getVideo(videoId: string): Promise<VideoResponse> {
+  return api.getVideo(videoId);
+}
+
+/**
  * Delete a video
  */
 export async function deleteVideo(videoId: string): Promise<void> {
