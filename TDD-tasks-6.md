@@ -26,13 +26,13 @@
 
 **File:** `backend/app/services/s3.py`
 
-- [ ] Add `delete_file(self, key: str) -> bool` method
+- [x] Add `delete_file(self, key: str) -> bool` method
   - Delete single file from S3
   - Handle S3 URL format (`s3://bucket/key`) and key format
   - Return True on success, False on failure
   - Log deletion attempts and results
 
-- [ ] Add `delete_directory(self, prefix: str) -> bool` method
+- [x] Add `delete_directory(self, prefix: str) -> bool` method
   - Delete all files with given prefix (e.g., `user_id/videos/video_id/`)
   - Use `list_files()` to get all files with prefix
   - Delete each file using `delete_file()`
@@ -44,13 +44,13 @@
 
 **File:** `backend/app/api/video.py`
 
-- [ ] Add `DELETE /api/video/{video_id}` endpoint
+- [x] Add `DELETE /api/video/{video_id}` endpoint
   - Use `Depends(get_current_user)` for authentication
   - Verify video belongs to authenticated user
   - Return 404 if video not found
   - Return 403 if user doesn't own video
 
-- [ ] Implement deletion sequence:
+- [x] Implement deletion sequence:
   1. Get video record from database
   2. Extract S3 prefix from video (use `get_video_s3_prefix(user_id, video_id)`)
   3. Delete all S3 files with that prefix using `s3_client.delete_directory()`
@@ -58,13 +58,13 @@
   5. Delete Redis cache entries using `redis_client.delete_video_data(video_id)`
   6. Return success response
 
-- [ ] Error handling:
+- [x] Error handling:
   - If S3 deletion fails: Log error but continue (don't fail entire operation)
   - If DB deletion fails: Rollback and return 500 error
   - If cache deletion fails: Log warning but don't fail (cache will expire)
   - Log each step for debugging
 
-- [ ] Return response:
+- [x] Return response:
   - `200 OK` with message: `{"message": "Video deleted successfully"}`
   - Include video_id in response for confirmation
 
@@ -72,7 +72,7 @@
 
 **File:** `frontend/src/lib/api.ts`
 
-- [ ] Add `deleteVideo(videoId: string): Promise<void>` function
+- [x] Add `deleteVideo(videoId: string): Promise<void>` function
   - Call `DELETE /api/video/{videoId}`
   - Handle errors (404, 403, 500)
   - Throw error with message for UI to display
@@ -82,7 +82,7 @@
 
 **File:** `frontend/src/App.tsx` (or appropriate component showing video list)
 
-- [ ] Add delete button to video/project card
+- [x] Add delete button to video/project card
   - Show delete button (trash icon) on hover or always visible
   - Add confirmation dialog before deletion
   - Call `deleteVideo()` API function
@@ -90,33 +90,33 @@
   - Remove video from local state after successful deletion
   - Show error message if deletion fails
 
-- [ ] Update video list after deletion:
+- [x] Update video list after deletion:
   - Remove deleted video from `projects` state
   - Or refresh video list from API
   - Show success toast/notification
 
 ### Task 1.5: Testing
 
-- [ ] Test S3 file deletion:
+- [x] Test S3 file deletion:
   - Create test video with files in S3
   - Verify all files are deleted (storyboard, chunks, stitched, final)
   - Verify S3 prefix structure is correct
 
-- [ ] Test database deletion:
+- [x] Test database deletion:
   - Verify video record is removed from database
   - Verify foreign key constraints are handled (if any)
 
-- [ ] Test cache deletion:
+- [x] Test cache deletion:
   - Verify Redis keys are removed
   - Verify status endpoint returns 404 after deletion
 
-- [ ] Test error cases:
+- [x] Test error cases:
   - Video not found (404)
   - User doesn't own video (403)
   - S3 deletion fails (should continue and delete DB)
   - DB deletion fails (should return 500)
 
-- [ ] Test frontend:
+- [x] Test frontend:
   - Delete button appears and works
   - Confirmation dialog appears
   - Video disappears from list after deletion
@@ -142,17 +142,17 @@
 
 **Files:** `backend/app/api/status.py`, `backend/app/services/status_builder.py`
 
-- [ ] Check status endpoint response structure
+- [x] Check status endpoint response structure
   - Verify `animatic_urls` field is included in response
   - Check if field name matches frontend expectation (`animaticUrls` vs `animatic_urls`)
   - Verify images are extracted from spec or phase_outputs
 
-- [ ] Check how storyboard images are stored:
+- [x] Check how storyboard images are stored:
   - Phase 2 stores images in `spec['beats'][i]['image_url']`
   - Check if status builder extracts these URLs correctly
   - Verify S3 URLs are converted to presigned URLs
 
-- [ ] Check status builder logic:
+- [x] Check status builder logic:
   - Review `build_status_response_from_redis_video_data()` function
   - Review `build_status_response_from_db()` function
   - Verify both functions extract `animatic_urls` from spec/phase_outputs
@@ -161,18 +161,18 @@
 
 **File:** `backend/app/services/status_builder.py`
 
-- [ ] Extract animatic URLs from spec:
+- [x] Extract animatic URLs from spec:
   - Get `spec['beats']` array
   - Extract `image_url` from each beat
   - Convert S3 URLs to presigned URLs if needed
   - Return as `animatic_urls` array in status response
 
-- [ ] Handle both Redis and DB sources:
+- [x] Handle both Redis and DB sources:
   - If data from Redis: Extract from `spec` field in Redis data
   - If data from DB: Extract from `video.spec` field
   - Ensure both paths return animatic URLs
 
-- [ ] Verify field name matches frontend:
+- [x] Verify field name matches frontend:
   - Frontend expects `animaticUrls` (camelCase)
   - Backend should return `animatic_urls` (snake_case)
   - Check if frontend converts or if backend should return camelCase
@@ -181,35 +181,35 @@
 
 **File:** `frontend/src/pages/VideoStatus.tsx`
 
-- [ ] Check how `animaticUrls` state is populated:
+- [x] Check how `animaticUrls` state is populated:
   - Verify `fetchStatus()` extracts `animaticUrls` from response
   - Check if field name matches (`animaticUrls` vs `animatic_urls`)
   - Verify state is updated when status response received
 
-- [ ] Check display logic:
+- [x] Check display logic:
   - Verify `animaticUrls && animaticUrls.length > 0` condition
   - Check if images render correctly when URLs are present
   - Verify image error handling (onError handler)
 
-- [ ] Add logging for debugging:
+- [x] Add logging for debugging:
   - Log status response to console
   - Log `animaticUrls` state value
   - Log when images should be displayed
 
 ### Task 2.4: Testing
 
-- [ ] Test during video generation:
+- [x] Test during video generation:
   - Start video generation
   - Check status endpoint response includes `animatic_urls`
   - Verify frontend displays images immediately after Phase 2 completes
   - Verify images remain visible during Phase 3 and Phase 4
 
-- [ ] Test with different video durations:
+- [x] Test with different video durations:
   - Short video (10s, 2-3 beats)
   - Medium video (30s, 5-6 beats)
   - Verify correct number of images displayed
 
-- [ ] Test image URLs:
+- [x] Test image URLs:
   - Verify presigned URLs are valid
   - Verify images load correctly
   - Test error handling for broken URLs
