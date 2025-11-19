@@ -183,9 +183,9 @@ def orchestrate_video(video_id):
 
 ---
 
-## PR #9: Parallel Chunk Generation with Pipelined Chains
+## PR #9: Parallel Chunk Generation with LangChain RunnableParallel
 
-**Goal:** Enable parallel chunk generation with streaming execution - continuous chunks start immediately when their reference image chunk completes
+**Goal:** Enable parallel chunk generation using LangChain's RunnableParallel for I/O-bound Replicate API calls, while keeping Celery for overall pipeline orchestration
 
 **TERMINOLOGY (Code-First Approach):**
 - **Reference Image Chunk**: Chunk that starts a beat, uses storyboard image from Phase 2 (`beat['image_url']`)
@@ -196,14 +196,21 @@ def orchestrate_video(video_id):
 
 **SCOPE LIMITATIONS:**
 - Beats can span 1 or 2 chunks only (5s or 10s beats with 5s chunks)
-- No 15s+ beats in this PR (would need 3+ chunk chains)
-- Pairs only: `chain(ref_image, continuous)` - max 2 tasks per chain
+- No 15s+ beats in this PR (would need 3+ chunk parallelization)
+- Two-phase execution: Reference chunks first (parallel), then continuous chunks (parallel)
+
+**TECHNOLOGY STACK:**
+- **LangChain RunnableParallel**: For parallel chunk generation (I/O-bound, thread-safe)
+- **Celery**: Still used for overall pipeline (Phases 1-6), NOT for chunk parallelism
+- **Threads/Async**: LangChain uses threads/async under the hood for I/O-bound API calls
 
 **NEW FUNCTIONS (Added to `task.py`):**
-- `generate_chunk_reference_image()` - Celery task for reference image chunks
-- `generate_chunk_continuous()` - Celery task for continuous chunks
-- `generate_chunks_parallel()` - Main orchestrator function (replaces sequential service)
-- `finalize_chunks()` - Celery task callback to collect chain results
+- `generate_chunk_reference_image()` - Helper function for reference image chunks
+- `generate_chunk_continuous()` - Helper function for continuous chunks
+- `generate_chunks_parallel()` - Main orchestrator using LangChain RunnableParallel
+
+**NEW DEPENDENCY:**
+- `langchain-core` - For RunnableParallel (lightweight, no full LangChain needed)
 
 **NO NEW FILES** - All changes in existing files
 
@@ -214,50 +221,57 @@ def orchestrate_video(video_id):
 - Current sequential approach wastes time: Chunk 3 waits for Chunk 1 to complete even though they're independent
 
 **The Solution:**
-- Use **pipelined chains** - each chunk pair (reference_image → continuous) runs as independent chain
-- All chains run in parallel via `chord`
-- Continuous chunks start immediately when their reference chunk finishes (no waiting for unrelated chunks)
-- Main orchestrator (`generate_chunks_parallel()`) dynamically builds chains based on `beat_to_chunk_map`
+- Use **LangChain RunnableParallel** for two-phase parallel execution:
+  1. **Phase 1**: Run all reference image chunks in parallel (independent, can all start together)
+  2. **Phase 2**: Run all continuous chunks in parallel (each uses last_frame from its reference chunk)
+- No complex Celery chain logic - simple parallel execution within single Celery task
+- LangChain handles threading/async for I/O-bound Replicate API calls
+- Main orchestrator (`generate_chunks_parallel()`) builds RunnableParallel dynamically based on `beat_to_chunk_map`
 
 **Benefits:**
-- **Maximum parallelism**: All reference image chunks start together, continuous chunks start immediately when ready
-- **Streaming execution**: No waiting for unrelated chunks - work flows continuously
-- **Faster completion**: Continuous chunks don't wait for unrelated reference chunks
-- **Non-blocking**: Main task waits on chord (blocks on chord.get(), but all chunk work happens in parallel)
-- **Simpler mental model**: Each pair is independent
+- **Maximum parallelism**: All reference image chunks start together, all continuous chunks start together after Phase 1
+- **Simpler than Celery chains**: No chain/chord complexity, just parallel function calls
+- **Thread-safe for I/O**: LangChain uses threads/async for I/O-bound operations (Replicate API calls)
+- **Faster completion**: Parallel execution reduces total time significantly
+- **Keep Celery for pipeline**: Still use Celery for Phases 1-6 orchestration, only use LangChain for chunk parallelism
+- **No extra infrastructure**: Runs in same process/worker, no additional workers needed
 
 **Execution Pattern Example:**
 ```
 4 chunks from 2 beats: [Beat 0: 10s, Beat 1: 10s] with 5s chunks
 Chunks: [0-ref, 1-cont, 2-ref, 3-cont]
 
-Chains (all run in parallel):
-- Chain A: Chunk 0 (ref image, Beat 0) → Chunk 1 (continuous, Beat 0)
-- Chain B: Chunk 2 (ref image, Beat 1) → Chunk 3 (continuous, Beat 1)
+Two-Phase Parallel Execution:
+- Phase 1 (Parallel): Chunk 0 (ref image) || Chunk 2 (ref image)
+- Phase 2 (Parallel): Chunk 1 (continuous, uses Chunk 0's last_frame) || Chunk 3 (continuous, uses Chunk 2's last_frame)
 
 Timeline:
-0s:  [Chunk 0] [Chunk 2]  ← Both reference image chunks start in parallel
-5s:  [✓ Chunk 0 done → Chunk 1 starts] [Chunk 2]
-7s:  [Chunk 1] [✓ Chunk 2 done → Chunk 3 starts]  ← Chunk 3 starts even though Chunk 1 still running
-10s: [✓ Chunk 1 done] [Chunk 3]
-12s: [✓ Chunk 3 done]
+0s:  [Chunk 0] [Chunk 2]  ← Phase 1: Both reference image chunks start in parallel (RunnableParallel)
+5s:  [✓ Chunk 0 done] [✓ Chunk 2 done]  ← Both complete, extract last frames
+5s:  [Chunk 1] [Chunk 3]  ← Phase 2: Both continuous chunks start in parallel (RunnableParallel)
+10s: [✓ Chunk 1 done] [✓ Chunk 3 done]  ← All chunks complete
 
 Sequential would be: Chunk 0 → Chunk 1 → Chunk 2 → Chunk 3 (15s+)
-Parallel is: (Chunk 0 → Chunk 1) || (Chunk 2 → Chunk 3) (~12s, 20% faster)
+Parallel is: (Chunk 0 || Chunk 2) → (Chunk 1 || Chunk 3) (~10s, 33% faster)
 ```
 
-**Pipelined Chain Pattern Example (Updated Terminology):**
+**LangChain RunnableParallel Pattern Example:**
 ```python
-from celery import chain, chord
+from langchain_core.runnables import RunnableParallel
+from app.phases.phase4_chunks_storyboard.chunk_generator import (
+    generate_single_chunk_with_storyboard,
+    generate_single_chunk_continuous
+)
+from app.phases.phase4_chunks_storyboard.schemas import ChunkSpec
 
-# Individual chunk generation tasks (in task.py)
-@celery_app.task
-def generate_chunk_reference_image(chunk_spec_dict):
+# Helper functions (in task.py)
+def generate_chunk_reference_image(chunk_spec: ChunkSpec, beat_to_chunk_map: dict) -> dict:
     """Generate chunk using storyboard image from Phase 2."""
-    chunk_spec = ChunkSpec(**chunk_spec_dict)
-    
-    # Use storyboard image from beat['image_url']
-    chunk_result = generate_single_chunk_with_storyboard.apply([chunk_spec_dict, beat_to_chunk_map])
+    # Call existing generator function (synchronous, will be called in parallel)
+    chunk_result = generate_single_chunk_with_storyboard(
+        chunk_spec.dict(),
+        beat_to_chunk_map
+    )
     
     return {
         'chunk_url': chunk_result['chunk_url'],
@@ -266,97 +280,134 @@ def generate_chunk_reference_image(chunk_spec_dict):
         'cost': chunk_result['cost']
     }
 
-@celery_app.task
-def generate_chunk_continuous(prev_result, chunk_spec_dict):
-    """Generate chunk using last frame from previous chunk (receives prev result via chain)."""
-    chunk_spec = ChunkSpec(**chunk_spec_dict)
+def generate_chunk_continuous(chunk_spec: ChunkSpec, ref_result: dict) -> dict:
+    """Generate chunk using last frame from reference chunk."""
+    # Update chunk spec with last frame from reference chunk
+    chunk_spec.previous_chunk_last_frame = ref_result['last_frame_url']
     
-    # Update chunk spec with last frame from previous chunk
-    chunk_spec.previous_chunk_last_frame = prev_result['last_frame_url']
-    
-    # Generate continuous chunk
+    # Call existing generator function (synchronous, will be called in parallel)
     result = generate_single_chunk_continuous(chunk_spec)
     
-    # CRITICAL: Return list containing BOTH chunks (chains only return last task's result)
-    return [
-        prev_result,  # Reference image chunk (from chain input)
-        {
-            'chunk_url': result['chunk_url'],
-            'chunk_num': chunk_spec.chunk_num,
-            'cost': result['cost']
-        }
-    ]
+    return {
+        'chunk_url': result['chunk_url'],
+        'chunk_num': chunk_spec.chunk_num,
+        'cost': result['cost']
+    }
 
 # Phase 4 parallel orchestrator (in task.py)
-def generate_chunks_parallel(video_id, spec, reference_urls, user_id):
-    """Build pipelined chains - each chunk pair runs independently."""
+def generate_chunks_parallel(video_id: str, spec: dict, reference_urls: dict, user_id: str) -> dict:
+    """Generate chunks in parallel using LangChain RunnableParallel."""
+    from app.phases.phase4_chunks_storyboard.chunk_generator import build_chunk_specs_with_storyboard
+    
     # Build chunk specs and beat_to_chunk_map
     chunk_specs, beat_to_chunk_map = build_chunk_specs_with_storyboard(
         video_id, spec, reference_urls, user_id
     )
     
-    chains = []
-    i = 0
+    # Separate reference and continuous chunks
+    ref_chunks = []  # List of (chunk_spec, chunk_num) tuples
+    cont_chunks = []  # List of (chunk_spec, ref_chunk_num) tuples
     
-    while i < len(chunk_specs):
-        # Check if this chunk starts a beat (has storyboard image)
+    for i, chunk_spec in enumerate(chunk_specs):
         if i in beat_to_chunk_map:
-            # Reference image chunk - start chain
-            chain_tasks = [generate_chunk_reference_image.s(chunk_specs[i].dict())]
-            
-            # Check if next chunk continues same beat (no storyboard)
-            if i + 1 < len(chunk_specs) and (i + 1) not in beat_to_chunk_map:
-                # Continuous chunk - add to chain
-                chain_tasks.append(generate_chunk_continuous.s(chunk_specs[i + 1].dict()))
-                i += 2  # Skip next chunk
-            else:
-                i += 1  # Single-chunk beat
-            
-            chains.append(chain(*chain_tasks))
+            # Reference image chunk
+            ref_chunks.append((chunk_spec, i))
         else:
-            raise PhaseException(f"Chunk {i} is orphaned (no storyboard and not paired)")
+            # Continuous chunk - find its reference chunk (previous chunk in same beat)
+            # Find the reference chunk that this continuous chunk belongs to
+            ref_chunk_num = None
+            for j in range(i - 1, -1, -1):
+                if j in beat_to_chunk_map:
+                    ref_chunk_num = j
+                    break
+            
+            if ref_chunk_num is None:
+                raise PhaseException(f"Chunk {i} is orphaned (no reference chunk found)")
+            
+            cont_chunks.append((chunk_spec, ref_chunk_num))
     
-    # All chains run in parallel, finalize collects results
-    chord_result = chord(chains)(finalize_chunks.s(video_id, spec)).apply_async()
+    # Phase 1: Generate all reference image chunks in parallel
+    if ref_chunks:
+        # Build RunnableParallel dict with proper closure capture
+        ref_parallel_dict = {}
+        for chunk_spec, chunk_num in ref_chunks:
+            # Create closure to capture chunk_spec and chunk_num
+            def make_ref_generator(cs, cn):
+                return lambda x: generate_chunk_reference_image(cs, beat_to_chunk_map)
+            
+            ref_parallel_dict[f'chunk_{chunk_num}'] = make_ref_generator(chunk_spec, chunk_num)
+        
+        ref_parallel = RunnableParallel(ref_parallel_dict)
+        
+        # Invoke parallel execution (blocks until all complete)
+        ref_results = ref_parallel.invoke({})
+        
+        # Convert results to dict keyed by chunk_num
+        ref_results_by_num = {}
+        for key, result in ref_results.items():
+            chunk_num = int(key.split('_')[1])
+            ref_results_by_num[chunk_num] = result
+    else:
+        ref_results_by_num = {}
     
-    # Wait for all chains to complete
-    final_result = chord_result.get()
+    # Phase 2: Generate all continuous chunks in parallel
+    if cont_chunks:
+        # Build RunnableParallel dict with proper closure capture
+        cont_parallel_dict = {}
+        for chunk_spec, ref_chunk_num in cont_chunks:
+            # Create closure to capture chunk_spec and ref_chunk_num
+            def make_cont_generator(cs, ref_num):
+                return lambda x: generate_chunk_continuous(cs, ref_results_by_num[ref_num])
+            
+            cont_parallel_dict[f'chunk_{chunk_spec.chunk_num}'] = make_cont_generator(chunk_spec, ref_chunk_num)
+        
+        cont_parallel = RunnableParallel(cont_parallel_dict)
+        
+        # Invoke parallel execution (blocks until all complete)
+        cont_results = cont_parallel.invoke({})
+        
+        # Convert results to dict keyed by chunk_num
+        cont_results_by_num = {}
+        for key, result in cont_results.items():
+            chunk_num = int(key.split('_')[1])
+            cont_results_by_num[chunk_num] = result
+    else:
+        cont_results_by_num = {}
     
-    return final_result
-
-@celery_app.task
-def finalize_chunks(chain_results, video_id, spec):
-    """Collect and merge chunk results from all parallel chains."""
+    # Merge and sort all chunks by chunk_num
     all_chunks = []
-    total_cost = 0.0
-    
-    for result in chain_results:
-        # Single-chunk chain returns dict, pair chain returns list [ref, cont]
-        if isinstance(result, list):
-            for chunk in result:
-                all_chunks.append(chunk)
-                total_cost += chunk['cost']
-        else:
-            all_chunks.append(result)
-            total_cost += result['cost']
-    
-    # Sort by chunk_num to maintain order
+    all_chunks.extend(ref_results_by_num.values())
+    all_chunks.extend(cont_results_by_num.values())
     all_chunks.sort(key=lambda x: x['chunk_num'])
     
+    # Extract URLs and calculate total cost
     chunk_urls = [chunk['chunk_url'] for chunk in all_chunks]
+    total_cost = sum(chunk['cost'] for chunk in all_chunks)
     
-    return {'chunk_urls': chunk_urls, 'total_cost': total_cost}
+    return {
+        'chunk_urls': chunk_urls,
+        'total_cost': total_cost
+    }
 
 # Main Phase 4 task (in task.py) - NO CHANGE to external interface
-@celery_app.task
-def generate_chunks(self, phase3_output, user_id, model):
-    # ... validation ...
+@celery_app.task(bind=True, name="app.phases.phase4_chunks_storyboard.task.generate_chunks")
+def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict:
+    # ... validation (same as before) ...
     
-    # NEW: Call parallel generation
-    chunk_results = generate_chunks_parallel(video_id, spec, reference_urls, user_id)
-    
-    # Rest stays the same (stitching, DB updates, etc.)
-    # ...
+    try:
+        # Update progress
+        update_progress(video_id, "generating_chunks", 50, current_phase="phase4_chunks")
+        
+        # NEW: Call parallel generation using LangChain
+        chunk_results = generate_chunks_parallel(
+            video_id=video_id,
+            spec=spec,
+            reference_urls=reference_urls,
+            user_id=user_id
+        )
+        
+        # Rest stays the same (stitching, DB updates, etc.)
+        # ...
 ```
 
 **Files to Review:**
@@ -391,9 +442,9 @@ def generate_chunks(self, phase3_output, user_id, model):
   - Location: `service.py` lines 156-221 (sequential for loop with `.apply()` calls)
   - Each chunk waits for previous to complete before starting next
 
-### Task 9.2: Design Pipelined Chain Pattern
+### Task 9.2: Design LangChain RunnableParallel Pattern
 
-**Files:** `backend/app/phases/phase4_chunks_storyboard/task.py`, `backend/app/orchestrator/pipeline.py`
+**Files:** `backend/app/phases/phase4_chunks_storyboard/task.py`
 
 **Terminology Cleanup Required:**
 - [ ] Rename terms in code comments/docstrings for consistency:
@@ -403,250 +454,216 @@ def generate_chunks(self, phase3_output, user_id, model):
   - Clarify: Continuous = uses last frame from previous chunk in same beat
 
 **Design Tasks:**
-- [ ] Design chunk pair identification logic using `beat_to_chunk_map`
+- [ ] Design two-phase parallel execution:
+  - **Phase 1**: Separate reference image chunks from continuous chunks using `beat_to_chunk_map`
+  - **Phase 2**: After Phase 1 completes, run continuous chunks in parallel (each uses its reference chunk's last_frame)
+- [ ] Design chunk separation logic:
   - Iterate through chunks, check if chunk is in `beat_to_chunk_map` (starts beat)
-  - If next chunk is NOT in map, it's a continuous chunk (forms a pair)
-  - Build chains dynamically: `chain(ref_image_chunk, continuous_chunk)` for pairs
-- [ ] Design chain structure for chunk pairs:
+  - Reference chunks: All chunks where `i in beat_to_chunk_map`
+  - Continuous chunks: All chunks where `i not in beat_to_chunk_map` (find their reference chunk by looking backwards)
+- [ ] Design RunnableParallel structure for Phase 1:
   ```python
-  # For beat spanning 2 chunks (e.g., 10s beat with 5s chunks):
-  chain(
-      generate_chunk_reference_image.s(chunk_spec_0),  # Uses beat['image_url']
-      generate_chunk_continuous.s(chunk_spec_1)         # Receives last_frame_url from previous
-  )
+  ref_parallel = RunnableParallel({
+      f'chunk_{chunk_num}': lambda x: generate_chunk_reference_image(chunk_spec, beat_to_chunk_map)
+      for chunk_spec, chunk_num in ref_chunks
+  })
+  ref_results = ref_parallel.invoke({})  # Blocks until all complete
   ```
-- [ ] Plan data flow between chain tasks:
-  - Reference image task returns: `{'chunk_url': ..., 'last_frame_url': ..., 'chunk_num': ...}`
-  - Continuous task receives this dict as first parameter via chain
-  - Continuous task extracts `last_frame_url` and uses it for generation
-- [ ] Design chord-of-chains structure for parallel execution:
+- [ ] Design RunnableParallel structure for Phase 2:
   ```python
-  chord(
-      [chain1, chain2, chain3, ...]  # All chains run in parallel
-  )(finalize_chunks.s())              # Callback collects results
+  cont_parallel = RunnableParallel({
+      f'chunk_{chunk_num}': lambda x: generate_chunk_continuous(chunk_spec, ref_results_by_num[ref_chunk_num])
+      for chunk_spec, ref_chunk_num in cont_chunks
+  })
+  cont_results = cont_parallel.invoke({})  # Blocks until all complete
   ```
-- [ ] Plan handling of single-chunk beats (no continuous chunk):
-  - Create single-task chain: `chain(generate_chunk_reference_image.s(chunk_spec))`
-  - Still participates in chord with other chains
+- [ ] Plan data flow between phases:
+  - Phase 1 returns: Dict of `{chunk_num: {'chunk_url': ..., 'last_frame_url': ..., 'cost': ...}}`
+  - Phase 2 uses: `ref_results_by_num[ref_chunk_num]['last_frame_url']` for each continuous chunk
+  - Phase 2 returns: Dict of `{chunk_num: {'chunk_url': ..., 'cost': ...}}`
+- [ ] Plan result merging:
+  - Merge `ref_results_by_num` and `cont_results_by_num` into single list
+  - Sort by `chunk_num` to maintain order
+  - Extract `chunk_urls` and calculate `total_cost`
 - [ ] Plan error handling:
-  - Each chain is isolated - failure in one doesn't block others
-  - Failed chains return error dict: `{'error': 'message', 'chunk_num': ...}`
-  - Finalize callback checks for errors and reports them
-- [ ] Design progress tracking:
-  - Track completion of reference image chunks: X% of total progress
-  - Track completion of continuous chunks: remaining % of total progress
-  - Update progress in each task completion
+  - Wrap each phase in try/except
+  - If Phase 1 fails, Phase 2 cannot proceed (raise PhaseException)
+  - If Phase 2 fails partially, log errors but continue with successful chunks
+  - Return error dicts for failed chunks: `{'error': 'message', 'chunk_num': ...}`
+- [ ] Plan progress tracking:
+  - Phase 1 start: 50% progress
+  - Phase 1 complete: 60% progress
+  - Phase 2 complete: 70% progress
+  - After stitching: 90% progress (existing)
 
 **Key Design Decisions (RESOLVED):**
-- ✅ Iterate through chunks (not beats), use `beat_to_chunk_map` to identify pairs
-- ✅ Pass last frame via chain: first task returns dict with `last_frame_url`, second task receives it
-- ✅ Collect results: finalize callback receives list of results (1 or 2 per chain), flattens and sorts
-- ✅ Preserve ordering: finalize sorts by `chunk_num` before returning
+- ✅ Two-phase execution: Reference chunks first (parallel), then continuous chunks (parallel)
+- ✅ No Celery chains needed - LangChain handles parallelism within single Celery task
+- ✅ Helper functions (not Celery tasks) - called synchronously but executed in parallel by RunnableParallel
+- ✅ Closure capture: Use factory functions to properly capture variables in lambda closures
+- ✅ Preserve ordering: Sort merged results by `chunk_num` before returning
 
-### Task 9.3: Create Individual Chunk Generation Tasks
+### Task 9.3: Create Helper Functions for Chunk Generation
 
 **File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
 
-**Note:** These tasks will wrap existing functions from `chunk_generator.py`:
-- `generate_single_chunk_with_storyboard()` - Already a Celery task, handles reference image chunks
-- `generate_single_chunk_continuous()` - Currently a helper function, needs to be a Celery task
+**Note:** These are helper functions (NOT Celery tasks) that will be called by LangChain RunnableParallel:
+- `generate_single_chunk_with_storyboard()` - Existing Celery task in `chunk_generator.py`, call synchronously
+- `generate_single_chunk_continuous()` - Existing helper function in `chunk_generator.py`, call directly
 
 **Tasks:**
 
-- [ ] Create `generate_chunk_reference_image` task (NEW Celery task in `task.py`)
+- [ ] Create `generate_chunk_reference_image` helper function (NEW in `task.py`)
   - **Purpose**: Generate chunk using storyboard image from Phase 2
-  - **Input**: `chunk_spec` dict (ChunkSpec serialized), `beat_to_chunk_map` dict
+  - **Signature**: `def generate_chunk_reference_image(chunk_spec: ChunkSpec, beat_to_chunk_map: dict) -> dict`
   - **Process**:
-    - Deserialize ChunkSpec
-    - Verify `chunk_spec['style_guide_url']` has storyboard image URL (from `beat['image_url']`)
-    - Call existing `generate_single_chunk_with_storyboard.apply()` from `chunk_generator.py`
-    - Extract last frame from generated chunk (for potential continuous chunk)
-    - Upload last frame to S3
+    - Call existing `generate_single_chunk_with_storyboard()` from `chunk_generator.py`
+    - NOTE: This is a Celery task, but we'll call it synchronously (`.get()` result)
+    - OR: Extract the core logic and call it directly (avoid Celery overhead)
+    - Extract last frame from generated chunk (already done in `generate_single_chunk_with_storyboard`)
+    - Return structured dict with chunk metadata
   - **Return**: `{'chunk_url': str, 'last_frame_url': str, 'chunk_num': int, 'cost': float}`
-  - **Error Handling**: Wrap in try/except, return error dict on failure
+  - **Error Handling**: Wrap in try/except, raise PhaseException on failure (RunnableParallel will catch)
 
-- [ ] Create `generate_chunk_continuous` task (NEW Celery task in `task.py`)
-  - **Purpose**: Generate chunk using last frame from previous chunk
-  - **Input**: `prev_result` dict (from chain - contains `last_frame_url`), `chunk_spec` dict
+- [ ] Create `generate_chunk_continuous` helper function (NEW in `task.py`)
+  - **Purpose**: Generate chunk using last frame from reference chunk
+  - **Signature**: `def generate_chunk_continuous(chunk_spec: ChunkSpec, ref_result: dict) -> dict`
   - **Process**:
-    - Extract `last_frame_url` from `prev_result` (passed by chain)
-    - Update `chunk_spec['previous_chunk_last_frame']` with `last_frame_url`
-    - Call existing `generate_single_chunk_continuous()` from `chunk_generator.py`
-    - NOTE: May need to convert `generate_single_chunk_continuous()` to Celery task OR keep as helper
-  - **Return**: **MUST return list containing BOTH chunks** (see Task 9.5 issue)
-    ```python
-    return [
-        prev_result,  # Reference image chunk result (from chain input)
-        {'chunk_url': str, 'chunk_num': int, 'cost': float}  # This continuous chunk
-    ]
-    ```
-  - **Rationale**: Chains only return last task's result; to preserve reference chunk data, continuous task must include it
-  - **Error Handling**: Wrap in try/except, return error dict on failure
+    - Extract `last_frame_url` from `ref_result` (passed from Phase 1 results)
+    - Update `chunk_spec.previous_chunk_last_frame` with `last_frame_url`
+    - Call existing `generate_single_chunk_continuous()` from `chunk_generator.py` directly
+    - Return structured dict with chunk metadata
+  - **Return**: `{'chunk_url': str, 'chunk_num': int, 'cost': float}` (no last_frame_url needed)
+  - **Error Handling**: Wrap in try/except, raise PhaseException on failure
 
-- [ ] Decide: Should `generate_single_chunk_continuous()` be a separate Celery task?
-  - **Option A**: Make it a Celery task, call it from `generate_chunk_continuous`
-  - **Option B**: Keep it as helper function, call directly from `generate_chunk_continuous`
-  - **Recommendation**: Option B (simpler, less overhead) UNLESS we need retry logic
+- [ ] Handle Celery task synchronization:
+  - `generate_single_chunk_with_storyboard` is a Celery task
+  - Options:
+    1. Call `.apply()` and `.get()` result (synchronous, blocks)
+    2. Extract core logic to separate function (better, avoids Celery overhead)
+  - **Recommendation**: Option 2 - create wrapper that calls core logic directly
+  - If keeping Celery: Use `.apply().get()` to get result synchronously
 
-- [ ] Ensure both tasks are idempotent:
-  - Check if chunk already exists in S3 before generating
-  - Use chunk_num to create unique S3 keys
-  - Safe to retry on failure
+- [ ] Ensure both functions are thread-safe:
+  - No shared mutable state between parallel calls
+  - Each function operates on its own chunk_spec
+  - S3 uploads are thread-safe (boto3 handles this)
+  - Replicate API calls are stateless
 
 - [ ] Add proper logging:
   - Log start of each chunk generation with chunk_num and type (reference/continuous)
   - Log completion with timing and cost
   - Log errors with full traceback
+  - Use thread-safe logging (Python's logging module is thread-safe)
 
-- [ ] Test chain data passing:
-  - Verify `generate_chunk_continuous` receives `prev_result` as first parameter
-  - Verify `last_frame_url` is correctly extracted and used
+- [ ] Test function signatures:
+  - Verify `generate_chunk_reference_image` takes ChunkSpec and beat_to_chunk_map
+  - Verify `generate_chunk_continuous` takes ChunkSpec and ref_result dict
+  - Verify return types match expected structure
 
-### Task 9.4: Create Phase 4 Parallel Orchestrator with Dynamic Chain Building
+### Task 9.4: Create Phase 4 Parallel Orchestrator with LangChain RunnableParallel
 
 **File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
 
-**Goal:** Create new `generate_chunks_parallel()` function that builds and executes chunk pairs in parallel using Celery chains and chord.
+**Goal:** Create new `generate_chunks_parallel()` function that builds and executes chunks in parallel using LangChain RunnableParallel (two-phase execution).
 
 - [ ] Create `generate_chunks_parallel()` function (NEW - will replace sequential service call)
-  - **Signature**: `def generate_chunks_parallel(phase3_output: dict, user_id: str, model: str) -> dict`
-  - **Purpose**: Orchestrate parallel chunk generation using chains for chunk pairs
-  - **Input**: Same as current `generate_chunks()` task
+  - **Signature**: `def generate_chunks_parallel(video_id: str, spec: dict, reference_urls: dict, user_id: str) -> dict`
+  - **Purpose**: Orchestrate two-phase parallel chunk generation using LangChain RunnableParallel
+  - **Input**: video_id, spec, reference_urls, user_id (extracted from phase3_output in main task)
   - **Process**:
-    1. Build chunk specs (reuse existing `build_chunk_specs_with_storyboard()`)
-    2. Build `beat_to_chunk_map` (identifies which chunks start beats)
-    3. Iterate through chunks, identify pairs using `beat_to_chunk_map`
-    4. Build chains for each pair (or single chunk)
-    5. Wrap chains in chord with finalize callback
-    6. Return chord AsyncResult (let Celery wait for completion)
-  - **Return**: PhaseOutput dict (same as current implementation)
+    1. Build chunk specs using `build_chunk_specs_with_storyboard()` (reuse existing)
+    2. Get `beat_to_chunk_map` from build function
+    3. Separate reference chunks from continuous chunks
+    4. Phase 1: Build RunnableParallel for all reference chunks, execute in parallel
+    5. Phase 2: Build RunnableParallel for all continuous chunks, execute in parallel
+    6. Merge and sort results by chunk_num
+    7. Return dict with chunk_urls and total_cost
+  - **Return**: `{'chunk_urls': List[str], 'total_cost': float}`
 
-- [ ] Implement chunk pair identification logic:
+- [ ] Implement chunk separation logic:
   ```python
-  # Iterate through chunks, not beats
-  # Use beat_to_chunk_map to identify which chunks start beats
+  # Separate reference and continuous chunks
+  ref_chunks = []  # List of (chunk_spec, chunk_num) tuples
+  cont_chunks = []  # List of (chunk_spec, ref_chunk_num) tuples
   
-  chains = []
-  i = 0
-  while i < len(chunk_specs):
-      chunk_spec = chunk_specs[i]
-      
-      # Check if this chunk starts a beat (has storyboard image)
+  for i, chunk_spec in enumerate(chunk_specs):
       if i in beat_to_chunk_map:
-          # This is a reference image chunk
-          chain_tasks = [generate_chunk_reference_image.s(chunk_spec.dict())]
-          
-          # Check if next chunk continues the same beat (no storyboard, continuous)
-          if i + 1 < len(chunk_specs) and (i + 1) not in beat_to_chunk_map:
-              # Next chunk is continuous (uses last frame from this chunk)
-              next_spec = chunk_specs[i + 1]
-              chain_tasks.append(generate_chunk_continuous.s(next_spec.dict()))
-              i += 2  # Skip next chunk (included in this chain)
-          else:
-              # Beat only needs one chunk (single-chunk beat)
-              i += 1
-          
-          chains.append(chain(*chain_tasks))
+          # Reference image chunk
+          ref_chunks.append((chunk_spec, i))
       else:
-          # Error: chunk doesn't start a beat and wasn't paired with previous
-          raise PhaseException(f"Chunk {i} is orphaned (no storyboard image and not paired)")
+          # Continuous chunk - find its reference chunk (look backwards)
+          ref_chunk_num = None
+          for j in range(i - 1, -1, -1):
+              if j in beat_to_chunk_map:
+                  ref_chunk_num = j
+                  break
+          
+          if ref_chunk_num is None:
+              raise PhaseException(f"Chunk {i} is orphaned (no reference chunk found)")
+          
+          cont_chunks.append((chunk_spec, ref_chunk_num))
   ```
 
-- [ ] Build chord structure:
+- [ ] Build Phase 1 RunnableParallel (reference chunks):
   ```python
-  # All chains run in parallel
-  # Finalize callback collects results
-  chord_result = chord(chains)(finalize_chunks.s(video_id, spec)).apply_async()
+  from langchain_core.runnables import RunnableParallel
   
-  # Wait for chord to complete (blocks until all chains finish)
-  final_result = chord_result.get()
+  # Build dict with proper closure capture
+  ref_parallel_dict = {}
+  for chunk_spec, chunk_num in ref_chunks:
+      def make_ref_generator(cs, cn):
+          return lambda x: generate_chunk_reference_image(cs, beat_to_chunk_map)
+      ref_parallel_dict[f'chunk_{chunk_num}'] = make_ref_generator(chunk_spec, chunk_num)
   
-  # Continue with stitching (sequential, after all chunks complete)
-  stitched_url = stitch_chunks(final_result['chunk_urls'])
+  ref_parallel = RunnableParallel(ref_parallel_dict)
+  ref_results = ref_parallel.invoke({})  # Blocks until all complete
+  
+  # Convert to dict keyed by chunk_num
+  ref_results_by_num = {int(k.split('_')[1]): v for k, v in ref_results.items()}
+  ```
+
+- [ ] Build Phase 2 RunnableParallel (continuous chunks):
+  ```python
+  # Build dict with proper closure capture
+  cont_parallel_dict = {}
+  for chunk_spec, ref_chunk_num in cont_chunks:
+      def make_cont_generator(cs, ref_num):
+          return lambda x: generate_chunk_continuous(cs, ref_results_by_num[ref_num])
+      cont_parallel_dict[f'chunk_{chunk_spec.chunk_num}'] = make_cont_generator(chunk_spec, ref_chunk_num)
+  
+  cont_parallel = RunnableParallel(cont_parallel_dict)
+  cont_results = cont_parallel.invoke({})  # Blocks until all complete
+  
+  # Convert to dict keyed by chunk_num
+  cont_results_by_num = {int(k.split('_')[1]): v for k, v in cont_results.items()}
+  ```
+
+- [ ] Merge and sort results:
+  ```python
+  all_chunks = []
+  all_chunks.extend(ref_results_by_num.values())
+  all_chunks.extend(cont_results_by_num.values())
+  all_chunks.sort(key=lambda x: x['chunk_num'])
+  
+  chunk_urls = [chunk['chunk_url'] for chunk in all_chunks]
+  total_cost = sum(chunk['cost'] for chunk in all_chunks)
+  
+  return {'chunk_urls': chunk_urls, 'total_cost': total_cost}
   ```
 
 - [ ] Handle edge cases:
-  - All chunks have storyboard images (no continuous chunks): N single-task chains
-  - Single chunk video: 1 single-task chain in chord
-  - Mixed pairs and singles: Some 2-task chains, some 1-task chains
+  - All chunks are reference (no continuous): Phase 1 only, Phase 2 skipped
+  - Single chunk video: Phase 1 with 1 chunk, Phase 2 skipped
+  - Mixed: Some reference chunks, some continuous chunks (both phases run)
 
-- [ ] Test chain building logic:
-  - 2 chunks (1 pair): 1 chain with 2 tasks
-  - 3 chunks (pair + single): 2 chains (1 with 2 tasks, 1 with 1 task)
-  - 4 chunks (2 pairs): 2 chains, each with 2 tasks
-  - 5 chunks (2 pairs + single): 3 chains
+- [ ] Test parallel execution:
+  - 2 chunks (1 pair): Phase 1 (1 ref), Phase 2 (1 cont)
+  - 3 chunks (pair + single): Phase 1 (2 refs), Phase 2 (1 cont)
+  - 4 chunks (2 pairs): Phase 1 (2 refs), Phase 2 (2 conts)
+  - 5 chunks (2 pairs + single): Phase 1 (3 refs), Phase 2 (2 conts)
 
-### Task 9.5: Create Finalize Callback
-
-**File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
-
-**Goal:** Create callback task that collects results from all parallel chains and prepares data for stitching.
-
-- [ ] Create `finalize_chunks` Celery task (NEW task in `task.py`)
-  - **Purpose**: Collect and merge chunk results from all parallel chains
-  - **Signature**: `@celery_app.task def finalize_chunks(chain_results: list, video_id: str, spec: dict) -> dict`
-  - **Input**: 
-    - `chain_results`: List of results from chains (each chain returns 1 or 2 chunk dicts)
-    - `video_id`: Video ID for logging
-    - `spec`: Video spec (passed through for cost tracking)
-  - **Process**:
-    1. Flatten results (chains return different structures)
-    2. Sort chunks by `chunk_num` to maintain order
-    3. Extract chunk URLs in order
-    4. Calculate total cost
-    5. Check for errors
-  - **Return**: `{'chunk_urls': [...], 'total_cost': float, 'chunk_results': [...]}`
-
-- [ ] Handle result flattening logic:
-  ```python
-  all_chunks = []
-  total_cost = 0.0
-  
-  for result in chain_results:
-      # Each chain can return:
-      # - Single dict (1-chunk chain): {'chunk_url': ..., 'chunk_num': ..., 'cost': ...}
-      # - List of 2 dicts (2-chunk chain): [ref_result, continuous_result]
-      #   (continuous task includes ref result - see Task 9.3)
-      
-      if isinstance(result, list):
-          # 2-chunk chain: list of [ref_result, continuous_result]
-          for chunk_result in result:
-              if 'error' in chunk_result:
-                  raise PhaseException(f"Chunk {chunk_result.get('chunk_num', '?')} failed: {chunk_result['error']}")
-              all_chunks.append(chunk_result)
-              total_cost += chunk_result.get('cost', 0.0)
-      elif isinstance(result, dict):
-          # 1-chunk chain: single dict
-          if 'error' in result:
-              raise PhaseException(f"Chunk {result.get('chunk_num', '?')} failed: {result['error']}")
-          all_chunks.append(result)
-          total_cost += result.get('cost', 0.0)
-      else:
-          raise PhaseException(f"Unexpected result format: {type(result)}")
-  
-  # Sort by chunk_num to maintain order
-  all_chunks.sort(key=lambda x: x['chunk_num'])
-  
-  # Extract URLs in order
-  chunk_urls = [chunk['chunk_url'] for chunk in all_chunks]
-  ```
-
-- [ ] **RESOLVED**: Chain return value issue
-  - Solution: Continuous task returns list `[prev_result, current_result]` (see Task 9.3)
-  - Single-chunk chains return dict
-  - 2-chunk chains return list
-  - Finalize handles both formats
-
-- [ ] Error handling:
-  - Check each result for 'error' key
-  - Raise PhaseException if any chunk failed
-  - Include chunk_num in error message for debugging
-
-- [ ] Logging:
-  - Log total chunks collected
-  - Log total cost
-  - Log chunk order verification
-  - Log any warnings about missing chunks
+**Note:** With LangChain RunnableParallel, we merge results directly in `generate_chunks_parallel()` - no separate callback task needed. Results are merged and sorted in the same function after both phases complete.
 
 ### Task 9.6: Update Main Task to Use Parallel Generation
 
@@ -867,13 +884,14 @@ def generate_chunks(self, phase3_output, user_id, model):
   - Document: Timing results in PR description
 
 **Key Implementation Notes:**
-1. **Chord blocks on `.get()`** - `generate_chunks_parallel()` calls `chord_result.get()` to wait for completion
-2. **Chain data passing** - continuous task receives reference result as first parameter from chain
-3. **Chunk ordering** - sort by `chunk_num` in finalize callback (not beat_index)
-4. **Last frame extraction** - happens in reference task, passed via chain to continuous task
-5. **Error isolation** - failure in one chain doesn't block other chains (chord collects all results)
-6. **Dynamic structure** - `generate_chunks_parallel()` builds chains at runtime based on `beat_to_chunk_map`
-7. **Return value preservation** - continuous task returns list `[ref_result, cont_result]` to preserve both chunks
+1. **Two-phase execution** - Phase 1: all reference chunks in parallel, Phase 2: all continuous chunks in parallel
+2. **LangChain RunnableParallel** - Uses threads/async for I/O-bound Replicate API calls (thread-safe)
+3. **Chunk ordering** - Sort by `chunk_num` after merging Phase 1 and Phase 2 results
+4. **Last frame passing** - Phase 2 uses `ref_results_by_num[ref_chunk_num]['last_frame_url']` from Phase 1
+5. **Error handling** - Wrap each phase in try/except, raise PhaseException on failure
+6. **Dynamic structure** - `generate_chunks_parallel()` separates chunks at runtime based on `beat_to_chunk_map`
+7. **No Celery chains** - All parallelism handled by LangChain within single Celery task
+8. **Closure capture** - Use factory functions to properly capture variables in lambda closures
 
 ---
 
@@ -889,25 +907,27 @@ def generate_chunks(self, phase3_output, user_id, model):
 | **beat_to_chunk_map** | Chunk→Beat mapping | `{0: 0, 2: 1}` = Chunk 0 starts Beat 0, Chunk 2 starts Beat 1 |
 
 ### New Functions (All in `task.py`):
-1. `generate_chunk_reference_image()` - Celery task, wraps existing storyboard generation
-2. `generate_chunk_continuous()` - Celery task, wraps existing continuous generation
-3. `generate_chunks_parallel()` - Main orchestrator, builds and executes chains
-4. `finalize_chunks()` - Celery task callback, collects and sorts results
+1. `generate_chunk_reference_image()` - Helper function, wraps existing storyboard generation
+2. `generate_chunk_continuous()` - Helper function, wraps existing continuous generation
+3. `generate_chunks_parallel()` - Main orchestrator using LangChain RunnableParallel (two-phase execution)
+
+### New Dependency:
+- `langchain-core` - For RunnableParallel (lightweight, no full LangChain needed)
 
 ### NO Changes To:
-- `pipeline.py` (still calls `generate_chunks` task)
+- `pipeline.py` (still calls `generate_chunks` Celery task)
 - `chunk_generator.py` (existing functions reused)
 - Database schema or models
 - External API (Phase 4 inputs/outputs unchanged)
+- Celery infrastructure (still used for pipeline orchestration)
 
 ### Key Design Decisions:
-- ✅ Iterate through chunks (not beats) using `beat_to_chunk_map`
-- ✅ Max 2 chunks per chain (pairs only, no 3+ chunk chains in this PR)
-- ✅ Continuous task returns list `[ref_result, cont_result]` to preserve both
-- ✅ Simplified progress: 50% start, 70% after chord, 90% after stitch
-- ✅ Chord blocks on `.get()` in `generate_chunks_parallel()`, then continues to stitching
+- ✅ Two-phase execution: Reference chunks first (parallel), then continuous chunks (parallel)
+- ✅ LangChain RunnableParallel for I/O-bound operations (thread-safe, no Celery chains needed)
+- ✅ Helper functions (not Celery tasks) - called synchronously but executed in parallel
+- ✅ Iterate through chunks (not beats) using `beat_to_chunk_map` to separate reference/continuous
+- ✅ Simplified progress: 50% start, 60% after Phase 1, 70% after Phase 2, 90% after stitch
+- ✅ Closure capture: Use factory functions to properly capture variables in lambda closures
 
 ### Ready to Implement:
 All terminology cleaned up, tasks updated, design documented. Ready to proceed with Task 9.3 (Create Individual Chunk Generation Tasks).
-
----
