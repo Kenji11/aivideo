@@ -231,6 +231,13 @@ export const api = {
     const response = await apiClient.get<VideoListResponse>('/api/videos');
     return response.data;
   },
+
+  /**
+   * Delete a video
+   */
+  async deleteVideo(videoId: string): Promise<void> {
+    await apiClient.delete(`/api/video/${videoId}`);
+  },
 };
 
 // Named exports for convenience
@@ -261,6 +268,13 @@ export async function getVideoStatus(videoId: string): Promise<StatusResponse> {
  */
 export async function listVideos(): Promise<VideoListResponse> {
   return api.getVideos();
+}
+
+/**
+ * Delete a video
+ */
+export async function deleteVideo(videoId: string): Promise<void> {
+  return api.deleteVideo(videoId);
 }
 
 export default api;

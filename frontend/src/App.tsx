@@ -9,6 +9,15 @@ import { ProjectCard } from './components/ProjectCard';
 import { Notification } from './components/NotificationCenter';
 import { toast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 // import type { Template } from './components/TemplateGallery';
 import { ExportPanel } from './components/ExportPanel';
 import { Auth } from './pages/Auth';
@@ -23,7 +32,7 @@ import { VideoStatus } from './pages/VideoStatus';
 // import { VideoLibraryUnused } from './pages/VideoLibraryUnused ';
 // import { Billing } from './pages/Billing';
 // import { API } from './pages/API';
-import { listVideos, VideoListItem } from './lib/api';
+import { listVideos, deleteVideo, VideoListItem } from './lib/api';
 import { useAuth } from './contexts/AuthContext';
 import { useDarkMode } from './lib/useDarkMode';
 
@@ -42,6 +51,9 @@ function AppContent() {
   const [stitchedVideoUrl, setStitchedVideoUrl] = useState<string | null>(null);
   const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('veo_fast');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [videoToDelete, setVideoToDelete] = useState<{ id: string; title: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const steps = [
     { id: 1, name: 'Create', icon: Sparkles },
@@ -70,6 +82,40 @@ function AppContent() {
       // Navigate to processing page for videos that are still processing
       navigate(`/processing/${project.video_id}`);
     }
+  };
+
+  const handleDeleteProject = (videoId: string) => {
+    // Find the project to get its title for confirmation
+    const project = projects.find(p => p.video_id === videoId);
+    const projectTitle = project?.title || 'this video';
+    
+    // Open confirmation dialog
+    setVideoToDelete({ id: videoId, title: projectTitle });
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!videoToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteVideo(videoToDelete.id);
+      // Remove video from local state
+      setProjects(projects.filter(p => p.video_id !== videoToDelete.id));
+      addNotification('success', 'Video Deleted', `"${videoToDelete.title}" has been deleted successfully.`);
+      setDeleteDialogOpen(false);
+      setVideoToDelete(null);
+    } catch (error) {
+      console.error('Failed to delete video:', error);
+      addNotification('error', 'Delete Failed', error instanceof Error ? error.message : 'Failed to delete video');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setVideoToDelete(null);
   };
 
   useEffect(() => {
@@ -303,6 +349,7 @@ function AppContent() {
                       key={project.video_id}
                       project={project}
                       onSelect={handleProjectSelect}
+                      onDelete={handleDeleteProject}
                     />
                   ))}
                 </div>
@@ -494,6 +541,34 @@ function AppContent() {
           {/* <Route path="/api" element={<API />} /> */}
           {/* <Route path="/settings" element={<SettingsPage />} /> */}
         </Routes>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Video</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete "{videoToDelete?.title}"? This action cannot be undone and will permanently delete the video and all associated files.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={cancelDelete}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

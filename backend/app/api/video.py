@@ -3,7 +3,11 @@ from sqlalchemy.orm import Session
 from app.common.schemas import VideoResponse, VideoListResponse, VideoListItem
 from app.common.models import VideoGeneration
 from app.common.auth import get_current_user
+from app.common.constants import get_video_s3_prefix
 from app.database import get_db
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -91,3 +95,71 @@ async def get_video(
         completed_at=video.completed_at,
         spec=video.spec
     )
+
+@router.delete("/api/video/{video_id}")
+async def delete_video(
+    video_id: str,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a video and all associated files
+    
+    Deletion order:
+    1. Delete S3 files (all files associated with video)
+    2. Delete database entry
+    3. Delete cache entries (Redis)
+    
+    Returns 404 if video not found, 403 if user doesn't own video.
+    """
+    # Verify video exists and belongs to authenticated user
+    video = db.query(VideoGeneration).filter(
+        VideoGeneration.id == video_id,
+        VideoGeneration.user_id == user_id
+    ).first()
+    
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+    
+    logger.info(f"Deleting video {video_id} for user {user_id}")
+    
+    # Step 1: Delete S3 files
+    try:
+        from app.services.s3 import s3_client
+        s3_prefix = get_video_s3_prefix(user_id, video_id)
+        logger.info(f"Deleting S3 files with prefix: {s3_prefix}")
+        s3_success = s3_client.delete_directory(s3_prefix)
+        if not s3_success:
+            logger.warning(f"Some S3 files may not have been deleted for video {video_id}")
+        else:
+            logger.info(f"Successfully deleted S3 files for video {video_id}")
+    except Exception as e:
+        logger.error(f"Error deleting S3 files for video {video_id}: {str(e)}")
+        # Continue with deletion even if S3 deletion fails
+    
+    # Step 2: Delete database entry
+    try:
+        db.delete(video)
+        db.commit()
+        logger.info(f"Successfully deleted database entry for video {video_id}")
+    except Exception as e:
+        logger.error(f"Error deleting database entry for video {video_id}: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete video from database")
+    
+    # Step 3: Delete Redis cache entries
+    try:
+        from app.services.redis import RedisClient
+        redis_client = RedisClient()
+        cache_success = redis_client.delete_video_data(video_id)
+        if cache_success:
+            logger.info(f"Successfully deleted Redis cache entries for video {video_id}")
+        else:
+            logger.warning(f"Failed to delete Redis cache entries for video {video_id} (may not exist)")
+    except Exception as e:
+        logger.warning(f"Error deleting Redis cache entries for video {video_id}: {str(e)}")
+        # Don't fail entire operation if cache deletion fails (cache will expire)
+    
+    return {
+        "message": "Video deleted successfully",
+        "video_id": video_id
+    }
