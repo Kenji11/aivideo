@@ -89,12 +89,12 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
 
 **Goal:** Create a reusable Redis client wrapper for video progress tracking with proper error handling and fallback.
 
-- [ ] Create `backend/app/services/redis.py`:
+- [x] Create `backend/app/services/redis.py`:
   - Import `redis` client library
   - Import `settings` from `app.config`
   - Create `RedisClient` class (singleton pattern)
 
-- [ ] Implement Redis connection:
+- [x] Implement Redis connection:
   ```python
   class RedisClient:
       _instance = None
@@ -116,7 +116,7 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
                   self._client = None
   ```
 
-- [ ] Implement helper methods:
+- [x] Implement helper methods:
   - `set_video_progress(video_id, progress)` - Set progress (0-100)
   - `set_video_status(video_id, status)` - Set status string
   - `set_video_phase(video_id, phase)` - Set current phase
@@ -128,17 +128,17 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
   - `delete_video_data(video_id)` - Delete all keys for video (cleanup)
   - All methods should set TTL: 3600 seconds (60 minutes)
 
-- [ ] Implement error handling:
+- [x] Implement error handling:
   - Wrap all Redis operations in try/except
   - Log errors but don't raise (graceful degradation)
   - Return None/False on failure (caller can fallback to DB)
 
-- [ ] Implement TTL management:
+- [x] Implement TTL management:
   - Use `EX` parameter in SET commands: `client.set(key, value, ex=3600)`
   - Or use `EXPIRE` after SET: `client.expire(key, 3600)`
   - Ensure all keys have 60-minute TTL (no refresh logic - fixed TTL)
 
-- [ ] Test Redis connection:
+- [x] Test Redis connection:
   - Test connection on import
   - Test all helper methods
   - Test TTL expiration
@@ -158,7 +158,7 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
   redis_client = RedisClient()
   ```
 
-- [ ] Refactor `update_progress()` function:
+- [x] Refactor `update_progress()` function:
   - Keep same signature: `update_progress(video_id, status, progress, **kwargs)`
   - Write to Redis first (if Redis available)
   - Fallback to DB write if Redis fails
@@ -184,18 +184,18 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
             # ...
     ```
 
-- [ ] Update metadata storage:
+- [x] Update metadata storage:
   - Store `title`, `prompt`, `description` in Redis metadata
   - Store `error_message` in Redis
   - Store `phase_outputs` in Redis as nested JSON (same structure as DB, for retry logic)
 
-- [ ] Keep DB writes for critical updates:
+- [x] Keep DB writes for critical updates:
   - Still write to DB if this is initial creation (video doesn't exist)
   - Still write to DB if status is "complete" or "failed" (final states)
   - This ensures DB always has final state even if Redis expires
   - **Complete fallback**: If Redis fails, fall back to DB for all operations (all or nothing approach)
 
-- [ ] Update `update_cost()` function:
+- [x] Update `update_cost()` function:
   - Store cost in Redis metadata
   - Still update DB cost_breakdown (for final persistence)
 
@@ -213,7 +213,7 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
 
 **Goal:** Add current_chunk_index and total_chunks fields to StatusResponse schema.
 
-- [ ] Update StatusResponse model:
+- [x] Update StatusResponse model:
   ```python
   class StatusResponse(BaseModel):
       """Response from status endpoint"""
@@ -231,7 +231,7 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
       total_chunks: Optional[int] = None  # NEW: Total number of chunks in Phase 4
   ```
 
-- [ ] Verify schema matches current status endpoint usage:
+- [x] Verify schema matches current status endpoint usage:
   - Check that status endpoint already extracts these fields from phase_outputs
   - Ensure schema matches implementation
 
@@ -249,7 +249,7 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
   redis_client = RedisClient()
   ```
 
-- [ ] Refactor `get_status()` function:
+- [x] Refactor `get_status()` function:
   - Check Redis first: `redis_client.get_video_data(video_id)`
   - If Redis data exists: Use it to build StatusResponse
   - If Redis data missing: Fallback to DB query (existing logic)
@@ -292,19 +292,19 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
             # ... existing DB logic to build StatusResponse
     ```
 
-- [ ] Handle Redis data structure:
+- [x] Handle Redis data structure:
   - Extract progress, status, current_phase from Redis
   - Extract metadata (title, description, etc.)
   - Extract phase_outputs (convert to StatusResponse format)
   - Use cached presigned URLs from Redis if available, otherwise generate and cache
 
-- [ ] Implement presigned URL caching:
+- [x] Implement presigned URL caching:
   - Check Redis for cached presigned URLs first
   - If missing, generate presigned URLs (same as current logic)
   - Cache generated URLs in Redis with 60min TTL
   - Use cached URLs in subsequent requests
 
-- [ ] Maintain backward compatibility:
+- [x] Maintain backward compatibility:
   - If Redis missing, DB query should work exactly as before
   - Ensure all StatusResponse fields are populated from either source
 
@@ -324,14 +324,14 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
 
 **Goal:** Replace polling endpoint with SSE stream for real-time updates using polling-based approach.
 
-- [ ] Add SSE dependencies:
+- [x] Add SSE dependencies:
   ```python
   from fastapi.responses import StreamingResponse
   import asyncio
   import json
   ```
 
-- [ ] Create SSE endpoint:
+- [x] Create SSE endpoint:
   ```python
   @router.get("/api/status/{video_id}/stream")
   async def stream_status(video_id: str, db: Session = Depends(get_db)):
@@ -382,18 +382,18 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
       )
   ```
 
-- [ ] Extract common status building logic:
+- [x] Extract common status building logic:
   - Create helper function `build_status_response()` that both GET and SSE endpoints use
   - Handles Redis/DB data extraction and StatusResponse construction
   - Handles presigned URL caching/generation
 
-- [ ] Keep existing GET endpoint:
+- [x] Keep existing GET endpoint:
   - Keep `/api/status/{video_id}` for compatibility (fallback only)
   - Frontend will use SSE primarily, GET endpoint only if SSE fails
   - Both endpoints check Redis first, DB fallback
   - Both endpoints use same status building logic
 
-- [ ] Handle connection cleanup:
+- [x] Handle connection cleanup:
   - Handle client disconnection gracefully (FastAPI handles this automatically)
   - Log connection events (connect/disconnect)
   - Ensure no resource leaks
@@ -414,12 +414,12 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
 
 **Goal:** Implement SSE stream for real-time status updates with automatic fallback to GET endpoint if SSE fails.
 
-- [ ] Identify current status polling implementation:
+- [x] Identify current status polling implementation:
   - Find component(s) that poll `/api/status/{video_id}`
   - Document current polling interval and logic
   - Identify where status updates are handled in UI
 
-- [ ] Create SSE connection hook/utility:
+- [x] Create SSE connection hook/utility:
   - Create `useVideoStatusStream(videoId)` hook or utility function
   - Use `EventSource` API to connect to `/api/status/{video_id}/stream`
   - Handle SSE events: `onmessage`, `onerror`, `onopen`
@@ -450,30 +450,30 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
     };
     ```
 
-- [ ] Implement fallback to GET endpoint:
+- [x] Implement fallback to GET endpoint:
   - If SSE connection fails (`onerror`), automatically fallback to polling
   - Use existing GET endpoint: `/api/status/{video_id}`
   - Poll interval: 2-3 seconds (reduced from current)
   - Log fallback event for debugging
 
-- [ ] Update status display components:
+- [x] Update status display components:
   - Replace current polling logic with SSE hook
   - Handle SSE stream updates in real-time
   - Handle fallback polling if SSE unavailable
   - Ensure UI updates smoothly with both approaches
 
-- [ ] Handle SSE stream closure:
+- [x] Handle SSE stream closure:
   - When status is "complete" or "failed", SSE stream closes
   - Detect closure event and stop any fallback polling
   - Update UI to show final state
 
-- [ ] Error handling:
+- [x] Error handling:
   - Handle SSE connection errors gracefully
   - Handle network disconnections
   - Handle invalid video_id (404 errors)
   - Show appropriate error messages to user
 
-- [ ] Test frontend implementation:
+- [x] Test frontend implementation:
   - Test SSE stream with video in progress (real-time updates)
   - Test SSE fallback when stream fails (should switch to polling)
   - Test SSE stream closure on completion
@@ -492,7 +492,7 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
 
 **Goal:** Comprehensive testing of Redis-based progress tracking and SSE.
 
-- [ ] Test Redis operations:
+- [x] Test Redis operations:
   - Test all Redis helper methods
   - Test TTL expiration (wait 60 minutes, or use shorter TTL for testing)
   - Test concurrent writes (multiple phases updating same video)
@@ -517,20 +517,20 @@ video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - 
   - Test multiple concurrent streams
   - Test client disconnection
 
-- [ ] Test pipeline execution:
+- [x] Test pipeline execution:
   - Run full pipeline, verify DB writes only at start/completion
   - Monitor DB connection usage (should be much lower)
   - Monitor Redis memory usage (should be reasonable with 60min TTL)
   - Verify status endpoint works throughout pipeline
   - Verify spec NOT in DB during pipeline, only after completion
 
-- [ ] Performance testing:
+- [x] Performance testing:
   - Measure DB write reduction (should be 90%+)
   - Measure status endpoint latency (Redis vs DB)
   - Measure SSE connection overhead
   - Verify system handles high concurrent video generation
 
-- [ ] Edge case testing:
+- [x] Edge case testing:
   - Test Redis TTL expiration during pipeline (should fallback to DB, re-add to Redis)
   - Test Redis connection loss (should fallback to DB completely)
   - Test video completion while SSE stream active (stream should close gracefully)

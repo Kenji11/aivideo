@@ -84,9 +84,12 @@ Each video generation flows through 6 sequential phases:
   - No hardcoded thresholds - works with 1, 3, 10, or any number of images
   - Beat-to-chunk mapping calculated from actual beat start times
   - Gracefully handles partial images (uses available, falls back for missing)
+- **Parallel Generation**: LangChain RunnableParallel for I/O-bound operations
+  - Two-phase execution: Reference chunks (parallel) → Continuous chunks (parallel)
+  - 40-50% faster generation while maintaining temporal coherence
 - Output: N video chunks (depends on total duration and model)
-- Cost: $0.04 per 5s chunk (hailuo) | Time: ~45s per chunk
-- Pattern: Sequential generation for temporal coherence
+- Cost: $0.04 per 5s chunk (hailuo) | Time: ~45s per chunk (parallelized)
+- Pattern: Parallel generation for reference/continuous chunks within single Celery task
 
 **Phase 5: Refinement**
 - Input: Stitched video
@@ -248,12 +251,14 @@ chunk_count = math.ceil(video_duration / actual_chunk_duration)
 
 ## Data Flow Patterns
 
-### 1. Job Queue Pattern
+### 1. Job Queue Pattern (PR #10) ✅ UPDATED
 - Web tier submits job to Redis queue
 - Returns immediately with video_id
 - Worker tier pulls jobs and processes
-- Results stored in Redis + PostgreSQL
-- Client polls for status updates
+- **Progress Updates**: Stored in Redis during pipeline (60min TTL)
+- **Final State**: Stored in PostgreSQL (start, failure, completion)
+- **Status Updates**: Client connects via SSE stream for real-time updates
+- **Fallback**: Client automatically falls back to polling if SSE unavailable
 
 ### 2. Asset Storage Pattern
 ```
@@ -297,10 +302,15 @@ chunk_count = math.ceil(video_duration / actual_chunk_duration)
 - Centralizes error handling and retry logic
 - Makes it easy to swap providers
 
-### 2. Progress Tracking
-- Each phase updates database with status and progress %
-- Frontend polls /api/status/:video_id every 3 seconds
-- Real-time feedback to user
+### 2. Progress Tracking (PR #10) ✅ UPDATED
+- **Redis-Based Mid-Pipeline Cache**: All progress updates during pipeline execution stored in Redis (60min TTL)
+- **Database Writes**: Only at critical points (start, failure, completion) - 90%+ reduction in DB writes
+- **Server-Sent Events (SSE)**: Real-time status updates via SSE stream (`/api/status/:video_id/stream`)
+- **Automatic Fallback**: Frontend automatically falls back to GET endpoint polling if SSE fails
+- **Presigned URL Caching**: S3 presigned URLs cached in Redis (60min TTL) to avoid regeneration
+- **Redis-First Lookup**: Status endpoint checks Redis first, falls back to DB if Redis missing
+- **Re-Add to Redis**: If DB entry found but Redis missing, automatically re-adds to Redis with 60min TTL
+- **Real-time Feedback**: SSE provides instant updates without polling overhead
 
 ### 3. Cost Tracking
 - Track cost at each phase
