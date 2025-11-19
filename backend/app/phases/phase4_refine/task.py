@@ -61,9 +61,7 @@ def refine_video(self, phase3_output: dict, user_id: str = None) -> dict:
     spec = phase3_data.get('spec')  # Spec passed through from Phase 2
     
     if not stitched_video_url:
-        # Phase 5 skipped - no stitched video
-        update_progress(video_id, "skipped", 100, current_phase="phase4_refine")
-        
+        # Phase 4 skipped - no stitched video
         # Update final status in database
         db = SessionLocal()
         try:
@@ -77,6 +75,9 @@ def refine_video(self, phase3_output: dict, user_id: str = None) -> dict:
                 db.commit()
         finally:
             db.close()
+        
+        # Update Redis to "complete" status after DB update
+        update_progress(video_id, "complete", 100, current_phase="phase3_chunks")
         
         return PhaseOutput(
             video_id=video_id,
@@ -155,6 +156,17 @@ def refine_video(self, phase3_output: dict, user_id: str = None) -> dict:
                 db.commit()
         finally:
             db.close()
+        
+        # Update Redis to "complete" status after DB update
+        update_progress(
+            video_id, 
+            "complete", 
+            100, 
+            current_phase="phase4_refine",
+            total_cost=total_cost,
+            generation_time=generation_time,
+            final_video_url=refined_url
+        )
         
         output = PhaseOutput(
             video_id=video_id,
