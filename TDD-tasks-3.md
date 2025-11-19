@@ -258,11 +258,11 @@ Parallel is: (Chunk 0 || Chunk 2) → (Chunk 1 || Chunk 3) (~10s, 33% faster)
 **LangChain RunnableParallel Pattern Example:**
 ```python
 from langchain_core.runnables import RunnableParallel
-from app.phases.phase4_chunks_storyboard.chunk_generator import (
+from app.phases.phase3_chunks.chunk_generator import (
     generate_single_chunk_with_storyboard,
     generate_single_chunk_continuous
 )
-from app.phases.phase4_chunks_storyboard.schemas import ChunkSpec
+from app.phases.phase3_chunks.schemas import ChunkSpec
 
 # Helper functions (in task.py)
 def generate_chunk_reference_image(chunk_spec: ChunkSpec, beat_to_chunk_map: dict) -> dict:
@@ -297,7 +297,7 @@ def generate_chunk_continuous(chunk_spec: ChunkSpec, ref_result: dict) -> dict:
 # Phase 4 parallel orchestrator (in task.py)
 def generate_chunks_parallel(video_id: str, spec: dict, reference_urls: dict, user_id: str) -> dict:
     """Generate chunks in parallel using LangChain RunnableParallel."""
-    from app.phases.phase4_chunks_storyboard.chunk_generator import build_chunk_specs_with_storyboard
+    from app.phases.phase3_chunks.chunk_generator import build_chunk_specs_with_storyboard
     
     # Build chunk specs and beat_to_chunk_map
     chunk_specs, beat_to_chunk_map = build_chunk_specs_with_storyboard(
@@ -390,7 +390,7 @@ def generate_chunks_parallel(video_id: str, spec: dict, reference_urls: dict, us
     }
 
 # Main Phase 4 task (in task.py) - NO CHANGE to external interface
-@celery_app.task(bind=True, name="app.phases.phase4_chunks_storyboard.task.generate_chunks")
+@celery_app.task(bind=True, name="app.phases.phase3_chunks.task.generate_chunks")
 def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict:
     # ... validation (same as before) ...
     
@@ -411,7 +411,7 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
 ```
 
 **Files to Review:**
-- `backend/app/phases/phase4_chunks_storyboard/task.py` (main chunk generation logic)
+- `backend/app/phases/phase3_chunks/task.py` (main chunk generation logic)
 - `backend/app/orchestrator/pipeline.py` (orchestrator with chain pattern)
 - `backend/app/orchestrator/celery_app.py` (Celery configuration)
 
@@ -422,20 +422,20 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
 **Rationale:** Since we're using LangChain RunnableParallel for parallelism within a single Celery task, individual chunk generation functions should NOT be Celery tasks. This avoids nested task calls and the "Never call result.get() within a task!" violation.
 
 **Files to Modify:**
-- `backend/app/phases/phase4_chunks_storyboard/chunk_generator.py`
-- `backend/app/phases/phase4_chunks_storyboard/service.py`
-- `backend/app/phases/phase4_chunks_storyboard/task.py` (if any helper functions are tasks)
+- `backend/app/phases/phase3_chunks/chunk_generator.py`
+- `backend/app/phases/phase3_chunks/service.py`
+- `backend/app/phases/phase3_chunks/task.py` (if any helper functions are tasks)
 
 **Tasks:**
 
 - [ ] **Task 9.0.1: Identify All Celery Tasks in Phase 4**
-  - Search for all `@celery_app.task` decorators in `phase4_chunks_storyboard/` directory
+  - Search for all `@celery_app.task` decorators in `phase3_chunks/` directory
   - List all functions that are currently Celery tasks
   - Verify that `generate_chunks` in `task.py` is the ONLY function that should remain a Celery task
   - Document which functions need to be converted
 
 - [ ] **Task 9.0.2: Convert `generate_single_chunk_with_storyboard` to Regular Function**
-  - **File:** `backend/app/phases/phase4_chunks_storyboard/chunk_generator.py`
+  - **File:** `backend/app/phases/phase3_chunks/chunk_generator.py`
   - Remove `@celery_app.task(bind=True, ...)` decorator
   - Remove `self` parameter (first parameter)
   - Change signature from `def generate_single_chunk_with_storyboard(self, chunk_spec: dict, beat_to_chunk_map: dict = None)` to `def generate_single_chunk_with_storyboard(chunk_spec: dict, beat_to_chunk_map: dict = None)`
@@ -443,7 +443,7 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
   - Update docstring to remove references to Celery task
 
 - [ ] **Task 9.0.3: Update All Callers of `generate_single_chunk_with_storyboard`**
-  - **File:** `backend/app/phases/phase4_chunks_storyboard/service.py`
+  - **File:** `backend/app/phases/phase3_chunks/service.py`
   - Find all calls using `.apply()` or `.apply().get()`
   - Replace with direct function calls
   - Change `generate_single_chunk_with_storyboard.apply(args=[...])` to `generate_single_chunk_with_storyboard(...)`
@@ -451,7 +451,7 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
   - Update error handling if needed (direct calls raise exceptions, not task failures)
 
 - [ ] **Task 9.0.4: Verify `generate_single_chunk_continuous` is Already Regular Function**
-  - **File:** `backend/app/phases/phase4_chunks_storyboard/chunk_generator.py`
+  - **File:** `backend/app/phases/phase3_chunks/chunk_generator.py`
   - Confirm it does NOT have `@celery_app.task` decorator
   - Verify it can be called directly (no `.apply()` needed)
   - If it's a task, convert it following Task 9.0.2 pattern
@@ -479,7 +479,7 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
 
 ### Task 9.1: Investigate Current Phase 4 Implementation
 
-**File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
+**File:** `backend/app/phases/phase3_chunks/task.py`
 
 - [x] Review current sequential chunk generation loop (found in `service.py` lines 156-221)
 - [x] Identify how storyboard images are used vs last frames
@@ -506,7 +506,7 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
 
 ### Task 9.2: Design LangChain RunnableParallel Pattern
 
-**Files:** `backend/app/phases/phase4_chunks_storyboard/task.py`
+**Files:** `backend/app/phases/phase3_chunks/task.py`
 
 **Terminology Cleanup Required:**
 - [ ] Rename terms in code comments/docstrings for consistency:
@@ -567,7 +567,7 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
 
 ### Task 9.3: Create Helper Functions for Chunk Generation
 
-**File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
+**File:** `backend/app/phases/phase3_chunks/task.py`
 
 **Note:** These are helper functions (NOT Celery tasks) that will be called by LangChain RunnableParallel:
 - `generate_single_chunk_with_storyboard()` - Existing Celery task in `chunk_generator.py`, call synchronously
@@ -625,7 +625,7 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
 
 ### Task 9.4: Create Phase 4 Parallel Orchestrator with LangChain RunnableParallel
 
-**File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
+**File:** `backend/app/phases/phase3_chunks/task.py`
 
 **Goal:** Create new `generate_chunks_parallel()` function that builds and executes chunks in parallel using LangChain RunnableParallel (two-phase execution).
 
@@ -729,7 +729,7 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
 
 ### Task 9.6: Update Main Task to Use Parallel Generation
 
-**File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
+**File:** `backend/app/phases/phase3_chunks/task.py`
 
 **Goal:** Update the main `generate_chunks()` Celery task to call `generate_chunks_parallel()` instead of sequential service.
 
@@ -742,7 +742,7 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
 
 - [ ] Implementation:
   ```python
-  @celery_app.task(bind=True, name="app.phases.phase4_chunks_storyboard.task.generate_chunks")
+  @celery_app.task(bind=True, name="app.phases.phase3_chunks.task.generate_chunks")
   def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict:
       # ... validation and setup (same as before) ...
       
@@ -778,7 +778,7 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
 
 ### Task 9.7: Handle Edge Cases
 
-**File:** `backend/app/phases/phase4_chunks_storyboard/task.py`
+**File:** `backend/app/phases/phase3_chunks/task.py`
 
 - [ ] Handle case where all chunks have storyboard images (all single-chunk beats)
   - Result: N single-task chains (one per chunk)
@@ -810,7 +810,7 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
 
 ### Task 9.8: Update Progress Tracking
 
-**Files:** `backend/app/orchestrator/progress.py`, `backend/app/phases/phase4_chunks_storyboard/task.py`
+**Files:** `backend/app/orchestrator/progress.py`, `backend/app/phases/phase3_chunks/task.py`
 
 **Goal:** Add progress tracking to parallel chunk generation tasks.
 

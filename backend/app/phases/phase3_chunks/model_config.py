@@ -37,7 +37,7 @@ Model Config Fields:
 - supports_image_to_video: Can generate from image + prompt
 
 Usage:
-    from app.phases.phase4_chunks_storyboard.model_config import get_default_model, get_model_config
+    from app.phases.phase3_chunks.model_config import get_default_model, get_model_config
     
     # Get default model config
     model = get_default_model()

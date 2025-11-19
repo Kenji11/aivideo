@@ -11,8 +11,8 @@ from typing import Optional, List, Dict, Tuple
 
 from app.services.replicate import replicate_client
 from app.services.s3 import s3_client
-from app.phases.phase4_chunks_storyboard.schemas import ChunkSpec
-from app.phases.phase4_chunks_storyboard.model_config import get_default_model, get_model_config
+from app.phases.phase3_chunks.schemas import ChunkSpec
+from app.phases.phase3_chunks.model_config import get_default_model, get_model_config
 from app.common.constants import get_video_s3_key
 from app.common.exceptions import PhaseException
 

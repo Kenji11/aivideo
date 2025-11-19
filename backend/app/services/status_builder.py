@@ -97,32 +97,32 @@ def build_status_response_from_redis_video_data(redis_data: Dict[str, Any]) -> S
                     presigned = _get_presigned_url_from_cache(video_id, f"animatic_{len(animatic_urls)}", url)
                     animatic_urls.append(presigned)
         
-        # Phase 4: Stitched video and chunk progress
-        phase4_output = phase_outputs.get('phase4_chunks')
-        if phase4_output:
-            if isinstance(phase4_output, dict):
-                current_chunk_index = phase4_output.get('current_chunk_index')
-                total_chunks = phase4_output.get('total_chunks')
+        # Phase 3: Stitched video and chunk progress
+        phase3_output = phase_outputs.get('phase3_chunks')
+        if phase3_output:
+            if isinstance(phase3_output, dict):
+                current_chunk_index = phase3_output.get('current_chunk_index')
+                total_chunks = phase3_output.get('total_chunks')
             
-            if phase4_output.get('status') == 'success':
-                phase4_data = phase4_output.get('output_data', {})
-                stitched_url = phase4_data.get('stitched_video_url')
+            if phase3_output.get('status') == 'success':
+                phase3_data = phase3_output.get('output_data', {})
+                stitched_url = phase3_data.get('stitched_video_url')
                 if stitched_url:
                     stitched_video_url = _get_presigned_url_from_cache(
                         video_id, "stitched_video_url", stitched_url
                     )
     
-    # Phase 5: Final video
+    # Phase 4: Final video
     final_video_url = None
     # Check metadata for final_video_url (set on completion)
     final_url = metadata.get('final_video_url')
     if final_url:
         final_video_url = _get_presigned_url_from_cache(video_id, "final_video_url", final_url)
     elif phase_outputs:
-        phase5_output = phase_outputs.get('phase5_refine')
-        if phase5_output and phase5_output.get('status') == 'success':
-            phase5_data = phase5_output.get('output_data', {})
-            refined_url = phase5_data.get('refined_video_url')
+        phase4_output = phase_outputs.get('phase4_refine')
+        if phase4_output and phase4_output.get('status') == 'success':
+            phase4_data = phase4_output.get('output_data', {})
+            refined_url = phase4_data.get('refined_video_url')
             if refined_url:
                 final_video_url = _get_presigned_url_from_cache(
                     video_id, "refined_video_url", refined_url
@@ -182,32 +182,32 @@ def build_status_response_from_db(video: VideoGeneration) -> StatusResponse:
                     presigned = _get_presigned_url_from_cache(video.id, f"animatic_{len(animatic_urls)}", url)
                     animatic_urls.append(presigned)
         
-        # Phase 4: Stitched video and chunk progress
-        phase4_output = video.phase_outputs.get('phase4_chunks')
-        if phase4_output:
-            if isinstance(phase4_output, dict):
-                current_chunk_index = phase4_output.get('current_chunk_index')
-                total_chunks = phase4_output.get('total_chunks')
+        # Phase 3: Stitched video and chunk progress
+        phase3_output = video.phase_outputs.get('phase3_chunks')
+        if phase3_output:
+            if isinstance(phase3_output, dict):
+                current_chunk_index = phase3_output.get('current_chunk_index')
+                total_chunks = phase3_output.get('total_chunks')
             
-            if phase4_output.get('status') == 'success':
-                phase4_data = phase4_output.get('output_data', {})
-                stitched_url = phase4_data.get('stitched_video_url') or video.stitched_url
+            if phase3_output.get('status') == 'success':
+                phase3_data = phase3_output.get('output_data', {})
+                stitched_url = phase3_data.get('stitched_video_url') or video.stitched_url
                 if stitched_url:
                     stitched_video_url = _get_presigned_url_from_cache(
                         video.id, "stitched_video_url", stitched_url
                     )
     
-    # Phase 5: Final video
+    # Phase 4: Final video
     final_video_url = None
     if video.final_video_url:
         final_video_url = _get_presigned_url_from_cache(
             video.id, "final_video_url", video.final_video_url
         )
     elif video.phase_outputs:
-        phase5_output = video.phase_outputs.get('phase5_refine')
-        if phase5_output and phase5_output.get('status') == 'success':
-            phase5_data = phase5_output.get('output_data', {})
-            refined_url = phase5_data.get('refined_video_url') or video.refined_url
+        phase4_output = video.phase_outputs.get('phase4_refine')
+        if phase4_output and phase4_output.get('status') == 'success':
+            phase4_data = phase4_output.get('output_data', {})
+            refined_url = phase4_data.get('refined_video_url') or video.refined_url
             if refined_url:
                 final_video_url = _get_presigned_url_from_cache(
                     video.id, "refined_video_url", refined_url

@@ -18,7 +18,7 @@
 **Ownership:**
 - Person A: `phases/phase1_validate/` + `phases/phase2_animatic/` + `features/generate/`
 - Person B: `phases/phase3_references/` + `phases/phase4_chunks/` + `features/progress/`
-- Person C: `phases/phase5_refine/` + `phases/phase6_export/` + `features/video/`
+- Person C: `phases/phase4_refine/` + `phases/phase6_export/` + `features/video/`
 
 ### Deployment Pattern
 **Multi-Tier AWS Architecture (us-east-2)**

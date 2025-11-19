@@ -1,16 +1,16 @@
-# Phase 4: Chunk Generation Task
+# Phase 3: Chunk Generation Task
 import time
 from datetime import datetime
 from app.orchestrator.celery_app import celery_app
 from app.common.schemas import PhaseOutput
-from app.phases.phase4_chunks_storyboard.stitcher import VideoStitcher
+from app.phases.phase3_chunks.stitcher import VideoStitcher
 from app.common.exceptions import PhaseException
 from app.orchestrator.progress import update_progress, update_cost
 from app.database import SessionLocal
 from app.common.models import VideoGeneration
 from sqlalchemy.orm.attributes import flag_modified
-from app.phases.phase4_chunks_storyboard.schemas import ChunkSpec
-from app.phases.phase4_chunks_storyboard.chunk_generator import (
+from app.phases.phase3_chunks.schemas import ChunkSpec
+from app.phases.phase3_chunks.chunk_generator import (
     generate_single_chunk_with_storyboard,
     generate_single_chunk_continuous,
     build_chunk_specs_with_storyboard
@@ -212,7 +212,7 @@ def generate_chunks_parallel(video_id: str, spec: dict, reference_urls: dict, us
             phase1_end = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
             print(f"   ✅ [{phase1_end}] Phase 1 COMPLETE: {len(ref_results_by_num)} reference chunks generated")
             # Update progress: 60% after Phase 1 completes
-            update_progress(video_id, "generating_chunks", 60, current_phase="phase4_chunks")
+            update_progress(video_id, "generating_chunks", 60, current_phase="phase3_chunks")
         else:
             print(f"   ⚠️  Phase 1 skipped: No reference chunks")
         
@@ -252,7 +252,7 @@ def generate_chunks_parallel(video_id: str, spec: dict, reference_urls: dict, us
             print(f"   ⚠️  Phase 2 skipped: No continuous chunks")
         
         # Update progress: 70% after both phases complete
-        update_progress(video_id, "generating_chunks", 70, current_phase="phase4_chunks")
+        update_progress(video_id, "generating_chunks", 70, current_phase="phase3_chunks")
         
         # Merge and sort all chunks by chunk_num
         all_chunks = []
@@ -291,19 +291,19 @@ def generate_chunks_parallel(video_id: str, spec: dict, reference_urls: dict, us
         raise PhaseException(f"Failed to generate chunks in parallel: {str(e)}")
 
 
-@celery_app.task(bind=True, name="app.phases.phase4_chunks_storyboard.task.generate_chunks")
+@celery_app.task(bind=True, name="app.phases.phase3_chunks.task.generate_chunks")
 def generate_chunks(
     self,
-    phase3_output: dict,
+    phase2_output: dict,
     user_id: str = None,
     model: str = 'hailuo'
 ) -> dict:
     """
-    Phase 4: Generate video chunks in parallel and stitch them together.
+    Phase 3: Generate video chunks in parallel and stitch them together.
     
     Args:
         self: Celery task instance
-        phase3_output: PhaseOutput dict from Phase 3 (contains spec and reference_urls)
+        phase2_output: PhaseOutput dict from Phase 2 (contains spec with storyboard images)
         user_id: User ID for organizing outputs in S3 (required for new structure)
         model: Video generation model to use (default: 'hailuo')
         
@@ -312,33 +312,33 @@ def generate_chunks(
     """
     start_time = time.time()
     
-    # Check if Phase 3 succeeded
-    if phase3_output.get('status') != 'success':
-        error_msg = phase3_output.get('error_message', 'Phase 3 failed')
-        video_id = phase3_output.get('video_id', 'unknown')
+    # Check if Phase 2 succeeded
+    if phase2_output.get('status') != 'success':
+        error_msg = phase2_output.get('error_message', 'Phase 2 failed')
+        video_id = phase2_output.get('video_id', 'unknown')
         
         # Update progress
-        update_progress(video_id, "failed", 0, error_message=f"Phase 3 failed: {error_msg}", current_phase="phase4_chunks")
+        update_progress(video_id, "failed", 0, error_message=f"Phase 2 failed: {error_msg}", current_phase="phase3_chunks")
         
         # Return failed PhaseOutput
         return PhaseOutput(
             video_id=video_id,
-            phase="phase4_chunks_storyboard",
+            phase="phase3_chunks",
             status="failed",
             output_data={},
             cost_usd=0.0,
             duration_seconds=0.0,
-            error_message=f"Phase 3 failed: {error_msg}"
+            error_message=f"Phase 2 failed: {error_msg}"
         ).dict()
     
-    # Extract data from Phase 3 output
-    # Phase 3 returns reference_urls and spec (passed through from Phase 2)
-    video_id = phase3_output.get('video_id', 'unknown')
-    phase3_data = phase3_output.get('output_data', {})
-    spec = phase3_data.get('spec')
+    # Extract data from Phase 2 output
+    # Phase 2 returns spec with storyboard images
+    video_id = phase2_output.get('video_id', 'unknown')
+    phase2_data = phase2_output.get('output_data', {})
+    spec = phase2_data.get('spec')
     reference_urls = {
-        'style_guide_url': phase3_data.get('style_guide_url'),
-        'product_reference_url': phase3_data.get('product_reference_url')
+        'style_guide_url': phase2_data.get('style_guide_url'),
+        'product_reference_url': phase2_data.get('product_reference_url')
     }
     
     if not spec:
@@ -352,12 +352,12 @@ def generate_chunks(
     
     try:
         # Update progress at start
-        update_progress(video_id, "generating_chunks", 50, current_phase="phase4_chunks")
+        update_progress(video_id, "generating_chunks", 50, current_phase="phase3_chunks")
         # Initialize stitcher
         stitcher = VideoStitcher()
         
         # Generate all chunks in parallel using LangChain RunnableParallel
-        print(f"🚀 Phase 4 (Chunks - Storyboard Mode, Parallel) starting for video {video_id}")
+        print(f"🚀 Phase 3 (Chunks - Storyboard Mode, Parallel) starting for video {video_id}")
         chunk_results = generate_chunks_parallel(
             video_id=video_id,
             spec=spec,
@@ -386,23 +386,23 @@ def generate_chunks(
             video_id,
             "generating_chunks",
             75,  # 75% = stitching complete
-            current_phase="phase4_chunks"
+            current_phase="phase3_chunks"
         )
         
         # Calculate duration
         duration_seconds = time.time() - start_time
         
         # Create success output
-        # Pass through spec for Phase 5 (needs it for music generation)
+        # Pass through spec for Phase 4 (needs it for music generation)
         output = PhaseOutput(
             video_id=video_id,
-            phase="phase4_chunks_storyboard",
+            phase="phase3_chunks",
             status="success",
             output_data={
                 'stitched_video_url': stitched_video_url,
                 'chunk_urls': chunk_urls,
                 'total_cost': total_cost,
-                'spec': spec  # Pass through spec for Phase 5
+                'spec': spec  # Pass through spec for Phase 4
             },
             cost_usd=total_cost,
             duration_seconds=duration_seconds,
@@ -410,25 +410,25 @@ def generate_chunks(
         )
         
         # Update cost tracking
-        update_cost(video_id, "phase4", total_cost)
+        update_cost(video_id, "phase3", total_cost)
         
         # Update progress
         update_progress(
             video_id,
             "generating_chunks",
             90,
-            current_phase="phase4_chunks",
+            current_phase="phase3_chunks",
             total_cost=total_cost
         )
         
-        # Store Phase 4 output in database
+        # Store Phase 3 output in database
         db = SessionLocal()
         try:
             video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
             if video:
                 if video.phase_outputs is None:
                     video.phase_outputs = {}
-                video.phase_outputs['phase4_chunks'] = output.dict()
+                video.phase_outputs['phase3_chunks'] = output.dict()
                 video.stitched_url = stitched_video_url
                 video.chunk_urls = chunk_urls
                 video.final_video_url = stitched_video_url
@@ -437,7 +437,7 @@ def generate_chunks(
         finally:
             db.close()
         
-        print(f"✅ Phase 4 (Chunks) completed successfully for video {video_id}")
+        print(f"✅ Phase 3 (Chunks) completed successfully for video {video_id}")
         print(f"   - Generated chunks: {len(chunk_urls)}")
         print(f"   - Stitched video: {stitched_video_url}")
         print(f"   - Total cost: ${total_cost:.4f}")
@@ -455,7 +455,7 @@ def generate_chunks(
             "failed",
             0,
             error_message=str(e),
-            current_phase="phase4_chunks"
+            current_phase="phase3_chunks"
         )
         
         # Store failure in database
@@ -467,14 +467,14 @@ def generate_chunks(
                     video.phase_outputs = {}
                 output_dict = {
                     "video_id": video_id,
-                    "phase": "phase4_chunks_storyboard",
+                    "phase": "phase3_chunks",
                     "status": "failed",
                     "output_data": {},
                     "cost_usd": 0.0,
                     "duration_seconds": duration_seconds,
                     "error_message": str(e)
                 }
-                video.phase_outputs['phase4_chunks'] = output_dict
+                video.phase_outputs['phase3_chunks'] = output_dict
                 flag_modified(video, 'phase_outputs')
                 db.commit()
         finally:
@@ -482,7 +482,7 @@ def generate_chunks(
         
         output = PhaseOutput(
             video_id=video_id,
-            phase="phase4_chunks_storyboard",
+            phase="phase3_chunks",
             status="failed",
             output_data={},
             cost_usd=0.0,
@@ -490,7 +490,7 @@ def generate_chunks(
             error_message=str(e)
         )
         
-        print(f"❌ Phase 4 (Chunks) failed for video {video_id}: {str(e)}")
+        print(f"❌ Phase 3 (Chunks) failed for video {video_id}: {str(e)}")
         return output.dict()
         
     except Exception as e:
@@ -503,7 +503,7 @@ def generate_chunks(
             "failed",
             0,
             error_message=str(e),
-            current_phase="phase4_chunks"
+            current_phase="phase3_chunks"
         )
         
         # Store failure in database
@@ -515,14 +515,14 @@ def generate_chunks(
                     video.phase_outputs = {}
                 output_dict = {
                     "video_id": video_id,
-                    "phase": "phase4_chunks_storyboard",
+                    "phase": "phase3_chunks",
                     "status": "failed",
                     "output_data": {},
                     "cost_usd": 0.0,
                     "duration_seconds": duration_seconds,
                     "error_message": f"An unexpected error occurred: {str(e)}"
                 }
-                video.phase_outputs['phase4_chunks'] = output_dict
+                video.phase_outputs['phase3_chunks'] = output_dict
                 flag_modified(video, 'phase_outputs')
                 db.commit()
         finally:
@@ -530,7 +530,7 @@ def generate_chunks(
         
         output = PhaseOutput(
             video_id=video_id,
-            phase="phase4_chunks_storyboard",
+            phase="phase3_chunks",
             status="failed",
             output_data={},
             cost_usd=0.0,
@@ -538,5 +538,5 @@ def generate_chunks(
             error_message=f"An unexpected error occurred: {str(e)}"
         )
         
-        print(f"❌ Phase 4 (Chunks) unexpected error for video {video_id}: {str(e)}")
+        print(f"❌ Phase 3 (Chunks) unexpected error for video {video_id}: {str(e)}")
         return output.dict()

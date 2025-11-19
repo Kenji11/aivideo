@@ -319,7 +319,7 @@ storyboard_images = Column(JSON, default=list, nullable=True)
 - `GENERATING_ANIMATIC` → Phase 2 (Storyboard)
 - `GENERATING_REFERENCES` → Phase 3 (References)
 - `GENERATING_CHUNKS` → Phase 4 (Chunks)
-- `REFINING` → Phase 5 (Refinement)
+- `REFINING` → Phase 4 (Refinement)
 - `EXPORTING` → Phase 6 (Export)
 
 **Note:** Migration executed LAST after full TDD implementation and testing.

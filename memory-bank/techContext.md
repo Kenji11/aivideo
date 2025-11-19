@@ -120,7 +120,7 @@ aivideo/
 │   │   │   ├── phase2_animatic/ # 👤 PERSON A
 │   │   │   ├── phase3_references/ # 👤 PERSON B
 │   │   │   ├── phase4_chunks/   # 👤 PERSON B
-│   │   │   ├── phase5_refine/   # 👤 PERSON C
+│   │   │   ├── phase4_refine/   # 👤 PERSON C
 │   │   │   └── phase6_export/   # 👤 PERSON C
 │   │   └── tests/
 │   ├── Dockerfile
