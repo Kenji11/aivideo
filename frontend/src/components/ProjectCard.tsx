@@ -58,16 +58,16 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
                 className="rounded-full transform scale-0 group-hover:scale-100 transition-transform duration-300"
               >
                 {isProcessing ? (
-                  <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
+                  <Loader2 className="w-6 h-6 text-primary animate-spin" />
                 ) : (
-                  <Play className="w-6 h-6 text-blue-600 dark:text-blue-400 fill-current" />
+                  <Play className="w-6 h-6 text-primary fill-current" />
                 )}
               </Button>
             </div>
             {isProcessing ? (
-              <Loader2 className="w-12 h-12 text-blue-600 dark:text-blue-400 animate-spin" />
+              <Loader2 className="w-12 h-12 text-primary animate-spin" />
             ) : (
-              <VideoIcon className="w-12 h-12 text-slate-400 dark:text-slate-500" />
+              <VideoIcon className="w-12 h-12 text-muted-foreground" />
             )}
           </>
         )}
@@ -80,7 +80,7 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
 
       <CardContent className="p-4 space-y-3">
         <div>
-          <h3 className="font-semibold text-slate-900 dark:text-slate-100 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+          <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
             {project.title}
           </h3>
           <p className="text-xs text-muted-foreground mt-1">

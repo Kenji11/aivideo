@@ -11,6 +11,12 @@
   body {
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
+    /* Claymorphism background effect */
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(129, 140, 248, 0.1) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, rgba(168, 85, 247, 0.1) 0px, transparent 50%);
   }
 
   :root {
@@ -66,8 +72,11 @@
     --shadow-2xl: 2px 2px 10px 4px hsl(240 4% 60% / 0.45);
     --tracking-normal: 0em;
     --spacing: 0.25rem;
+    --shadow-offset-x: 2px;
+    --shadow-offset-y: 2px;
+    --letter-spacing: 0em;
   }
-  
+
   .dark {
     --background: oklch(0.2244 0.0074 67.4370);
     --foreground: oklch(0.9288 0.0126 255.5078);
@@ -119,8 +128,12 @@
     --shadow-lg: 2px 2px 10px 4px hsl(0 0% 0% / 0.18), 2px 4px 6px 3px hsl(0 0% 0% / 0.18);
     --shadow-xl: 2px 2px 10px 4px hsl(0 0% 0% / 0.18), 2px 8px 10px 3px hsl(0 0% 0% / 0.18);
     --shadow-2xl: 2px 2px 10px 4px hsl(0 0% 0% / 0.45);
+    --shadow-offset-x: 2px;
+    --shadow-offset-y: 2px;
+    --letter-spacing: 0em;
+    --spacing: 0.25rem;
   }
-  
+
   @theme inline {
     --color-background: var(--background);
     --color-foreground: var(--foreground);
@@ -154,16 +167,16 @@
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
-  
+
     --font-sans: var(--font-sans);
     --font-mono: var(--font-mono);
     --font-serif: var(--font-serif);
-  
+
     --radius-sm: calc(var(--radius) - 4px);
     --radius-md: calc(var(--radius) - 2px);
     --radius-lg: var(--radius);
     --radius-xl: calc(var(--radius) + 4px);
-  
+
     --shadow-2xs: var(--shadow-2xs);
     --shadow-xs: var(--shadow-xs);
     --shadow-sm: var(--shadow-sm);
@@ -173,27 +186,66 @@
     --shadow-xl: var(--shadow-xl);
     --shadow-2xl: var(--shadow-2xl);
   }
+  .theme {
+    --font-sans: Plus Jakarta Sans, sans-serif;
+    --font-mono: Roboto Mono, monospace;
+    --font-serif: Lora, serif;
+    --radius: 1.25rem;
+    --tracking-tighter: calc(var(--tracking-normal) - 0.05em);
+    --tracking-tight: calc(var(--tracking-normal) - 0.025em);
+    --tracking-wide: calc(var(--tracking-normal) + 0.025em);
+    --tracking-wider: calc(var(--tracking-normal) + 0.05em);
+    --tracking-widest: calc(var(--tracking-normal) + 0.1em);
+  }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 active:scale-95 disabled:bg-slate-300 disabled:cursor-not-allowed;
+    @apply bg-primary text-primary-foreground py-3 px-6 rounded-lg font-medium transition-all duration-200 active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed;
+  }
+  
+  .btn-primary:hover {
+    opacity: 0.9;
   }
 
   .btn-secondary {
-    @apply border-2 border-slate-300 text-slate-700 py-3 px-6 rounded-lg font-medium hover:bg-slate-50 transition-all duration-200 active:scale-95;
+    @apply border-2 border-border text-foreground py-3 px-6 rounded-lg font-medium hover:bg-accent hover:text-accent-foreground transition-all duration-200 active:scale-95;
   }
 
   .input-field {
-    @apply w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-slate-900 dark:text-slate-100 dark:bg-slate-700 placeholder-slate-400 dark:placeholder-slate-500;
+    @apply w-full px-4 py-3 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent transition-all bg-background text-foreground placeholder:text-muted-foreground;
   }
 
   .card {
-    @apply bg-card text-card-foreground rounded-2xl shadow-sm border border-border transition-all duration-200 hover:shadow-md;
+    @apply text-card-foreground rounded-2xl shadow-lg border transition-all duration-200 hover:shadow-xl;
+    /* Claymorphism effect */
+    background: linear-gradient(135deg, var(--card) 0%, var(--card) 100%);
+    background-color: var(--card);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-color: var(--border);
+    opacity: 0.95;
+    box-shadow: 
+      0 8px 32px 0 rgba(0, 0, 0, 0.1),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  }
+  
+  .dark .card {
+    opacity: 0.9;
+    box-shadow: 
+      0 8px 32px 0 rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
   }
 
   .gradient-text {
-    @apply bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent;
+    background: linear-gradient(to right, var(--primary), color-mix(in oklch, var(--primary) 80%, transparent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    /* Fallback: if bg-clip-text doesn't work, show primary color */
+    @supports not (background-clip: text) {
+      color: var(--primary);
+    }
   }
 
   .step-indicator {

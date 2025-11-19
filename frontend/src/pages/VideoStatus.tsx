@@ -228,13 +228,13 @@ export function VideoStatus() {
       />
 
       <div className="card p-8 text-center animate-fade-in">
-        <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-100 dark:bg-blue-900 rounded-full mb-6 animate-pulse-subtle">
-          <Video className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+        <div className="inline-flex items-center justify-center w-20 h-20 bg-primary/20 rounded-full mb-6 animate-pulse-subtle">
+          <Video className="w-10 h-10 text-primary" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+        <h2 className="text-2xl font-bold text-foreground mb-2">
           AI is Creating Your Video
         </h2>
-        <p className="text-slate-600 dark:text-slate-400 mb-8">
+        <p className="text-muted-foreground mb-8">
           Sit back and relax while our AI works its magic...
         </p>
 
@@ -243,16 +243,16 @@ export function VideoStatus() {
         </div>
 
         {animaticUrls && animaticUrls.length > 0 && (
-          <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
+          <div className="mt-8 pt-8 border-t border-border">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-1">
+                <h3 className="text-xl font-bold text-foreground mb-1">
                   🎬 Storyboard Images Generated
                 </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
+                <p className="text-sm text-muted-foreground">
                   {animaticUrls.length} storyboard image{animaticUrls.length !== 1 ? 's' : ''} ready for video generation
                   {currentChunkIndex !== null && totalChunks !== null && (
-                    <span className="ml-2 text-blue-600 dark:text-blue-400 font-semibold">
+                    <span className="ml-2 text-primary font-semibold">
                       • Processing chunk {currentChunkIndex + 1} of {totalChunks}
                     </span>
                   )}
@@ -277,10 +277,10 @@ export function VideoStatus() {
                         alt={`Storyboard image ${idx + 1}`}
                         className={`w-full h-32 object-cover rounded-lg border-2 shadow-md group-hover:scale-105 transition-transform cursor-pointer ${
                           isProcessingChunk
-                            ? 'border-blue-500 dark:border-blue-400 ring-4 ring-blue-300 dark:ring-blue-600'
+                            ? 'border-primary ring-4 ring-primary/30'
                             : isCompleted
-                            ? 'border-green-500 dark:border-green-400'
-                            : 'border-slate-200 dark:border-slate-700'
+                            ? 'border-primary'
+                            : 'border-border'
                         }`}
                         onClick={() => window.open(url, '_blank')}
                         onError={(e) => {
@@ -288,12 +288,12 @@ export function VideoStatus() {
                         }}
                       />
                       {isProcessingChunk && (
-                        <div className="absolute inset-0 bg-blue-500 bg-opacity-20 rounded-lg flex items-center justify-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+                        <div className="absolute inset-0 bg-primary/20 rounded-lg flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent"></div>
                         </div>
                       )}
                       {isCompleted && (
-                        <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1">
+                        <div className="absolute top-2 right-2 bg-primary rounded-full p-1">
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
@@ -314,18 +314,18 @@ export function VideoStatus() {
 
         {/* Phase 3 (Reference Assets) */}
         {referenceAssets && (
-          <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-700">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">
+          <div className="mt-8 pt-8 border-t border-border">
+            <h3 className="text-lg font-semibold text-foreground mb-4">
               Reference Assets Generated
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
               {referenceAssets.style_guide_url && (
-                <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Style Guide</p>
+                <div className="bg-card rounded-lg p-4">
+                  <p className="text-sm font-medium text-card-foreground mb-2">Style Guide</p>
                   <img 
                     src={referenceAssets.style_guide_url} 
                     alt="Style Guide"
-                    className="w-full h-48 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
+                    className="w-full h-48 object-cover rounded-lg border border-border"
                     onError={(e) => {
                       e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Style+Guide';
                     }}
@@ -333,12 +333,12 @@ export function VideoStatus() {
                 </div>
               )}
               {referenceAssets.product_reference_url && (
-                <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Product Reference</p>
+                <div className="bg-card rounded-lg p-4">
+                  <p className="text-sm font-medium text-card-foreground mb-2">Product Reference</p>
                   <img 
                     src={referenceAssets.product_reference_url} 
                     alt="Product Reference"
-                    className="w-full h-48 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
+                    className="w-full h-48 object-cover rounded-lg border border-border"
                     onError={(e) => {
                       e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Product+Reference';
                     }}
@@ -348,7 +348,7 @@ export function VideoStatus() {
             </div>
             {referenceAssets.uploaded_assets && referenceAssets.uploaded_assets.length > 0 && (
               <div className="mt-4">
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <p className="text-sm font-medium text-card-foreground mb-2">
                   Uploaded Assets ({referenceAssets.uploaded_assets.length})
                 </p>
                 <div className="grid grid-cols-3 gap-2">
@@ -357,7 +357,7 @@ export function VideoStatus() {
                       key={idx}
                       src={asset.s3_url}
                       alt={`Uploaded asset ${idx + 1}`}
-                      className="w-full h-24 object-cover rounded border border-slate-200 dark:border-slate-700"
+                      className="w-full h-24 object-cover rounded border border-border"
                       onError={(e) => {
                         e.currentTarget.src = 'https://via.placeholder.com/200x200?text=Asset';
                       }}

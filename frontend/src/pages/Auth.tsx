@@ -83,7 +83,7 @@ export function Auth({ onAuthSuccess }: AuthProps) {
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl mb-6 shadow-xl">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-primary to-primary/80 rounded-3xl mb-6 shadow-xl">
             <Film className="w-11 h-11 text-white" />
           </div>
           <h1 className="text-4xl font-bold text-foreground mb-3">VideoAI Studio</h1>
@@ -166,7 +166,7 @@ export function Auth({ onAuthSuccess }: AuthProps) {
           {/* Divider */}
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-300"></div>
+              <div className="w-full border-t border-border"></div>
             </div>
             <div className="relative flex justify-center text-sm">
               <span className="px-4 bg-card text-muted-foreground">Or continue with</span>
@@ -211,7 +211,7 @@ export function Auth({ onAuthSuccess }: AuthProps) {
                   setIsSignUp(!isSignUp);
                   setError(null);
                 }}
-                className="text-blue-600 hover:text-blue-700 font-semibold transition-colors"
+                className="text-primary hover:text-primary/80 font-semibold transition-colors"
                 disabled={loading}
               >
                 {isSignUp ? 'Sign In' : 'Sign Up'}

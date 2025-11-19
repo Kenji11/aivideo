@@ -161,8 +161,8 @@ function AppContent() {
               onClick={() => navigate('/dashboard')}
               className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
                 location.pathname === '/dashboard' 
-                  ? 'bg-blue-600 text-white' 
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'text-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
               title="Dashboard"
             >
@@ -173,8 +173,8 @@ function AppContent() {
               onClick={() => navigate('/templates')}
               className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
                 location.pathname === '/templates' 
-                  ? 'bg-blue-600 text-white' 
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'text-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
               title="Templates"
             >
@@ -185,8 +185,8 @@ function AppContent() {
               onClick={() => navigate('/library')}
               className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
                 location.pathname === '/library' 
-                  ? 'bg-blue-600 text-white' 
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'text-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
               title="Video Library"
             >
@@ -197,8 +197,8 @@ function AppContent() {
               onClick={() => navigate('/analytics')}
               className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
                 location.pathname === '/analytics' 
-                  ? 'bg-blue-600 text-white' 
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'text-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
               title="Analytics"
             >
@@ -209,8 +209,8 @@ function AppContent() {
               onClick={() => navigate('/billing')}
               className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
                 location.pathname === '/billing' 
-                  ? 'bg-blue-600 text-white' 
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'text-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
               title="Billing"
             >
@@ -221,8 +221,8 @@ function AppContent() {
               onClick={() => navigate('/api')}
               className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
                 location.pathname === '/api' 
-                  ? 'bg-blue-600 text-white' 
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'text-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
               title="API"
             >
@@ -233,8 +233,8 @@ function AppContent() {
               onClick={() => navigate('/settings')}
               className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap text-sm ${
                 location.pathname === '/settings' 
-                  ? 'bg-blue-600 text-white' 
-                  : 'text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'text-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
               title="Settings"
             >
@@ -282,7 +282,7 @@ function AppContent() {
 
               {isLoadingProjects ? (
                 <div className="card p-16 text-center">
-                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mb-4"></div>
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
                   <p className="text-muted-foreground">Loading projects...</p>
                 </div>
               ) : projects.length === 0 ? (
@@ -314,7 +314,7 @@ function AppContent() {
 
           <Route path="/preview" element={
             <div className="card overflow-hidden animate-fade-in">
-              <div className="aspect-video bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
+              <div className="aspect-video bg-gradient-to-br from-card to-muted flex items-center justify-center">
                 {stitchedVideoUrl ? (
                   <video
                     src={stitchedVideoUrl}
@@ -422,7 +422,7 @@ function AppContent() {
                     <video
                       src={stitchedVideoUrl}
                       controls
-                      className="w-full max-w-2xl mx-auto rounded-lg border border-slate-200 dark:border-slate-700"
+                      className="w-full max-w-2xl mx-auto rounded-lg border border-border"
                     >
                       Your browser does not support the video tag.
                     </video>

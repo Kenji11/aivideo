@@ -46,13 +46,13 @@ export function AssetList({ selectedAssetIds, onSelectionChange, disabled = fals
   const getAssetIcon = (assetType: string) => {
     switch (assetType) {
       case 'image':
-        return <Image className="w-4 h-4 text-blue-600" />;
+        return <Image className="w-4 h-4 text-primary" />;
       case 'video':
-        return <Video className="w-4 h-4 text-purple-600" />;
+        return <Video className="w-4 h-4 text-primary" />;
       case 'audio':
-        return <FileText className="w-4 h-4 text-green-600" />;
+        return <FileText className="w-4 h-4 text-primary" />;
       default:
-        return <FileText className="w-4 h-4 text-slate-600" />;
+        return <FileText className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -71,7 +71,7 @@ export function AssetList({ selectedAssetIds, onSelectionChange, disabled = fals
   if (isLoading) {
     return (
       <div className="p-6 text-center">
-        <Loader2 className="w-6 h-6 text-blue-600 animate-spin mx-auto mb-2" />
+        <Loader2 className="w-6 h-6 text-primary animate-spin mx-auto mb-2" />
         <p className="text-sm text-muted-foreground">Loading assets...</p>
       </div>
     );
@@ -80,10 +80,10 @@ export function AssetList({ selectedAssetIds, onSelectionChange, disabled = fals
   if (error) {
     return (
       <div className="p-6 text-center">
-        <p className="text-sm text-red-600 mb-2">{error}</p>
+        <p className="text-sm text-destructive mb-2">{error}</p>
         <button
           onClick={fetchAssets}
-          className="text-sm text-blue-600 hover:text-blue-700 underline"
+          className="text-sm text-primary hover:text-primary/80 underline"
         >
           Try again
         </button>
@@ -112,7 +112,7 @@ export function AssetList({ selectedAssetIds, onSelectionChange, disabled = fals
         <button
           onClick={fetchAssets}
           disabled={isLoading || disabled}
-          className="flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center space-x-1 text-xs text-primary hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
           <span>Refresh</span>
@@ -134,9 +134,9 @@ export function AssetList({ selectedAssetIds, onSelectionChange, disabled = fals
             >
               <div className="flex-shrink-0">
                 {isSelected ? (
-                  <CheckSquare className="w-5 h-5 text-blue-600" />
+                  <CheckSquare className="w-5 h-5 text-primary" />
                 ) : (
-                  <Square className="w-5 h-5 text-slate-400" />
+                  <Square className="w-5 h-5 text-muted-foreground" />
                 )}
               </div>
               <div className="flex-shrink-0">
