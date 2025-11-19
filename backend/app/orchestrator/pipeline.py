@@ -1,6 +1,8 @@
 # Main orchestration task
 import time
+import logging
 from celery import chain
+from celery.exceptions import Retry
 from app.orchestrator.celery_app import celery_app
 from app.phases.phase1_validate.task import validate_prompt
 from app.phases.phase2_storyboard.task import generate_storyboard
@@ -8,7 +10,14 @@ from app.phases.phase3_references.task import generate_references
 from app.phases.phase4_chunks_storyboard.task import generate_chunks as generate_chunks_storyboard
 from app.phases.phase5_refine.task import refine_video
 from app.database import SessionLocal
-from app.common.models import VideoGeneration
+from app.common.models import VideoGeneration, VideoStatus
+from app.orchestrator.progress import update_progress
+from app.services.redis import RedisClient
+
+logger = logging.getLogger(__name__)
+
+# Initialize Redis client
+redis_client = RedisClient()
 
 
 @celery_app.task(bind=True, name="app.orchestrator.pipeline.run_pipeline")
@@ -16,6 +25,9 @@ def run_pipeline(self, video_id: str, prompt: str, assets: list = None, model: s
     """
     Main orchestration task - dispatches pipeline as Celery chain and returns immediately.
     Worker thread is freed to handle more videos concurrently.
+    
+    Writes to DB only at start (video creation). All mid-pipeline updates go to Redis.
+    Spec is written to DB only on completion/failure (final submission).
     
     Args:
         video_id: Unique video generation ID
@@ -35,9 +47,14 @@ def run_pipeline(self, video_id: str, prompt: str, assets: list = None, model: s
     print(f"   - Model: {model}")
     
     # Get user_id from video record for S3 path organization
+    # Note: Video record is already created in generate.py endpoint
     db = SessionLocal()
     try:
         video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+        if not video:
+            logger.error(f"Video {video_id} not found in DB - should have been created in generate.py")
+            raise Exception(f"Video {video_id} not found")
+        
         user_id = video.user_id if video else None
         if not user_id:
             # Fallback to mock user ID if not set (for development/testing)
@@ -46,11 +63,18 @@ def run_pipeline(self, video_id: str, prompt: str, assets: list = None, model: s
             print(f"⚠️  No user_id found for video {video_id}, using mock user ID: {user_id}")
         
         # Update status to validating (Phase 1 will start)
-        if video:
-            from app.common.models import VideoStatus
-            video.status = VideoStatus.VALIDATING
-            db.commit()
-            print(f"✅ Updated video {video_id} status to VALIDATING")
+        # This is a critical update (initial state), so write to DB
+        video.status = VideoStatus.VALIDATING
+        db.commit()
+        print(f"✅ Updated video {video_id} status to VALIDATING in DB")
+        
+        # Also update Redis (video should already be in Redis from generate.py, but update status)
+        if redis_client._client:
+            try:
+                redis_client.set_video_status(video_id, VideoStatus.VALIDATING.value)
+                print(f"✅ Updated video {video_id} status in Redis")
+            except Exception as e:
+                logger.warning(f"Failed to update Redis: {e}")
     finally:
         db.close()
     
