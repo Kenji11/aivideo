@@ -33,8 +33,8 @@ export function Header({ userName, onLogout }: HeaderProps) {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-2 cursor-pointer group" onClick={() => navigate('/')}>
             <div className="relative">
-              <Film className="w-8 h-8 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
-              <div className="absolute inset-0 bg-blue-600/20 rounded-lg blur-md group-hover:blur-lg transition-all" />
+              <Film className="w-8 h-8 text-primary group-hover:scale-110 transition-transform" />
+              <div className="absolute inset-0 bg-primary/20 rounded-lg blur-md group-hover:blur-lg transition-all" />
             </div>
             <div>
               <span className="text-xl font-bold gradient-text">VideoAI</span>

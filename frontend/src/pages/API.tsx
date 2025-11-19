@@ -59,14 +59,14 @@ export function API() {
   return (
     <div className="max-w-6xl mx-auto animate-fade-in">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">API Documentation</h1>
-        <p className="text-slate-600 dark:text-slate-400 mt-1">Integrate VideoAI Studio into your application</p>
+        <h1 className="text-3xl font-bold text-foreground">API Documentation</h1>
+        <p className="text-muted-foreground mt-1">Integrate VideoAI Studio into your application</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="card p-6">
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Base URL</p>
-          <p className="text-lg font-mono font-semibold text-slate-900 dark:text-slate-100 break-all">
+          <p className="text-sm text-muted-foreground mb-1">Base URL</p>
+          <p className="text-lg font-mono font-semibold text-foreground break-all">
             https://api.videoai.studio
           </p>
         </div>
@@ -81,58 +81,58 @@ export function API() {
       </div>
 
       <div className="card p-6 mb-8">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Getting Your API Key</h3>
-        <ol className="space-y-3 text-slate-700 dark:text-slate-300">
+        <h3 className="text-lg font-semibold text-foreground mb-4">Getting Your API Key</h3>
+        <ol className="space-y-3 text-foreground">
           <li className="flex items-start space-x-3">
-            <span className="font-bold text-blue-600">1.</span>
+            <span className="font-bold text-primary">1.</span>
             <span>Go to your account settings</span>
           </li>
           <li className="flex items-start space-x-3">
-            <span className="font-bold text-blue-600">2.</span>
+            <span className="font-bold text-primary">2.</span>
             <span>Navigate to "API & Integrations"</span>
           </li>
           <li className="flex items-start space-x-3">
-            <span className="font-bold text-blue-600">3.</span>
+            <span className="font-bold text-primary">3.</span>
             <span>Click "Generate New Key"</span>
           </li>
           <li className="flex items-start space-x-3">
-            <span className="font-bold text-blue-600">4.</span>
+            <span className="font-bold text-primary">4.</span>
             <span>Copy your key and store it securely</span>
           </li>
         </ol>
       </div>
 
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Endpoints</h2>
+        <h2 className="text-2xl font-bold text-foreground">Endpoints</h2>
 
         {endpoints.map((endpoint) => (
           <div key={endpoint.id} className="card p-6">
-            <div className="mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
+            <div className="mb-4 pb-4 border-b border-border">
               <div className="flex items-center space-x-4 mb-2">
                 <span
-                  className={`px-3 py-1 rounded text-sm font-bold text-white ${
-                    endpoint.method === 'POST' ? 'bg-green-600' : 'bg-blue-600'
+                  className={`px-3 py-1 rounded text-sm font-bold text-primary-foreground ${
+                    endpoint.method === 'POST' ? 'bg-primary' : 'bg-primary'
                   }`}
                 >
                   {endpoint.method}
                 </span>
-                <code className="font-mono text-slate-900 dark:text-slate-100">{endpoint.path}</code>
+                <code className="font-mono text-foreground">{endpoint.path}</code>
               </div>
-              <p className="text-slate-600 dark:text-slate-400">{endpoint.description}</p>
+              <p className="text-muted-foreground">{endpoint.description}</p>
             </div>
 
-            <div className="bg-slate-900 rounded-lg p-4 mb-4 relative group">
-              <pre className="text-slate-300 font-mono text-sm overflow-x-auto whitespace-pre-wrap break-words">
+            <div className="bg-card rounded-lg p-4 mb-4 relative group border border-border">
+              <pre className="text-card-foreground font-mono text-sm overflow-x-auto whitespace-pre-wrap break-words">
                 {endpoint.example}
               </pre>
               <button
                 onClick={() => copyToClipboard(endpoint.example, endpoint.id)}
-                className="absolute top-2 right-2 p-2 bg-slate-700 rounded hover:bg-slate-600 transition-colors opacity-0 group-hover:opacity-100"
+                className="absolute top-2 right-2 p-2 bg-muted rounded hover:bg-accent transition-colors opacity-0 group-hover:opacity-100"
               >
                 {copiedEndpoint === endpoint.id ? (
-                  <Check className="w-4 h-4 text-green-400" />
+                  <Check className="w-4 h-4 text-primary" />
                 ) : (
-                  <Copy className="w-4 h-4 text-slate-300" />
+                  <Copy className="w-4 h-4 text-muted-foreground" />
                 )}
               </button>
             </div>
@@ -141,12 +141,12 @@ export function API() {
       </div>
 
       <div className="card p-6 mt-8">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center space-x-2">
+        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center space-x-2">
           <Code className="w-5 h-5" />
           <span>Response Format</span>
         </h3>
-        <div className="bg-slate-900 rounded-lg p-4">
-          <pre className="text-slate-300 font-mono text-sm overflow-x-auto">
+        <div className="bg-card rounded-lg p-4 border border-border">
+          <pre className="text-card-foreground font-mono text-sm overflow-x-auto">
 {`{
   "success": true,
   "data": {
@@ -162,8 +162,8 @@ export function API() {
       </div>
 
       <div className="card p-6 mt-8">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Need Help?</h3>
-        <p className="text-slate-600 dark:text-slate-400 mb-4">
+        <h3 className="text-lg font-semibold text-foreground mb-4">Need Help?</h3>
+        <p className="text-muted-foreground mb-4">
           Check our documentation, examples, and community forum for help with integration.
         </p>
         <div className="flex space-x-3">

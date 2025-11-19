@@ -23,23 +23,23 @@ export function ProcessingSteps({ steps, elapsedTime = 0 }: ProcessingStepsProps
       {steps.map((step, idx) => (
         <Card
           key={idx}
-          className="animate-slide-in border-slate-200 dark:border-slate-700"
+          className="animate-slide-in border-border"
           style={{ animationDelay: `${idx * 100}ms` }}
         >
           <CardContent className="p-4">
             <div className="flex items-center space-x-4">
               <div className="flex-shrink-0">
                 {step.status === 'completed' && (
-                  <CheckCircle2 className="w-6 h-6 text-green-500" />
+                  <CheckCircle2 className="w-6 h-6 text-primary" />
                 )}
                 {step.status === 'processing' && (
-                  <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                  <Loader2 className="w-6 h-6 text-primary animate-spin" />
                 )}
                 {step.status === 'failed' && (
-                  <AlertCircle className="w-6 h-6 text-red-500" />
+                  <AlertCircle className="w-6 h-6 text-destructive" />
                 )}
                 {step.status === 'pending' && (
-                  <div className="w-6 h-6 rounded-full bg-slate-300 dark:bg-slate-600" />
+                  <div className="w-6 h-6 rounded-full bg-muted" />
                 )}
               </div>
               <span
@@ -50,7 +50,7 @@ export function ProcessingSteps({ steps, elapsedTime = 0 }: ProcessingStepsProps
                       ? 'text-foreground'
                       : step.status === 'completed'
                         ? 'text-muted-foreground'
-                        : 'text-red-700 dark:text-red-400'
+                        : 'text-destructive'
                 }`}
               >
                 {step.name}

@@ -41,8 +41,8 @@ export function VideoEditor({ onSave, onCancel }: VideoEditorProps) {
   return (
     <div className="card p-6 space-y-6 animate-fade-in">
       <div>
-        <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-4 flex items-center space-x-2">
-          <Sliders className="w-5 h-5 text-blue-600" />
+        <h3 className="font-semibold text-foreground mb-4 flex items-center space-x-2">
+          <Sliders className="w-5 h-5 text-primary" />
           <span>Video Settings</span>
         </h3>
       </div>
@@ -51,7 +51,7 @@ export function VideoEditor({ onSave, onCancel }: VideoEditorProps) {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label>Duration</Label>
-            <span className="text-sm text-blue-600">{settings.duration}s</span>
+            <span className="text-sm text-primary">{settings.duration}s</span>
           </div>
           <Slider
             min={15}
@@ -70,7 +70,7 @@ export function VideoEditor({ onSave, onCancel }: VideoEditorProps) {
               <Volume2 className="w-4 h-4" />
               <span>Volume</span>
             </Label>
-            <span className="text-sm text-blue-600">{settings.volume}%</span>
+            <span className="text-sm text-primary">{settings.volume}%</span>
           </div>
           <Slider
             min={0}
@@ -113,7 +113,7 @@ export function VideoEditor({ onSave, onCancel }: VideoEditorProps) {
               <Type className="w-4 h-4" />
               <span>Text Size</span>
             </Label>
-            <span className="text-sm text-blue-600">{settings.fontSize}px</span>
+            <span className="text-sm text-primary">{settings.fontSize}px</span>
           </div>
           <Slider
             min={16}

@@ -20,8 +20,8 @@ export function Settings() {
     <div className="max-w-3xl mx-auto animate-fade-in">
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Settings</h1>
-        <p className="text-slate-600 dark:text-slate-400 mt-1">Customize your VideoAI Studio experience</p>
+        <h1 className="text-3xl font-bold text-foreground">Settings</h1>
+        <p className="text-muted-foreground mt-1">Customize your VideoAI Studio experience</p>
       </div>
 
       <div className="space-y-6">
