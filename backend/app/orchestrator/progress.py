@@ -82,16 +82,16 @@ def update_progress(
             if "phase_outputs" in kwargs:
                 redis_client.set_video_phase_outputs(video_id, kwargs["phase_outputs"])
             elif "current_chunk_index" in kwargs:
-                # Handle Phase 4 chunk progress tracking
+                # Handle Phase 3 chunk progress tracking
                 # Get existing phase_outputs from Redis or create new
                 existing_data = redis_client.get_video_data(video_id)
                 phase_outputs = existing_data.get("phase_outputs", {}) if existing_data else {}
                 
-                if "phase4_chunks" not in phase_outputs:
-                    phase_outputs["phase4_chunks"] = {}
-                phase_outputs["phase4_chunks"]["current_chunk_index"] = kwargs["current_chunk_index"]
+                if "phase3_chunks" not in phase_outputs:
+                    phase_outputs["phase3_chunks"] = {}
+                phase_outputs["phase3_chunks"]["current_chunk_index"] = kwargs["current_chunk_index"]
                 if "total_chunks" in kwargs:
-                    phase_outputs["phase4_chunks"]["total_chunks"] = kwargs["total_chunks"]
+                    phase_outputs["phase3_chunks"]["total_chunks"] = kwargs["total_chunks"]
                 
                 redis_client.set_video_phase_outputs(video_id, phase_outputs)
             
@@ -173,10 +173,10 @@ def update_progress(
             elif "current_chunk_index" in kwargs:
                 if video.phase_outputs is None:
                     video.phase_outputs = {}
-                if "phase4_chunks" not in video.phase_outputs:
-                    video.phase_outputs["phase4_chunks"] = {}
-                video.phase_outputs["phase4_chunks"]["current_chunk_index"] = kwargs["current_chunk_index"]
-                video.phase_outputs["phase4_chunks"]["total_chunks"] = kwargs.get("total_chunks")
+                if "phase3_chunks" not in video.phase_outputs:
+                    video.phase_outputs["phase3_chunks"] = {}
+                video.phase_outputs["phase3_chunks"]["current_chunk_index"] = kwargs["current_chunk_index"]
+                video.phase_outputs["phase3_chunks"]["total_chunks"] = kwargs.get("total_chunks")
                 from sqlalchemy.orm.attributes import flag_modified
                 flag_modified(video, 'phase_outputs')
             

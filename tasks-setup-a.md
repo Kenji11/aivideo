@@ -14,7 +14,7 @@ cd videogen-pipeline
 
 # Backend structure
 mkdir -p backend/app/{common,services,api,orchestrator,phases,tests}
-mkdir -p backend/app/phases/{phase1_validate,phase2_animatic,phase3_references,phase4_chunks,phase5_refine,phase6_export}
+mkdir -p backend/app/phases/{phase1_validate,phase2_animatic,phase3_references,phase4_chunks,phase4_refine,phase6_export}
 mkdir -p backend/alembic/versions
 
 cd backend
@@ -166,7 +166,7 @@ touch app/phases/phase2_animatic/prompts.py
 ### Task 1.11: Create Placeholder Phase Files
 ```bash
 # Placeholder for other phases
-for phase in phase3_references phase4_chunks phase5_refine phase6_export; do
+for phase in phase3_references phase4_chunks phase4_refine phase6_export; do
   touch app/phases/$phase/__init__.py
   touch app/phases/$phase/task.py
   touch app/phases/$phase/service.py

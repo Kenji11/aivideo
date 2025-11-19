@@ -57,7 +57,7 @@ Six-phase pipeline that progressively refines from low-fidelity animatics to hig
 ## Team Structure (3 People)
 - **Person A**: Phase 1 (Validation) + Phase 2 (Animatic) + Generate Form
 - **Person B**: Phase 3 (References) + Phase 4 (Chunks) + Progress Indicator
-- **Person C**: Phase 5 (Refinement) + Phase 6 (Export) + Video Player
+- **Person C**: Phase 4 (Refinement) + Phase 6 (Export) + Video Player
 
 **Philosophy**: Phase-based vertical slices minimize merge conflicts and enable parallel development.
 

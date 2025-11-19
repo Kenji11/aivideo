@@ -289,7 +289,7 @@ backend/
 │   │   │   ├── chunk_generator.py # Single chunk generation
 │   │   │   └── stitcher.py        # FFmpeg stitching + transitions
 │   │   │
-│   │   ├── phase5_refine/         # 👤 PERSON C
+│   │   ├── phase4_refine/         # 👤 PERSON C
 │   │   │   ├── __init__.py
 │   │   │   ├── task.py            # @celery_app.task refine_video()
 │   │   │   ├── service.py         # Orchestrate refinement steps
@@ -515,7 +515,7 @@ from app.phases.phase1_validate.task import validate_prompt
 from app.phases.phase2_animatic.task import generate_animatic
 from app.phases.phase3_references.task import generate_references
 from app.phases.phase4_chunks.task import generate_chunks
-from app.phases.phase5_refine.task import refine_video
+from app.phases.phase4_refine.task import refine_video
 from app.phases.phase6_export.task import export_video
 from app.orchestrator.progress import update_progress, update_cost
 from app.orchestrator.celery_app import celery_app
@@ -1190,18 +1190,18 @@ def generate_single_chunk(chunk_spec: dict) -> str:
 
 ### Phase 5: Refinement (Person C)
 
-**Location:** `phases/phase5_refine/`
+**Location:** `phases/phase4_refine/`
 
 **Objective:** Polish stitched video (upscale, color grade, add music).
 
 **Implementation:**
 
 ```python
-# phases/phase5_refine/task.py
+# phases/phase4_refine/task.py
 
 from app.orchestrator.celery_app import celery_app
 from app.common.schemas import PhaseOutput
-from app.phases.phase5_refine.service import RefinementService
+from app.phases.phase4_refine.service import RefinementService
 import time
 
 @celery_app.task
@@ -1222,7 +1222,7 @@ def refine_video(video_id: str, stitched_url: str, spec: dict) -> PhaseOutput:
         
         return PhaseOutput(
             video_id=video_id,
-            phase="phase5_refine",
+            phase="phase4_refine",
             status="success",
             output_data={
                 "refined_video_url": refined_url,
@@ -1234,7 +1234,7 @@ def refine_video(video_id: str, stitched_url: str, spec: dict) -> PhaseOutput:
     except Exception as e:
         return PhaseOutput(
             video_id=video_id,
-            phase="phase5_refine",
+            phase="phase4_refine",
             status="failed",
             output_data={},
             cost_usd=0.0,
@@ -1667,7 +1667,7 @@ aws cloudfront create-invalidation --distribution-id <id> --paths "/*"
 
 **Person C:**
 - Phase 5: Refinement
-  - Implement `phases/phase5_refine/task.py`
+  - Implement `phases/phase4_refine/task.py`
   - Implement FFmpeg upscaling/color grading
   - Integrate MusicGen
 - Phase 6: Export
@@ -1854,7 +1854,7 @@ git push origin feature/phase1-validate
 **Allowed to edit:**
 - Person A: `phases/phase1_validate/`, `phases/phase2_animatic/`, `features/generate/`
 - Person B: `phases/phase3_references/`, `phases/phase4_chunks/`, `features/progress/`
-- Person C: `phases/phase5_refine/`, `phases/phase6_export/`, `features/video/`
+- Person C: `phases/phase4_refine/`, `phases/phase6_export/`, `features/video/`
 
 **Shared files (need approval from all):**
 - `common/schemas.py`

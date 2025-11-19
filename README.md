@@ -148,8 +148,8 @@ aivideo/
 │   │   ├── phases/           # Phase implementations
 │   │   │   ├── phase1_validate/
 │   │   │   ├── phase2_storyboard/
-│   │   │   ├── phase4_chunks_storyboard/
-│   │   │   └── phase5_refine/
+│   │   │   ├── phase3_chunks/
+│   │   │   └── phase4_refine/
 │   │   ├── services/         # External service clients
 │   │   └── common/           # Shared code
 │   ├── docker-compose.yml
@@ -186,7 +186,7 @@ AWS_REGION=us-east-2
 Default model is `hailuo`. To change:
 
 ```python
-# backend/app/phases/phase4_chunks_storyboard/model_config.py
+# backend/app/phases/phase3_chunks/model_config.py
 DEFAULT_MODEL = 'hailuo'  # Change to 'veo_fast', 'veo', etc.
 ```
 
