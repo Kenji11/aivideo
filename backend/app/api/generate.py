@@ -65,7 +65,7 @@ async def generate_video(
         try:
             redis_client.set_video_progress(video_id, 0.0)
             redis_client.set_video_status(video_id, VideoStatus.QUEUED.value)
-            redis_client.set_video_phase(video_id, None)  # No phase yet
+            redis_client.set_video_phase(video_id, "phase1_validate")  # Initial phase
             redis_client.set_video_user_id(video_id, user_id)  # Store user_id for access checks
             redis_client.set_video_metadata(video_id, {
                 "title": video_record.title,
