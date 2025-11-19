@@ -1,45 +1,16 @@
-import { useState, useEffect } from 'react';
-
 /**
- * Custom hook for managing dark mode with localStorage persistence
- * Defaults to dark mode on first load
+ * Hook that enforces dark mode - always applies dark class to document root
+ * Dark mode cannot be toggled off
+ * Note: Dark mode is also enforced in index.html and main.tsx for immediate application
  */
 export function useDarkMode() {
-  const [isDark, setIsDark] = useState<boolean>(() => {
-    // Check localStorage first
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('darkMode');
-      if (saved !== null) {
-        return saved === 'true';
-      }
-    }
-    // Default to dark mode
-    return true;
-  });
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (isDark) {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    // Persist to localStorage
-    localStorage.setItem('darkMode', String(isDark));
-  }, [isDark]);
-
-  const toggleDarkMode = () => {
-    setIsDark((prev) => !prev);
-  };
-
-  const setDarkMode = (value: boolean) => {
-    setIsDark(value);
-  };
+  // Ensure dark mode is applied (redundant but safe)
+  if (typeof document !== 'undefined') {
+    document.documentElement.classList.add('dark');
+    localStorage.setItem('darkMode', 'true');
+  }
 
   return {
-    isDark,
-    toggleDarkMode,
-    setDarkMode,
+    isDark: true,
   };
 }
-

@@ -58,17 +58,17 @@ export function UploadVideo({
   return (
     <div className="card p-8 animate-fade-in">
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+        <h2 className="text-2xl font-bold text-card-foreground mb-2">
           Create Your Video
         </h2>
-        <p className="text-slate-600 dark:text-slate-400">
+        <p className="text-muted-foreground">
           Describe your vision and let AI bring it to life, or choose a template to get started
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             Project Title
           </label>
           <input
@@ -82,7 +82,7 @@ export function UploadVideo({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             Description (optional)
           </label>
           <textarea
@@ -94,7 +94,7 @@ export function UploadVideo({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             What would you like to create?
           </label>
           <textarea
@@ -107,7 +107,7 @@ export function UploadVideo({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             Reference Materials
           </label>
           <UploadZone 
@@ -116,7 +116,7 @@ export function UploadVideo({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             Video Model
           </label>
           <select
@@ -131,7 +131,7 @@ export function UploadVideo({
             <option value="runway_gen4_turbo">Runway Gen-4 Turbo (Test)</option>
             <option value="runway">Runway Gen-2</option>
           </select>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-xs text-muted-foreground">
             Choose the AI model for video generation. Different models have different quality, speed, and cost characteristics.
           </p>
         </div>
