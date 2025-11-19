@@ -62,7 +62,7 @@ function AppContent() {
     // Phase 3 (references) is disabled - skip to Phase 4
     if (phase === 'phase3_references') return 2; // Should not occur, but handle gracefully
     if (phase === 'phase4_chunks') return 2; // Moved from 3 to 2 (Phase 3 removed)
-    if (phase === 'phase5_refine') return 2; // Phase 5 is part of chunk generation/refinement, keep at step 2
+    if (phase === 'phase4_refine') return 2; // Phase 5 is part of chunk generation/refinement, keep at step 2
     return Math.min(Math.floor(progress / 25), 2); // Cap at 2 (max step index)
   };
 

@@ -185,7 +185,7 @@ backend/app/
 │   │
 │   ├── phase3_references/    # DISABLED (kept for compatibility)
 │   │
-│   ├── phase4_chunks_storyboard/  # Video chunk generation (ACTIVE)
+│   ├── phase3_chunks/  # Video chunk generation (ACTIVE)
 │   │   ├── task.py           # Celery task wrapper
 │   │   ├── service.py        # ChunkGenerationService
 │   │   ├── chunk_generator.py # Chunk generation logic
@@ -194,7 +194,7 @@ backend/app/
 │   │
 │   ├── phase4_chunks/        # OLD implementation (fallback)
 │   │
-│   ├── phase5_refine/        # Audio generation & video refinement
+│   ├── phase4_refine/        # Audio generation & video refinement
 │   │   ├── task.py           # Celery task wrapper
 │   │   ├── service.py        # RefinementService
 │   │   └── music_generator.py # MusicGen integration

@@ -45,9 +45,9 @@ Each model config includes: name, replicate_model, cost_per_generation, params (
 - `backend/app/phases/phase4_chunks/model_config.py` - Model configuration management
 - `backend/app/phases/phase4_chunks/frame_extractor.py` - Extract last frame from generated chunks
 - `backend/app/phases/phase4_chunks/stitcher.py` - Video stitching logic
-- `backend/app/phases/phase5_refine/service.py` - **NEW**: Music generation and audio integration (simplified from previous scope)
-- `backend/app/phases/phase5_refine/task.py` - Phase 5 Celery task (music workflow)
-- `backend/app/phases/phase5_refine/schemas.py` - Phase 5 schemas (music specs, output)
+- `backend/app/phases/phase4_refine/service.py` - **NEW**: Music generation and audio integration (simplified from previous scope)
+- `backend/app/phases/phase4_refine/task.py` - Phase 5 Celery task (music workflow)
+- `backend/app/phases/phase4_refine/schemas.py` - Phase 5 schemas (music specs, output)
 - `backend/app/common/constants.py` - Model cost constants (add music generation costs)
 
 ## Tasks
@@ -209,7 +209,7 @@ Each model config includes: name, replicate_model, cost_per_generation, params (
   - [x] 10.6 Save time and cost during iterative testing (~$2-3 per test avoided)
   - [x] 10.7 Update Phase 5 scope: Remove upscaling, temporal smoothing, color grading
   - [x] 10.8 Phase 5 new focus: Music generation and audio integration ONLY
-  - [x] 10.9 Update `backend/app/phases/phase5_refine/service.py` for music-only workflow
+  - [x] 10.9 Update `backend/app/phases/phase4_refine/service.py` for music-only workflow
   - [x] 10.10 Add music generation using `meta/musicgen` model (switched from suno-ai/bark, stable-audio had broken model identifier)
   - [x] 10.11 Input: video duration + template audio spec (tempo, mood, style from spec)
   - [x] 10.12 Generate music ~5s longer than video duration for safety margin (up to 47s max)
@@ -353,7 +353,7 @@ Existing structure (unchanged for backward compatibility):
 - `backend/app/phases/phase3_references/asset_handler.py` - Update uploaded asset reference paths
 - `backend/app/phases/phase4_chunks/chunk_generator.py` - Update chunk and last frame upload paths
 - `backend/app/phases/phase4_chunks/stitcher.py` - Update stitched video upload path
-- `backend/app/phases/phase5_refine/service.py` - Update music and final draft upload paths
+- `backend/app/phases/phase4_refine/service.py` - Update music and final draft upload paths
 - `backend/app/orchestrator/pipeline.py` - Pass user_id to phase functions that need it
 - `backend/manual_stitch.py` - Update chunk discovery path for manual stitching
 - `backend/check_s3_files.py` - Update verification paths
@@ -380,8 +380,8 @@ Existing structure (unchanged for backward compatibility):
   - [x] 3.4 Ensure Phase 4 services receive and use `user_id` parameter from pipeline
 
 - [x] 4.0 Update Phase 5 (Refine) S3 paths
-  - [x] 4.1 Modify `phase5_refine/service.py` to use `{userId}/videos/{videoId}/background.mp3` for music uploads
-  - [x] 4.2 Modify `phase5_refine/service.py` to use `{userId}/videos/{videoId}/final_draft.mp4` for final video uploads
+  - [x] 4.1 Modify `phase4_refine/service.py` to use `{userId}/videos/{videoId}/background.mp3` for music uploads
+  - [x] 4.2 Modify `phase4_refine/service.py` to use `{userId}/videos/{videoId}/final_draft.mp4` for final video uploads
   - [x] 4.3 Ensure Phase 5 service receives and uses `user_id` parameter from pipeline
 
 - [x] 5.0 Update pipeline orchestration
@@ -451,7 +451,7 @@ Existing structure (unchanged for backward compatibility):
 - `backend/app/common/constants.py` - Added path helper functions
 - `backend/app/phases/phase3_references/` - Updated all reference image uploads
 - `backend/app/phases/phase4_chunks/` - Updated chunk, last frame, and stitched video uploads
-- `backend/app/phases/phase5_refine/` - Updated music and final video uploads
+- `backend/app/phases/phase4_refine/` - Updated music and final video uploads
 - `backend/app/orchestrator/pipeline.py` - Passes user_id to all phases
 - `backend/manual_stitch.py` - Updated to use new paths with fallback to old
 - `backend/check_s3_files.py` - Updated to check new structure first, then old

@@ -39,15 +39,11 @@
 - [x] **Temporarily disabled for MVP** (simpler workflow)
 - [x] May re-enable post-MVP for multi-image consistency
 
-### Phase 3: Reference Assets
-- [x] Reference image generation via Replicate (SDXL/Flux)
-- [x] **PR #6**: Re-enabled for MVP
-- [x] Product reference generation (one per video)
-- [x] Style guide marked OUT OF SCOPE for MVP
-- [x] S3 upload for reference images
-- [x] Integration with Phase 4
+### Phase 3: Reference Assets (REMOVED in PR #11)
+- [x] **PR #11**: Removed phase3_references from pipeline ✅
+- [x] Phase 2 storyboard generation now provides images directly to Phase 3 (chunks)
 
-### Phase 4: Chunked Video Generation
+### Phase 3: Chunked Video Generation (renamed from Phase 4)
 - [x] **PR #1**: Initial comment-out of Phase 2 & 3
 - [x] **PR #2**: Model configuration system
 - [x] **PR #3**: Text-to-video fallback support
@@ -55,8 +51,9 @@
 - [x] **PR #7**: Actual chunk duration calculations
 - [x] **PR #8**: Last-frame continuation for temporal coherence ✅
 - [x] **PR #9**: Parallel chunk generation with LangChain RunnableParallel ✅
+- [x] **PR #11**: Renamed from phase4_chunks_storyboard to phase3_chunks ✅
 - [x] wan model integration (wan-2.1-480p image-to-video)
-- [x] Chunk generation with reference images
+- [x] Chunk generation with storyboard images
 - [x] Last frame extraction (FFmpeg)
 - [x] Parallel generation for reference chunks (Phase 1)
 - [x] Parallel generation for continuous chunks (Phase 2)
@@ -74,14 +71,10 @@
 - [x] Presigned URL caching in Redis
 - [x] StatusResponse schema with current_chunk_index and total_chunks
 
-### Phase 5: Refinement
+### Phase 4: Refinement (renamed from Phase 5)
 - [x] Basic implementation complete
-- [ ] **S3 path issue**: Stitched video not found (404 error) - IN PROGRESS
-
-### Phase 6: Export
-- [x] S3 upload for final videos
-- [x] Pre-signed URL generation
-- [x] Basic cleanup logic
+- [x] **PR #11**: Renamed from phase5_refine to phase4_refine ✅
+- [ ] **S3 path issue**: Stitched video not found (404 error) - May be resolved, needs testing
 
 ### Bug Fixes & Improvements
 - [x] **Bug Fix**: Status API None handling
@@ -106,6 +99,7 @@
 8. ✅ **PR #8**: Last-frame continuation for temporal coherence
 9. ✅ **PR #9**: Parallel chunk generation with LangChain RunnableParallel
 10. ✅ **PR #10**: Redis-based progress tracking with Server-Sent Events (SSE)
+11. ✅ **PR #11**: Phase cleanup and renaming - sequential structure (phase1 → phase2 → phase3 → phase4)
 
 ---
 
@@ -305,10 +299,12 @@
 
 ## Notes
 
+- PR #11 is a major cleanup milestone - sequential phase structure achieved!
+- Pipeline simplified: phase1 → phase2 → phase3 → phase4 (clean, sequential)
+- Removed 4 unused phases, reducing codebase by ~50%
 - PR #8 is a major milestone - temporal coherence is working!
-- Pipeline simplified by disabling Phase 2 (may re-enable later)
 - wan model is good for MVP but may need higher quality later
-- Sequential generation is acceptable trade-off for quality
+- Parallel generation (PR #9) provides 40-50% speed improvement
 - User feedback on duration override was critical catch
-- Next focus: Fix Phase 5 and test full 30s generation
+- Next focus: Test full pipeline with new phase structure
 

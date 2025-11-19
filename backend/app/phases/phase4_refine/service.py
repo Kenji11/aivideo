@@ -11,7 +11,7 @@ from app.services.s3 import s3_client
 from app.services.openai import openai_client
 from app.common.exceptions import PhaseException
 from app.common.constants import COST_AUDIO_CROP, get_video_s3_key
-from app.phases.phase5_refine.model_config import get_default_music_model, get_music_model_config
+from app.phases.phase4_refine.model_config import get_default_music_model, get_music_model_config
 from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
 try:
     from mutagen import File as MutagenFile
