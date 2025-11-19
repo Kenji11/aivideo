@@ -6,7 +6,6 @@ from celery.exceptions import Retry
 from app.orchestrator.celery_app import celery_app
 from app.phases.phase1_validate.task import validate_prompt
 from app.phases.phase2_storyboard.task import generate_storyboard
-from app.phases.phase3_references.task import generate_references
 from app.phases.phase4_chunks_storyboard.task import generate_chunks as generate_chunks_storyboard
 from app.phases.phase5_refine.task import refine_video
 from app.database import SessionLocal
@@ -88,10 +87,7 @@ def run_pipeline(self, video_id: str, prompt: str, assets: list = None, model: s
         # Phase 2: Generate storyboard images (receives Phase 1 output)
         generate_storyboard.s(user_id),
         
-        # Phase 3: Generate references (receives Phase 2 output, may skip if storyboard exists)
-        generate_references.s(user_id),
-        
-        # Phase 4: Generate chunks and stitch (receives Phase 3 output)
+        # Phase 4: Generate chunks and stitch (receives Phase 2 output)
         generate_chunks_storyboard.s(user_id, model),
         
         # Phase 5: Refine video with music (receives Phase 4 output)

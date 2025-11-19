@@ -30,9 +30,8 @@ celery_app.conf.update(
     include=[
         "app.orchestrator.pipeline",
         "app.phases.phase1_validate.task",
-        "app.phases.phase2_animatic.task",
-        "app.phases.phase3_references.task",
-        "app.phases.phase4_chunks.task",
+        "app.phases.phase2_storyboard.task",
+        "app.phases.phase4_chunks_storyboard.task",
         "app.phases.phase5_refine.task",
     ],
 )
@@ -55,24 +54,17 @@ except Exception as e:
     raise
 
 try:
-    from app.phases.phase2_animatic import task as phase2_task  # noqa: F401
-    logger.info("✓ Imported app.phases.phase2_animatic.task")
+    from app.phases.phase2_storyboard import task as phase2_task  # noqa: F401
+    logger.info("✓ Imported app.phases.phase2_storyboard.task")
 except Exception as e:
-    logger.error(f"✗ Failed to import app.phases.phase2_animatic.task: {e}", exc_info=True)
+    logger.error(f"✗ Failed to import app.phases.phase2_storyboard.task: {e}", exc_info=True)
     raise
 
 try:
-    from app.phases.phase3_references import task as phase3_task  # noqa: F401
-    logger.info("✓ Imported app.phases.phase3_references.task")
+    from app.phases.phase4_chunks_storyboard import task as phase4_task  # noqa: F401
+    logger.info("✓ Imported app.phases.phase4_chunks_storyboard.task")
 except Exception as e:
-    logger.error(f"✗ Failed to import app.phases.phase3_references.task: {e}", exc_info=True)
-    raise
-
-try:
-    from app.phases.phase4_chunks import task as phase4_task  # noqa: F401
-    logger.info("✓ Imported app.phases.phase4_chunks.task")
-except Exception as e:
-    logger.error(f"✗ Failed to import app.phases.phase4_chunks.task: {e}", exc_info=True)
+    logger.error(f"✗ Failed to import app.phases.phase4_chunks_storyboard.task: {e}", exc_info=True)
     raise
 
 try:
