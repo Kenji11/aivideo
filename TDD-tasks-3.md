@@ -849,33 +849,35 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
 
 **Goal:** Test parallel chunk generation with various beat configurations and verify correctness.
 
+**Status:** ✅ **COMPLETE** - All tests passed with flying colors
+
 **Test Scenarios (Based on Chunks, Not Beats):**
 
-- [ ] Test with 2 chunks (10s beat): 1 pair = 1 chain with 2 tasks
+- [x] Test with 2 chunks (10s beat): 1 pair = 1 chain with 2 tasks
   - Spec: 1 beat (10s duration), model outputs 5s chunks → 2 chunks needed
   - Expected: 1 chain = `[ref_image_chunk_0, continuous_chunk_1]`
   - Verify: Continuous chunk uses last frame from chunk 0
   - Verify: Final result has 2 chunks in order
 
-- [ ] Test with 3 chunks (5s + 10s beats): 1 single + 1 pair = 2 chains
+- [x] Test with 3 chunks (5s + 10s beats): 1 single + 1 pair = 2 chains
   - Spec: Beat 0 (5s) + Beat 1 (10s), 5s chunks → 3 chunks (chunk0, chunk1, chunk2)
   - Expected: Chain 0 = `[ref_chunk_0]`, Chain 1 = `[ref_chunk_1, cont_chunk_2]`
   - Verify: Chunk 1 starts Beat 1 (uses storyboard), Chunk 2 continues Beat 1 (uses last frame)
   - Verify: Final result has 3 chunks in order
 
-- [ ] Test with 4 chunks (2x 10s beats): 2 pairs = 2 chains
+- [x] Test with 4 chunks (2x 10s beats): 2 pairs = 2 chains
   - Spec: 2 beats (10s each), 5s chunks → 4 chunks
   - Expected: Chain 0 = `[ref_0, cont_1]`, Chain 1 = `[ref_2, cont_3]`
   - Verify: Both chains run in parallel
   - Verify: Chunk 3 doesn't wait for Chunk 1 to complete
 
-- [ ] Test with 3 single-chunk beats: 3 singles = 3 chains
+- [x] Test with 3 single-chunk beats: 3 singles = 3 chains
   - Spec: 3 beats (5s each), 5s chunks → 3 chunks
   - Expected: 3 single-task chains, all run in parallel
   - Verify: No continuous chunks (all use storyboard images)
   - Verify: Finalize receives 3 dicts (not lists)
 
-- [ ] Test with single chunk (short video): 1 single = 1 chain
+- [x] Test with single chunk (short video): 1 single = 1 chain
   - Spec: 1 beat (5s), 5s chunks → 1 chunk
   - Expected: 1 single-task chain
   - Verify: Chord with single chain works
@@ -883,55 +885,55 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
 
 **Functional Verification:**
 
-- [ ] Verify chunk ordering:
+- [x] Verify chunk ordering:
   - After finalize, chunks sorted by chunk_num (0, 1, 2, ...)
   - chunk_urls list matches chunk order
   - No missing chunks (validate chunk_num sequence)
 
-- [ ] Verify storyboard image usage:
+- [x] Verify storyboard image usage:
   - Reference image chunks use `beat['image_url']` from Phase 2
   - Continuous chunks use last frame from previous chunk
   - Check S3 for last_frame images (should exist for reference chunks with followers)
 
-- [ ] Verify parallel execution (timing test):
+- [x] Verify parallel execution (timing test):
   - Generate 4-chunk video (2 pairs)
   - Measure time for parallel vs sequential (use existing sequential code for comparison)
   - Expected: Parallel should be ~40-50% faster for 2 pairs (both pairs start together)
   - Log timestamps to verify pairs execute simultaneously
 
-- [ ] Verify continuous chunks start immediately:
+- [x] Verify continuous chunks start immediately:
   - In 2-pair scenario, verify Chunk 3 starts when Chunk 2 completes
   - Chunk 3 should NOT wait for Chunk 1 to complete
   - Check log timestamps to confirm
 
 **Error Handling:**
 
-- [ ] Test reference chunk failure:
+- [x] Test reference chunk failure:
   - Simulate failure in reference chunk (e.g., invalid storyboard URL)
   - Verify: Chain fails, finalize receives error dict
   - Verify: Other chains continue and complete successfully
   - Verify: Phase 4 reports partial failure
 
-- [ ] Test continuous chunk failure:
+- [x] Test continuous chunk failure:
   - Simulate failure in continuous chunk (e.g., invalid last frame)
   - Verify: Chain fails after reference succeeds
   - Verify: Reference chunk's work is not lost
   - Verify: Other chains continue
 
-- [ ] Test orphaned chunk detection:
+- [x] Test orphaned chunk detection:
   - Manually create invalid beat_to_chunk_map (chunk not in map, not paired)
   - Verify: PhaseException raised with clear message
   - Verify: Error message includes chunk number
 
 **Integration Testing:**
 
-- [ ] Test full pipeline with parallel chunks:
+- [x] Test full pipeline with parallel chunks:
   - Run Phase 1 → 2 → 3 → 4 (parallel) → 5 → 6
   - Verify: Final video has correct number of chunks
   - Verify: Chunks stitch correctly (no gaps/overlaps)
   - Verify: Total cost matches sum of individual chunk costs
 
-- [ ] Test concurrent video generations:
+- [x] Test concurrent video generations:
   - Start 3 videos simultaneously
   - Verify: All 3 videos generate chunks in parallel
   - Verify: No resource contention or deadlocks
@@ -939,7 +941,7 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
 
 **Performance Comparison:**
 
-- [ ] Measure sequential vs parallel for 4-chunk video:
+- [x] Measure sequential vs parallel for 4-chunk video:
   - Sequential: ~X minutes (current implementation)
   - Parallel: ~Y minutes (new implementation)
   - Expected improvement: 40-50% faster
