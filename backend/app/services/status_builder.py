@@ -68,34 +68,40 @@ def build_status_response_from_redis_video_data(redis_data: Dict[str, Any]) -> S
             estimated_time_remaining = int((100 - progress) / progress * 600)  # seconds
     
     # Extract phase outputs
-    animatic_urls = None
+    storyboard_urls = None
     reference_assets = None
     stitched_video_url = None
     current_chunk_index = None
     total_chunks = None
     
-    if phase_outputs:
-        # Phase 2: Storyboard images
+    # Check Redis first for storyboard URLs
+    storyboard_urls_raw = redis_data.get('storyboard_urls')
+    
+    if storyboard_urls_raw:
+        # Convert S3 URLs to presigned URLs
+        storyboard_urls = []
+        for idx, url in enumerate(storyboard_urls_raw):
+            presigned = _get_presigned_url_from_cache(video_id, f"storyboard_{idx}", url)
+            storyboard_urls.append(presigned)
+    elif phase_outputs:
+        # Fallback: Extract from phase_outputs/spec
         phase2_output = phase_outputs.get('phase2_storyboard')
         if phase2_output and phase2_output.get('status') == 'success':
             phase2_data = phase2_output.get('output_data', {})
             spec_data = phase2_data.get('spec', {}) or spec
             beats = spec_data.get('beats', [])
-            animatic_urls_raw = []
+            storyboard_urls_raw = []
             
             for beat in beats:
                 image_url = beat.get('image_url')
                 if image_url:
-                    animatic_urls_raw.append(image_url)
+                    storyboard_urls_raw.append(image_url)
             
-            if not animatic_urls_raw:
-                animatic_urls_raw = phase2_data.get('animatic_urls', [])
-            
-            if animatic_urls_raw:
-                animatic_urls = []
-                for url in animatic_urls_raw:
-                    presigned = _get_presigned_url_from_cache(video_id, f"animatic_{len(animatic_urls)}", url)
-                    animatic_urls.append(presigned)
+            if storyboard_urls_raw:
+                storyboard_urls = []
+                for idx, url in enumerate(storyboard_urls_raw):
+                    presigned = _get_presigned_url_from_cache(video_id, f"storyboard_{idx}", url)
+                    storyboard_urls.append(presigned)
         
         # Phase 3: Stitched video and chunk progress
         phase3_output = phase_outputs.get('phase3_chunks')
@@ -135,7 +141,7 @@ def build_status_response_from_redis_video_data(redis_data: Dict[str, Any]) -> S
         current_phase=current_phase,
         estimated_time_remaining=estimated_time_remaining,
         error=error,
-        animatic_urls=animatic_urls,
+        storyboard_urls=storyboard_urls,
         reference_assets=reference_assets,
         stitched_video_url=stitched_video_url,
         final_video_url=final_video_url,
@@ -153,34 +159,41 @@ def build_status_response_from_db(video: VideoGeneration) -> StatusResponse:
             estimated_time_remaining = int((100 - video.progress) / video.progress * 600)  # seconds
     
     # Extract phase outputs
-    animatic_urls = None
+    storyboard_urls = None
     reference_assets = None
     stitched_video_url = None
     current_chunk_index = None
     total_chunks = None
     
-    if video.phase_outputs:
-        # Phase 2: Storyboard images
+    # Check Redis first for storyboard URLs
+    redis_data = redis_client.get_video_data(video.id)
+    storyboard_urls_raw = redis_data.get('storyboard_urls') if redis_data else None
+    
+    if storyboard_urls_raw:
+        # Convert S3 URLs to presigned URLs
+        storyboard_urls = []
+        for idx, url in enumerate(storyboard_urls_raw):
+            presigned = _get_presigned_url_from_cache(video.id, f"storyboard_{idx}", url)
+            storyboard_urls.append(presigned)
+    elif video.phase_outputs:
+        # Fallback: Extract from phase_outputs/spec
         phase2_output = video.phase_outputs.get('phase2_storyboard')
         if phase2_output and phase2_output.get('status') == 'success':
             phase2_data = phase2_output.get('output_data', {})
             spec = phase2_data.get('spec', {}) or video.spec or {}
             beats = spec.get('beats', [])
-            animatic_urls_raw = []
+            storyboard_urls_raw = []
             
             for beat in beats:
                 image_url = beat.get('image_url')
                 if image_url:
-                    animatic_urls_raw.append(image_url)
+                    storyboard_urls_raw.append(image_url)
             
-            if not animatic_urls_raw:
-                animatic_urls_raw = phase2_data.get('animatic_urls', []) or video.animatic_urls or []
-            
-            if animatic_urls_raw:
-                animatic_urls = []
-                for url in animatic_urls_raw:
-                    presigned = _get_presigned_url_from_cache(video.id, f"animatic_{len(animatic_urls)}", url)
-                    animatic_urls.append(presigned)
+            if storyboard_urls_raw:
+                storyboard_urls = []
+                for idx, url in enumerate(storyboard_urls_raw):
+                    presigned = _get_presigned_url_from_cache(video.id, f"storyboard_{idx}", url)
+                    storyboard_urls.append(presigned)
         
         # Phase 3: Stitched video and chunk progress
         phase3_output = video.phase_outputs.get('phase3_chunks')
@@ -220,7 +233,7 @@ def build_status_response_from_db(video: VideoGeneration) -> StatusResponse:
         current_phase=video.current_phase,
         estimated_time_remaining=estimated_time_remaining,
         error=video.error_message,
-        animatic_urls=animatic_urls,
+        storyboard_urls=storyboard_urls,
         reference_assets=reference_assets,
         stitched_video_url=stitched_video_url,
         final_video_url=final_video_url,

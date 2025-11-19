@@ -96,7 +96,7 @@ export interface StatusResponse {
   estimated_time_remaining?: number;
   error?: string;
   reference_assets?: ReferenceAssets;
-  animatic_urls?: string[];
+  storyboard_urls?: string[];
   stitched_video_url?: string;
   final_video_url?: string;  // Phase 5 final video (with audio)
   current_chunk_index?: number;  // Current chunk being processed (0-based)
