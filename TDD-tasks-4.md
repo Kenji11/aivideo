@@ -13,7 +13,7 @@
 ### Solution Architecture:
 
 **Redis as Mid-Pipeline Cache:**
-- Store all progress/status data in Redis during video generation (TTL: 10 minutes)
+- Store all progress/status data in Redis during video generation (TTL: 60 minutes)
 - Only write to DB at 3 critical points:
   1. **Video Creation**: Initial record creation when pipeline starts
   2. **Pipeline Failure**: Write error state and cleanup
@@ -32,7 +32,7 @@ Status Endpoint → Redis (if exists) → DB (if Redis expired/missing)
 - Replace polling with SSE stream
 - Frontend opens connection, receives real-time updates
 - Reduces requests from N polls/second to 1 connection per video
-- Standard approach: Redis pub/sub for push notifications (or polling fallback)
+- Redis pub/sub
 
 **Redis Key Structure:**
 ```
@@ -41,8 +41,9 @@ video:{video_id}:status        → String (queued, validating, complete, failed,
 video:{video_id}:current_phase → String (phase1_validate, phase2_storyboard, etc.)
 video:{video_id}:error_message → String (if failed)
 video:{video_id}:metadata      → JSON (video_id, title, description, prompt, etc.)
-video:{video_id}:phase_outputs → JSON (all phase outputs for frontend)
-video:{video_id}:spec         → JSON (video spec - also persisted to DB for testing)
+video:{video_id}:phase_outputs → JSON (all phase outputs for frontend - nested structure, same as DB)
+video:{video_id}:spec         → JSON (video spec - stored in Redis during pipeline, written to DB only on final submission)
+video:{video_id}:presigned_urls → JSON (cached presigned URLs for S3 assets - expires with 60min TTL)
 ```
 
 **Fallback Strategy:**
@@ -59,17 +60,22 @@ video:{video_id}:spec         → JSON (video spec - also persisted to DB for te
 
 **Scope:**
 - ✅ Progress tracking refactored to Redis
-- ✅ Status endpoint checks Redis first, DB fallback
-- ✅ Status endpoint converted to SSE
+- ✅ Status endpoint checks Redis first, DB fallback (re-adds to Redis if DB entry found but Redis missing)
+- ✅ Status endpoint converted to SSE (polling-based)
+- ✅ Frontend implements SSE stream with automatic fallback to GET endpoint
 - ✅ Pipeline writes to DB only at start/failure/completion
-- ✅ Spec still persisted to DB (for testing/debugging)
+- ✅ Spec persisted to DB only on final submission (completion/failure) for testing/debugging
+- ✅ StatusResponse schema updated with current_chunk_index and total_chunks
+- ✅ Presigned URLs cached in Redis (60min TTL)
 - ❌ Migration of existing in-progress videos (out of scope)
 
 **Files to Modify:**
 - `backend/app/services/redis.py` (NEW - Redis client wrapper)
 - `backend/app/orchestrator/progress.py` (Refactor to use Redis)
-- `backend/app/api/status.py` (Check Redis, convert to SSE)
+- `backend/app/api/status.py` (Check Redis, convert to SSE, re-add to Redis if missing)
 - `backend/app/orchestrator/pipeline.py` (DB writes only at start/failure/completion)
+- `backend/app/common/schemas.py` (Add current_chunk_index and total_chunks to StatusResponse)
+- `frontend/src/` (Status polling components - implement SSE with fallback)
 - All phase tasks (update to use new progress tracking)
 
 **NEW DEPENDENCY:**
@@ -117,9 +123,10 @@ video:{video_id}:spec         → JSON (video spec - also persisted to DB for te
   - `set_video_metadata(video_id, metadata_dict)` - Set video metadata
   - `set_video_phase_outputs(video_id, phase_outputs_dict)` - Set phase outputs
   - `set_video_spec(video_id, spec_dict)` - Set video spec
+  - `set_video_presigned_urls(video_id, urls_dict)` - Cache presigned URLs for S3 assets
   - `get_video_data(video_id)` - Get all video data as dict
   - `delete_video_data(video_id)` - Delete all keys for video (cleanup)
-  - All methods should set TTL: 600 seconds (10 minutes)
+  - All methods should set TTL: 3600 seconds (60 minutes)
 
 - [ ] Implement error handling:
   - Wrap all Redis operations in try/except
@@ -127,9 +134,9 @@ video:{video_id}:spec         → JSON (video spec - also persisted to DB for te
   - Return None/False on failure (caller can fallback to DB)
 
 - [ ] Implement TTL management:
-  - Use `EX` parameter in SET commands: `client.set(key, value, ex=600)`
-  - Or use `EXPIRE` after SET: `client.expire(key, 600)`
-  - Ensure all keys have 10-minute TTL
+  - Use `EX` parameter in SET commands: `client.set(key, value, ex=3600)`
+  - Or use `EXPIRE` after SET: `client.expire(key, 3600)`
+  - Ensure all keys have 60-minute TTL (no refresh logic - fixed TTL)
 
 - [ ] Test Redis connection:
   - Test connection on import
@@ -180,12 +187,13 @@ video:{video_id}:spec         → JSON (video spec - also persisted to DB for te
 - [ ] Update metadata storage:
   - Store `title`, `prompt`, `description` in Redis metadata
   - Store `error_message` in Redis
-  - Store `phase_outputs` in Redis (for frontend access)
+  - Store `phase_outputs` in Redis as nested JSON (same structure as DB, for retry logic)
 
 - [ ] Keep DB writes for critical updates:
   - Still write to DB if this is initial creation (video doesn't exist)
   - Still write to DB if status is "complete" or "failed" (final states)
   - This ensures DB always has final state even if Redis expires
+  - **Complete fallback**: If Redis fails, fall back to DB for all operations (all or nothing approach)
 
 - [ ] Update `update_cost()` function:
   - Store cost in Redis metadata
@@ -193,17 +201,47 @@ video:{video_id}:spec         → JSON (video spec - also persisted to DB for te
 
 - [ ] Test progress tracking:
   - Verify Redis writes work
-  - Verify DB fallback works when Redis unavailable
-  - Verify TTL expiration (wait 10 minutes, check keys deleted)
+  - Verify DB fallback works when Redis unavailable (complete fallback, not partial)
+  - Verify TTL expiration (wait 60 minutes, check keys deleted)
   - Verify concurrent updates don't conflict
 
 ---
 
-### Task 10.3: Update Status Endpoint to Check Redis First
+### Task 10.3: Update StatusResponse Schema
+
+**File:** `backend/app/common/schemas.py`
+
+**Goal:** Add current_chunk_index and total_chunks fields to StatusResponse schema.
+
+- [ ] Update StatusResponse model:
+  ```python
+  class StatusResponse(BaseModel):
+      """Response from status endpoint"""
+      video_id: str
+      status: str
+      progress: float
+      current_phase: Optional[str]
+      estimated_time_remaining: Optional[int]
+      error: Optional[str]
+      animatic_urls: Optional[List[str]] = None
+      reference_assets: Optional[Dict] = None
+      stitched_video_url: Optional[str] = None
+      final_video_url: Optional[str] = None
+      current_chunk_index: Optional[int] = None  # NEW: Current chunk being processed in Phase 4
+      total_chunks: Optional[int] = None  # NEW: Total number of chunks in Phase 4
+  ```
+
+- [ ] Verify schema matches current status endpoint usage:
+  - Check that status endpoint already extracts these fields from phase_outputs
+  - Ensure schema matches implementation
+
+---
+
+### Task 10.4: Update Status Endpoint to Check Redis First
 
 **File:** `backend/app/api/status.py`
 
-**Goal:** Modify status endpoint to check Redis first, fallback to DB if Redis key missing.
+**Goal:** Modify status endpoint to check Redis first, fallback to DB if Redis key missing. Re-add to Redis if DB entry exists but Redis doesn't.
 
 - [ ] Import Redis client:
   ```python
@@ -215,6 +253,7 @@ video:{video_id}:spec         → JSON (video spec - also persisted to DB for te
   - Check Redis first: `redis_client.get_video_data(video_id)`
   - If Redis data exists: Use it to build StatusResponse
   - If Redis data missing: Fallback to DB query (existing logic)
+  - **NEW**: If DB entry found but Redis missing, re-add to Redis with 60min TTL
   - Structure:
     ```python
     @router.get("/api/status/{video_id}")
@@ -238,14 +277,32 @@ video:{video_id}:spec         → JSON (video spec - also persisted to DB for te
         else:
             # Fallback to DB (existing logic)
             video = db.query(VideoGeneration).filter(...).first()
-            # ... existing DB logic
+            
+            if video:
+                # Re-add to Redis if DB entry exists but Redis doesn't
+                if redis_client._client:
+                    try:
+                        # Reconstruct Redis data from DB entry
+                        redis_client.set_video_progress(video_id, video.progress)
+                        redis_client.set_video_status(video_id, video.status.value)
+                        # ... populate all Redis keys from DB
+                    except Exception as e:
+                        logger.warning(f"Failed to re-add to Redis: {e}")
+            
+            # ... existing DB logic to build StatusResponse
     ```
 
 - [ ] Handle Redis data structure:
   - Extract progress, status, current_phase from Redis
   - Extract metadata (title, description, etc.)
   - Extract phase_outputs (convert to StatusResponse format)
-  - Handle presigned URL generation for S3 URLs (same as DB logic)
+  - Use cached presigned URLs from Redis if available, otherwise generate and cache
+
+- [ ] Implement presigned URL caching:
+  - Check Redis for cached presigned URLs first
+  - If missing, generate presigned URLs (same as current logic)
+  - Cache generated URLs in Redis with 60min TTL
+  - Use cached URLs in subsequent requests
 
 - [ ] Maintain backward compatibility:
   - If Redis missing, DB query should work exactly as before
@@ -254,16 +311,18 @@ video:{video_id}:spec         → JSON (video spec - also persisted to DB for te
 - [ ] Test status endpoint:
   - Test with Redis data (video in progress)
   - Test with DB fallback (Redis expired or missing)
+  - Test re-adding to Redis when DB entry found
+  - Test presigned URL caching (verify URLs cached and reused)
   - Test with video not found (404)
   - Test error handling (Redis connection failure)
 
 ---
 
-### Task 10.4: Convert Status Endpoint to Server-Sent Events (SSE)
+### Task 10.5: Convert Status Endpoint to Server-Sent Events (SSE)
 
 **File:** `backend/app/api/status.py`
 
-**Goal:** Replace polling endpoint with SSE stream for real-time updates.
+**Goal:** Replace polling endpoint with SSE stream for real-time updates using polling-based approach.
 
 - [ ] Add SSE dependencies:
   ```python
@@ -275,30 +334,43 @@ video:{video_id}:spec         → JSON (video spec - also persisted to DB for te
 - [ ] Create SSE endpoint:
   ```python
   @router.get("/api/status/{video_id}/stream")
-  async def stream_status(video_id: str):
-      """Server-Sent Events stream for real-time status updates"""
+  async def stream_status(video_id: str, db: Session = Depends(get_db)):
+      """Server-Sent Events stream for real-time status updates (polling-based)"""
       async def event_generator():
+          last_data = None
           while True:
-              # Check Redis for updates
-              redis_data = redis_client.get_video_data(video_id)
+              # Check Redis for updates (same logic as GET endpoint)
+              redis_data = None
+              if redis_client._client:
+                  try:
+                      redis_data = redis_client.get_video_data(video_id)
+                  except Exception as e:
+                      logger.warning(f"Redis read failed in SSE: {e}")
               
-              if redis_data:
+              # Fallback to DB if Redis missing
+              if not redis_data:
+                  video = db.query(VideoGeneration).filter(...).first()
+                  if video:
+                      # Re-add to Redis (same as GET endpoint)
+                      # ... re-add logic ...
+                      # Build redis_data from video
+              
+              # Only send event if data changed
+              if redis_data and redis_data != last_data:
+                  # Build StatusResponse from Redis/DB data
+                  status_response = build_status_response(redis_data or video)
+                  
                   # Format as SSE event
-                  data = {
-                      'video_id': redis_data['video_id'],
-                      'status': redis_data['status'],
-                      'progress': redis_data['progress'],
-                      # ... all StatusResponse fields
-                  }
-                  yield f"data: {json.dumps(data)}\n\n"
+                  yield f"data: {json.dumps(status_response.dict())}\n\n"
+                  last_data = redis_data
               
               # Check if complete or failed (stop streaming)
-              if redis_data and redis_data['status'] in ['complete', 'failed']:
+              if redis_data and redis_data.get('status') in ['complete', 'failed']:
                   yield "event: close\ndata: {}\n\n"
                   break
               
-              # Poll every 1 second (or use Redis pub/sub if implemented)
-              await asyncio.sleep(1)
+              # Poll every 1-2 seconds
+              await asyncio.sleep(1.5)
       
       return StreamingResponse(
           event_generator(),
@@ -310,143 +382,121 @@ video:{video_id}:spec         → JSON (video spec - also persisted to DB for te
       )
   ```
 
-- [ ] Implement Redis pub/sub (optional enhancement):
-  - Subscribe to Redis channel: `video:{video_id}:updates`
-  - Publish updates in `update_progress()`: `redis_client.publish(f"video:{video_id}:updates", json.dumps(data))`
-  - Use pub/sub in SSE stream instead of polling
-  - Fallback to polling if pub/sub unavailable
+- [ ] Extract common status building logic:
+  - Create helper function `build_status_response()` that both GET and SSE endpoints use
+  - Handles Redis/DB data extraction and StatusResponse construction
+  - Handles presigned URL caching/generation
 
 - [ ] Keep existing GET endpoint:
-  - Keep `/api/status/{video_id}` for compatibility
-  - Frontend can choose: SSE stream or polling
+  - Keep `/api/status/{video_id}` for compatibility (fallback only)
+  - Frontend will use SSE primarily, GET endpoint only if SSE fails
   - Both endpoints check Redis first, DB fallback
+  - Both endpoints use same status building logic
 
 - [ ] Handle connection cleanup:
-  - Close Redis pub/sub connection on client disconnect
-  - Handle client disconnection gracefully
-  - Log connection events
+  - Handle client disconnection gracefully (FastAPI handles this automatically)
+  - Log connection events (connect/disconnect)
+  - Ensure no resource leaks
 
 - [ ] Test SSE endpoint:
   - Test SSE stream with video in progress
+  - Test stream updates in real-time (verify events sent on changes)
   - Test stream closes when video completes
-  - Test multiple concurrent streams
+  - Test multiple concurrent streams (different video_ids)
   - Test client disconnection handling
+  - Test Redis fallback in SSE stream
 
 ---
 
-### Task 10.5: Update Pipeline to Write DB Only at Critical Points
+### Task 10.8: Frontend Integration - SSE with Fallback
 
-**File:** `backend/app/orchestrator/pipeline.py`
+**File:** `frontend/src/` (status polling components)
 
-**Goal:** Ensure pipeline only writes to DB at start, failure, and completion.
+**Goal:** Implement SSE stream for real-time status updates with automatic fallback to GET endpoint if SSE fails.
 
-- [ ] Review current pipeline implementation:
-  - Identify all DB write locations
-  - Document which writes are critical vs. mid-pipeline
+- [ ] Identify current status polling implementation:
+  - Find component(s) that poll `/api/status/{video_id}`
+  - Document current polling interval and logic
+  - Identify where status updates are handled in UI
 
-- [ ] Update pipeline start:
-  - Keep DB write for initial video creation
-  - Write to Redis immediately after DB write
-  - Ensure spec is written to both DB and Redis
-
-- [ ] Update pipeline failure handling:
-  - On failure: Write error state to DB (final state)
-  - Also update Redis (for immediate status endpoint access)
-  - Clean up Redis keys after DB write (optional, or let TTL expire)
-
-- [ ] Update pipeline completion:
-  - On completion: Write all final data to DB
-  - Update Redis with final state (cache until TTL expires)
-  - Ensure all fields written: final_video_url, cost, phase_outputs, etc.
-
-- [ ] Remove mid-pipeline DB writes:
-  - Remove DB writes from `update_progress()` calls (now Redis-only)
-  - Keep DB writes only for:
-    1. Initial creation (pipeline start)
-    2. Final state (completion)
-    3. Error state (failure)
-  - All other updates go to Redis only
-
-- [ ] Update phase tasks:
-  - Ensure all phases use `update_progress()` (which now writes to Redis)
-  - Remove any direct DB writes from phase tasks
-  - Keep phase_outputs storage in Redis (not DB until completion)
-
-- [ ] Test pipeline execution:
-  - Test video creation (DB write + Redis write)
-  - Test mid-pipeline updates (Redis only, no DB writes)
-  - Test completion (DB write + Redis update)
-  - Test failure (DB write + Redis update)
-  - Verify DB only has 3 writes per video (start, completion/failure)
-
----
-
-### Task 10.6: Handle Spec Persistence to DB
-
-**File:** `backend/app/orchestrator/pipeline.py`, `backend/app/orchestrator/progress.py`
-
-**Goal:** Ensure spec is persisted to DB (for testing) while other data uses Redis.
-
-- [ ] Update spec storage:
-  - Write spec to DB when video is created (pipeline start)
-  - Also write spec to Redis (for status endpoint access)
-  - Update spec in DB if it changes during pipeline (rare, but handle it)
-
-- [ ] Update `update_progress()`:
-  - If `spec` in kwargs: Write to both Redis and DB
-  - This ensures spec is always in DB for testing/debugging
-  - Other fields (progress, status, phase_outputs) go to Redis only
-
-- [ ] Test spec persistence:
-  - Verify spec in DB after video creation
-  - Verify spec in Redis during pipeline
-  - Verify spec accessible from status endpoint (from Redis)
-  - Verify spec in DB after completion
-
----
-
-### Task 10.7: Frontend Integration (Optional - Document Only)
-
-**File:** Documentation only (frontend changes out of scope for this PR)
-
-**Goal:** Document frontend changes needed to use SSE endpoint.
-
-- [ ] Document SSE endpoint usage:
-  - Endpoint: `GET /api/status/{video_id}/stream`
-  - Response: Server-Sent Events stream
-  - Example frontend code:
+- [ ] Create SSE connection hook/utility:
+  - Create `useVideoStatusStream(videoId)` hook or utility function
+  - Use `EventSource` API to connect to `/api/status/{video_id}/stream`
+  - Handle SSE events: `onmessage`, `onerror`, `onopen`
+  - Structure:
     ```typescript
-    const eventSource = new EventSource(`/api/status/${videoId}/stream`);
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      // Update UI with status, progress, etc.
-    };
-    eventSource.onerror = () => {
-      // Handle error, fallback to polling
+    const useVideoStatusStream = (videoId: string) => {
+      const [status, setStatus] = useState<StatusResponse | null>(null);
+      const [error, setError] = useState<Error | null>(null);
+      
+      useEffect(() => {
+        const eventSource = new EventSource(`/api/status/${videoId}/stream`);
+        
+        eventSource.onmessage = (event) => {
+          const data = JSON.parse(event.data) as StatusResponse;
+          setStatus(data);
+        };
+        
+        eventSource.onerror = () => {
+          // SSE failed, fallback to polling
+          eventSource.close();
+          // Trigger fallback polling
+        };
+        
+        return () => eventSource.close();
+      }, [videoId]);
+      
+      return { status, error };
     };
     ```
 
-- [ ] Document fallback strategy:
-  - If SSE unavailable: Fallback to polling `/api/status/{video_id}`
+- [ ] Implement fallback to GET endpoint:
+  - If SSE connection fails (`onerror`), automatically fallback to polling
+  - Use existing GET endpoint: `/api/status/{video_id}`
   - Poll interval: 2-3 seconds (reduced from current)
-  - Both endpoints check Redis first, DB fallback
+  - Log fallback event for debugging
 
-- [ ] Document status response format:
-  - Same StatusResponse schema (no changes)
-  - Frontend code doesn't need changes (same data structure)
-  - Only change: Use SSE stream instead of polling
+- [ ] Update status display components:
+  - Replace current polling logic with SSE hook
+  - Handle SSE stream updates in real-time
+  - Handle fallback polling if SSE unavailable
+  - Ensure UI updates smoothly with both approaches
+
+- [ ] Handle SSE stream closure:
+  - When status is "complete" or "failed", SSE stream closes
+  - Detect closure event and stop any fallback polling
+  - Update UI to show final state
+
+- [ ] Error handling:
+  - Handle SSE connection errors gracefully
+  - Handle network disconnections
+  - Handle invalid video_id (404 errors)
+  - Show appropriate error messages to user
+
+- [ ] Test frontend implementation:
+  - Test SSE stream with video in progress (real-time updates)
+  - Test SSE fallback when stream fails (should switch to polling)
+  - Test SSE stream closure on completion
+  - Test multiple concurrent video status streams
+  - Test error scenarios (network failure, invalid video_id)
+
+**Key Points:**
+- **Primary**: Use SSE stream (`/api/status/{video_id}/stream`) for real-time updates
+- **Fallback**: Only use GET endpoint (`/api/status/{video_id}`) if SSE fails
+- **Same Data**: StatusResponse schema unchanged, frontend handles same data structure
+- **Automatic**: Fallback should happen automatically, user shouldn't notice
 
 ---
 
-### Task 10.8: Testing and Verification
+### Task 10.9: Testing and Verification
 
 **Goal:** Comprehensive testing of Redis-based progress tracking and SSE.
 
 - [ ] Test Redis operations:
   - Test all Redis helper methods
-  - Test TTL expiration (wait 10 minutes)
+  - Test TTL expiration (wait 60 minutes, or use shorter TTL for testing)
   - Test concurrent writes (multiple phases updating same video)
-  - Test Redis connection failure (fallback to DB)
+  - Test Redis connection failure (complete fallback to DB)
 
 - [ ] Test progress tracking:
   - Create video, verify Redis write
@@ -470,8 +520,9 @@ video:{video_id}:spec         → JSON (video spec - also persisted to DB for te
 - [ ] Test pipeline execution:
   - Run full pipeline, verify DB writes only at start/completion
   - Monitor DB connection usage (should be much lower)
-  - Monitor Redis memory usage (should be reasonable with 10min TTL)
+  - Monitor Redis memory usage (should be reasonable with 60min TTL)
   - Verify status endpoint works throughout pipeline
+  - Verify spec NOT in DB during pipeline, only after completion
 
 - [ ] Performance testing:
   - Measure DB write reduction (should be 90%+)
@@ -480,18 +531,25 @@ video:{video_id}:spec         → JSON (video spec - also persisted to DB for te
   - Verify system handles high concurrent video generation
 
 - [ ] Edge case testing:
-  - Test Redis TTL expiration during pipeline (should fallback to DB)
-  - Test Redis connection loss (should fallback to DB)
-  - Test video completion while SSE stream active
-  - Test multiple status requests for same video
+  - Test Redis TTL expiration during pipeline (should fallback to DB, re-add to Redis)
+  - Test Redis connection loss (should fallback to DB completely)
+  - Test video completion while SSE stream active (stream should close gracefully)
+  - Test multiple status requests for same video (presigned URLs should be cached)
+  - Test re-adding to Redis when DB entry found (verify 60min TTL set)
 
 ---
 
 **Key Implementation Notes:**
-1. **Redis TTL**: 10 minutes (600 seconds) for all video keys
+1. **Redis TTL**: 60 minutes (3600 seconds) for all video keys (no refresh logic - fixed TTL)
 2. **DB Writes**: Only at start, failure, completion (3 writes per video)
-3. **Fallback Strategy**: Always fallback to DB if Redis unavailable
-4. **Spec Persistence**: Write to both DB and Redis (for testing)
-5. **SSE Implementation**: Polling-based (can enhance with pub/sub later)
-6. **Backward Compatibility**: Existing GET endpoint still works (checks Redis first)
-7. **Error Handling**: Graceful degradation (Redis failure doesn't break system)
+3. **Fallback Strategy**: Complete fallback to DB if Redis unavailable (all or nothing, not partial)
+4. **Spec Persistence**: Write to Redis during pipeline, write to DB only on final submission (completion/failure)
+5. **SSE Implementation**: Polling-based (check Redis every 1-2 seconds)
+6. **Status Endpoint**: Re-adds to Redis if DB entry found but Redis missing (60min TTL)
+7. **Presigned URLs**: Cached in Redis (60min TTL) to avoid regenerating on each request
+8. **Phase Outputs**: Stored as nested JSON in Redis (same structure as DB, for retry logic)
+9. **StatusResponse Schema**: Includes current_chunk_index and total_chunks fields
+10. **Backward Compatibility**: Existing GET endpoint still works (checks Redis first, DB fallback) - used as fallback if SSE fails
+11. **Frontend Implementation**: SSE stream is primary, GET endpoint only used as fallback
+11. **Error Handling**: Graceful degradation (Redis failure doesn't break system)
+12. **Redis Connection**: Uses same Redis instance as Celery (via settings.redis_url)

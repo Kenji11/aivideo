@@ -182,25 +182,33 @@ Each video generation flows through 6 sequential phases:
 
 ### 4. Processing Pattern Evolution
 
-**Current: Sequential Generation (PR #8)**
+**Current: Two-Phase Parallel Generation (PR #9)** ✅ ACTIVE
+- **Phase 1**: All reference image chunks generated in parallel
+  - Chunks that start beats (use storyboard images)
+  - Independent of each other, can all start together
+  - Example: Chunks 0, 2, 4 (if beats start at those chunks)
+- **Phase 2**: All continuous chunks generated in parallel (after Phase 1)
+  - Chunks within beats (use last frame from reference chunk)
+  - Each uses its reference chunk's last frame
+  - Example: Chunks 1, 3 (continuous chunks)
+- **Technology**: LangChain RunnableParallel for I/O-bound operations
+- **Architecture**: Celery for pipeline orchestration, LangChain for chunk parallelism
+- **Performance**: 40-50% faster than sequential while maintaining temporal coherence
+- **Key Design**: Chunk generation functions are regular functions (not Celery tasks)
+
+**Previous: Sequential Generation (PR #8)** ❌ DEPRECATED
 - Chunks generated one at a time (0, 1, 2, 3, ...)
 - Required for last-frame continuation
 - Each chunk needs previous chunk's last frame
 - Slower but ensures temporal coherence
 - Generation time: ~45s × chunk_count
-
-**Future: Hybrid Approach (Planned)**
-- Generate chunk 0 first (uses Phase 3 reference)
-- Extract last frame from chunk 0
-- Generate chunks 1+ in parallel (all use chunk 0's last frame)
-- Trade-off: Slightly less coherence but much faster
-- Alternative: Batch sequential (0-1-2 sequential, then 3-4-5 parallel, etc.)
+- Replaced by two-phase parallel approach
 
 **Original: Parallel Generation (Deprecated)**
 - All chunks generated simultaneously
 - Fast but no temporal continuity between chunks
 - Caused visual resets and inconsistency
-- Replaced by sequential approach
+- Replaced by sequential approach (now replaced by two-phase parallel)
 
 ### 5. Model Reality Pattern (PR #7)
 

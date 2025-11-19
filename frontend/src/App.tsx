@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Sparkles, Video, Film, Download, Settings, BarChart3, Zap, Library, CreditCard, Code2 } from 'lucide-react';
 import { Header } from './components/Header';
@@ -19,6 +19,7 @@ import { Billing } from './pages/Billing';
 import { API } from './pages/API';
 import { generateVideo, getVideoStatus, StatusResponse, listVideos, VideoListItem } from './lib/api';
 import { useAuth } from './contexts/AuthContext';
+import { useVideoStatusStream } from './lib/useVideoStatusStream';
 
 // Main App Content (inside router)
 function AppContent() {
@@ -93,102 +94,127 @@ function AppContent() {
     setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 5000);
   };
 
-  // Poll for video status
+  // Use SSE stream for real-time status updates (with automatic fallback to polling)
+  const { status: streamStatus, error: streamError, isConnected } = useVideoStatusStream(
+    videoId || null,
+    isProcessing
+  );
+
+  // Use refs to track notification state across renders
+  const hasShownAnimaticNotificationRef = useRef(false);
+  const hasShownStitchedNotificationRef = useRef(false);
+
+  // Reset notification flags when videoId changes
   useEffect(() => {
-    if (!videoId || !isProcessing) return;
+    if (videoId) {
+      hasShownAnimaticNotificationRef.current = false;
+      hasShownStitchedNotificationRef.current = false;
+    }
+  }, [videoId]);
 
-    let hasShownAnimaticNotification = false;
-    let hasShownStitchedNotification = false;
+  // Handle status updates from SSE stream
+  useEffect(() => {
+    if (!streamStatus || !isProcessing) return;
 
-    const pollStatus = async () => {
-      try {
-        const status = await getVideoStatus(videoId);
-        
-        const currentStep = getProcessingStepFromPhase(status.current_phase, status.progress);
-        setProcessingProgress(currentStep);
-        setCurrentPhase(status.current_phase);
-        
-        // Update animatic URLs (allow updates if they change)
-        if (status.animatic_urls && status.animatic_urls.length > 0) {
-          // Only show notification on first set, but allow updates
-          setAnimaticUrls(prev => {
-            const isFirstTime = !prev;
-            if (isFirstTime && !hasShownAnimaticNotification) {
-              hasShownAnimaticNotification = true;
-              addNotification('success', 'Storyboard Images Generated', `${status.animatic_urls!.length} storyboard image${status.animatic_urls!.length !== 1 ? 's' : ''} ready!`);
-            }
-            return status.animatic_urls!;
-          });
+    const status = streamStatus;
+    
+    console.log('[App] Processing status update:', {
+      video_id: status.video_id,
+      status: status.status,
+      progress: status.progress,
+      current_phase: status.current_phase,
+      has_animatic_urls: !!status.animatic_urls?.length,
+      has_video_url: !!(status.final_video_url || status.stitched_video_url),
+      chunk_progress: status.current_chunk_index !== undefined 
+        ? `${status.current_chunk_index + 1}/${status.total_chunks}` 
+        : null,
+      timestamp: new Date().toISOString()
+    });
+    
+    const currentStep = getProcessingStepFromPhase(status.current_phase, status.progress);
+    setProcessingProgress(currentStep);
+    setCurrentPhase(status.current_phase);
+    
+    // Update animatic URLs (allow updates if they change)
+    if (status.animatic_urls && status.animatic_urls.length > 0) {
+      // Only show notification on first set, but allow updates
+      setAnimaticUrls(prev => {
+        const isFirstTime = !prev;
+        if (isFirstTime && !hasShownAnimaticNotificationRef.current) {
+          hasShownAnimaticNotificationRef.current = true;
+          addNotification('success', 'Storyboard Images Generated', `${status.animatic_urls!.length} storyboard image${status.animatic_urls!.length !== 1 ? 's' : ''} ready!`);
         }
-        
-        // Phase 3 (Reference Assets) is disabled - commented out
-        // if (status.reference_assets && !referenceAssets) {
-        //   setReferenceAssets(status.reference_assets);
-        //   addNotification('success', 'Reference Assets Generated', 'Style guide and product references are ready!');
-        // }
-        
-        // Update current chunk progress for Phase 4
-        if (status.current_phase === 'phase4_chunks') {
-          if (status.current_chunk_index !== undefined) {
-            setCurrentChunkIndex(status.current_chunk_index);
-          }
-          if (status.total_chunks !== undefined) {
-            setTotalChunks(status.total_chunks);
-          }
-        } else {
-          // Clear chunk progress when Phase 4 is done
-          setCurrentChunkIndex(null);
-          setTotalChunks(null);
-        }
-        
-        // Update video URLs - prefer final_video_url, fallback to stitched_video_url
-        // For Veo models, Phase 5 is skipped, so final_video_url might not be set
-        const videoUrl = status.final_video_url || status.stitched_video_url;
-        if (videoUrl) {
-          setStitchedVideoUrl(prev => {
-            const isFirstTime = !prev;
-            const urlChanged = prev && prev !== videoUrl;
-            const isFinalVideo = !!status.final_video_url;
-            
-            if (isFirstTime) {
-              // First time we get a video URL
-              if (!hasShownStitchedNotification) {
-                hasShownStitchedNotification = true;
-                if (isFinalVideo) {
-                  addNotification('success', 'Video Complete', 'Your video with audio is ready!');
-                } else {
-                  addNotification('success', 'Video Chunks Generated', 'Video chunks are being stitched together!');
-                }
-              }
-            } else if (urlChanged && isFinalVideo) {
-              // URL changed from stitched to final (Phase 5 completed for non-Veo models)
-              if (!hasShownStitchedNotification) {
-                hasShownStitchedNotification = true;
-                addNotification('success', 'Video Complete', 'Your video with audio is ready!');
-              }
-            }
-            
-            return videoUrl;
-          });
-        }
-        
-        if (status.status === 'complete') {
-          setIsProcessing(false);
-          navigate('/preview');
-        } else if (status.status === 'failed') {
-          setIsProcessing(false);
-          addNotification('error', 'Generation Failed', status.error || 'Unknown error');
-        }
-      } catch (error) {
-        console.error('Failed to poll status:', error);
+        return status.animatic_urls!;
+      });
+    }
+    
+    // Phase 3 (Reference Assets) is disabled - commented out
+    // if (status.reference_assets && !referenceAssets) {
+    //   setReferenceAssets(status.reference_assets);
+    //   addNotification('success', 'Reference Assets Generated', 'Style guide and product references are ready!');
+    // }
+    
+    // Update current chunk progress for Phase 4
+    if (status.current_phase === 'phase4_chunks') {
+      if (status.current_chunk_index !== undefined) {
+        setCurrentChunkIndex(status.current_chunk_index);
       }
-    };
+      if (status.total_chunks !== undefined) {
+        setTotalChunks(status.total_chunks);
+      }
+    } else {
+      // Clear chunk progress when Phase 4 is done
+      setCurrentChunkIndex(null);
+      setTotalChunks(null);
+    }
+    
+    // Update video URLs - prefer final_video_url, fallback to stitched_video_url
+    // For Veo models, Phase 5 is skipped, so final_video_url might not be set
+    const videoUrl = status.final_video_url || status.stitched_video_url;
+    if (videoUrl) {
+      setStitchedVideoUrl(prev => {
+        const isFirstTime = !prev;
+        const urlChanged = prev && prev !== videoUrl;
+        const isFinalVideo = !!status.final_video_url;
+        
+        if (isFirstTime) {
+          // First time we get a video URL
+          if (!hasShownStitchedNotificationRef.current) {
+            hasShownStitchedNotificationRef.current = true;
+            if (isFinalVideo) {
+              addNotification('success', 'Video Complete', 'Your video with audio is ready!');
+            } else {
+              addNotification('success', 'Video Chunks Generated', 'Video chunks are being stitched together!');
+            }
+          }
+        } else if (urlChanged && isFinalVideo) {
+          // URL changed from stitched to final (Phase 5 completed for non-Veo models)
+          if (!hasShownStitchedNotificationRef.current) {
+            hasShownStitchedNotificationRef.current = true;
+            addNotification('success', 'Video Complete', 'Your video with audio is ready!');
+          }
+        }
+        
+        return videoUrl;
+      });
+    }
+    
+    if (status.status === 'complete') {
+      setIsProcessing(false);
+      navigate('/preview');
+    } else if (status.status === 'failed') {
+      setIsProcessing(false);
+      addNotification('error', 'Generation Failed', status.error || 'Unknown error');
+    }
+  }, [streamStatus, isProcessing, navigate]);
 
-    const interval = setInterval(pollStatus, 5000);
-    pollStatus();
-
-    return () => clearInterval(interval);
-  }, [videoId, isProcessing, navigate]); // Removed unnecessary dependencies to prevent re-renders
+  // Handle SSE errors (fallback to polling is automatic, but log errors)
+  useEffect(() => {
+    if (streamError) {
+      console.error('SSE stream error:', streamError);
+      // Fallback to polling happens automatically in the hook
+    }
+  }, [streamError]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
