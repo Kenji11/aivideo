@@ -415,6 +415,68 @@ def generate_chunks(self, phase3_output: dict, user_id: str, model: str) -> dict
 - `backend/app/orchestrator/pipeline.py` (orchestrator with chain pattern)
 - `backend/app/orchestrator/celery_app.py` (Celery configuration)
 
+### Task 9.0: Refactor Celery Tasks - Remove Task Decorators from Chunk Generation Functions
+
+**Goal:** Convert all chunk generation functions from Celery tasks to regular functions, except `generate_chunks` which must remain a Celery task (called from pipeline chain).
+
+**Rationale:** Since we're using LangChain RunnableParallel for parallelism within a single Celery task, individual chunk generation functions should NOT be Celery tasks. This avoids nested task calls and the "Never call result.get() within a task!" violation.
+
+**Files to Modify:**
+- `backend/app/phases/phase4_chunks_storyboard/chunk_generator.py`
+- `backend/app/phases/phase4_chunks_storyboard/service.py`
+- `backend/app/phases/phase4_chunks_storyboard/task.py` (if any helper functions are tasks)
+
+**Tasks:**
+
+- [ ] **Task 9.0.1: Identify All Celery Tasks in Phase 4**
+  - Search for all `@celery_app.task` decorators in `phase4_chunks_storyboard/` directory
+  - List all functions that are currently Celery tasks
+  - Verify that `generate_chunks` in `task.py` is the ONLY function that should remain a Celery task
+  - Document which functions need to be converted
+
+- [ ] **Task 9.0.2: Convert `generate_single_chunk_with_storyboard` to Regular Function**
+  - **File:** `backend/app/phases/phase4_chunks_storyboard/chunk_generator.py`
+  - Remove `@celery_app.task(bind=True, ...)` decorator
+  - Remove `self` parameter (first parameter)
+  - Change signature from `def generate_single_chunk_with_storyboard(self, chunk_spec: dict, beat_to_chunk_map: dict = None)` to `def generate_single_chunk_with_storyboard(chunk_spec: dict, beat_to_chunk_map: dict = None)`
+  - Keep all function logic exactly the same
+  - Update docstring to remove references to Celery task
+
+- [ ] **Task 9.0.3: Update All Callers of `generate_single_chunk_with_storyboard`**
+  - **File:** `backend/app/phases/phase4_chunks_storyboard/service.py`
+  - Find all calls using `.apply()` or `.apply().get()`
+  - Replace with direct function calls
+  - Change `generate_single_chunk_with_storyboard.apply(args=[...])` to `generate_single_chunk_with_storyboard(...)`
+  - Change `result.result` access to direct return value
+  - Update error handling if needed (direct calls raise exceptions, not task failures)
+
+- [ ] **Task 9.0.4: Verify `generate_single_chunk_continuous` is Already Regular Function**
+  - **File:** `backend/app/phases/phase4_chunks_storyboard/chunk_generator.py`
+  - Confirm it does NOT have `@celery_app.task` decorator
+  - Verify it can be called directly (no `.apply()` needed)
+  - If it's a task, convert it following Task 9.0.2 pattern
+
+- [ ] **Task 9.0.5: Check for Other Celery Tasks in Phase 4**
+  - Search for any other `@celery_app.task` decorators in phase 4 files
+  - Verify none are needed for LangChain parallel execution
+  - Convert any found tasks to regular functions (except `generate_chunks`)
+
+- [ ] **Task 9.0.6: Update Imports and Dependencies**
+  - Remove any Celery-related imports that are no longer needed in `chunk_generator.py`
+  - Ensure `celery_app` import is only in `task.py` (for `generate_chunks`)
+  - Verify all imports are correct after refactoring
+
+- [ ] **Task 9.0.7: Test Direct Function Calls**
+  - Verify functions can be called directly without Celery task overhead
+  - Test that function signatures match expected inputs/outputs
+  - Ensure no breaking changes to function interfaces
+
+**Expected Outcome:**
+- Only `generate_chunks` in `task.py` remains a Celery task
+- All chunk generation functions (`generate_single_chunk_with_storyboard`, `generate_single_chunk_continuous`, etc.) are regular functions
+- All callers use direct function calls (no `.apply()` or `.get()`)
+- Ready for LangChain RunnableParallel integration (functions can be called directly in parallel)
+
 ### Task 9.1: Investigate Current Phase 4 Implementation
 
 **File:** `backend/app/phases/phase4_chunks_storyboard/task.py`

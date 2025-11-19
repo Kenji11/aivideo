@@ -183,20 +183,18 @@ class ChunkGenerationService:
                         else:
                             print(f"   📸 Chunk {i}: Independent chunk (beat only needs one chunk)")
                     
-                    # Generate chunk synchronously (using apply to get result immediately)
+                    # Generate chunk directly (function call, not Celery task)
                     # Use storyboard-aware function
-                    result = generate_single_chunk_with_storyboard.apply(
-                        args=[chunk_spec.dict(), self.beat_to_chunk_map]
-                    )
-                    
-                    # Accessing result.result may raise an exception if the task failed
                     try:
-                        chunk_result = result.result
+                        chunk_result = generate_single_chunk_with_storyboard(
+                            chunk_spec.dict(), 
+                            self.beat_to_chunk_map
+                        )
                     except Exception as e:
-                        # Task raised an exception - add to failed chunks
+                        # Function raised an exception - add to failed chunks
                         failed_chunks.append((i, chunk_spec))
                         error_type = type(e).__name__
-                        print(f"   ❌ Chunk {i+1} task exception ({error_type}): {str(e)}")
+                        print(f"   ❌ Chunk {i+1} exception ({error_type}): {str(e)}")
                         continue  # Skip to next chunk
                     
                     if isinstance(chunk_result, dict) and 'chunk_url' in chunk_result:
@@ -318,20 +316,18 @@ class ChunkGenerationService:
                         else:
                             print(f"   📸 Chunk {chunk_index}: Independent chunk (beat only needs one chunk)")
                     
-                    # Generate chunk synchronously (using apply to get result immediately)
+                    # Generate chunk directly (function call, not Celery task)
                     # Use storyboard-aware function
-                    result = generate_single_chunk_with_storyboard.apply(
-                        args=[chunk_spec.dict(), self.beat_to_chunk_map]
-                    )
-                    
-                    # Accessing result.result may raise an exception if the task failed
                     try:
-                        chunk_result = result.result
+                        chunk_result = generate_single_chunk_with_storyboard(
+                            chunk_spec.dict(), 
+                            self.beat_to_chunk_map
+                        )
                     except Exception as e:
-                        # Task raised an exception - capture it
+                        # Function raised an exception - capture it
                         error_msg = str(e)
                         error_type = type(e).__name__
-                        print(f"Chunk {chunk_index} retry {retry_count} task exception ({error_type}): {error_msg}")
+                        print(f"Chunk {chunk_index} retry {retry_count} exception ({error_type}): {error_msg}")
                         last_error = error_msg
                         continue  # Skip to next retry attempt
                     
