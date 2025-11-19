@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { Sparkles, Video, Film, Download, BarChart3 } from 'lucide-react';
+import { Sparkles, Video, Film, Download } from 'lucide-react';
 // Commented out - may use later
 // import { Settings, Zap, Library, CreditCard, Code2 } from 'lucide-react';
 import { Header } from './components/Header';
@@ -20,10 +20,12 @@ import {
 import { Button } from '@/components/ui/button';
 // import type { Template } from './components/TemplateGallery';
 import { ExportPanel } from './components/ExportPanel';
-import { Auth } from './pages/Auth';
+// Lazy load Auth component (contains Firebase which is a large bundle)
+const Auth = lazy(() => import('./pages/Auth').then(module => ({ default: module.Auth })));
 import { AssetLibrary } from './pages/AssetLibrary';
 import { UploadVideo } from './pages/UploadVideo';
 import { VideoStatus } from './pages/VideoStatus';
+import { Preview } from './pages/Preview';
 // Commented out - may use later
 // import { Settings as SettingsPage } from './pages/Settings';
 // import { Analytics } from './pages/Analytics';
@@ -35,6 +37,37 @@ import { VideoStatus } from './pages/VideoStatus';
 import { listVideos, deleteVideo, VideoListItem } from './lib/api';
 import { useAuth } from './contexts/AuthContext';
 import { useDarkMode } from './lib/useDarkMode';
+import { useParams } from 'react-router-dom';
+
+// Export Route Wrapper Component
+function ExportRouteWrapper() {
+  const navigate = useNavigate();
+  const { videoId } = useParams<{ videoId: string }>();
+  
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleExport = (_settings: any) => {
+    toast({
+      variant: 'default',
+      title: 'Export Started',
+      description: 'Your video is being exported',
+    });
+    if (videoId) {
+      navigate(`/preview/${videoId}`);
+    } else {
+      navigate('/projects');
+    }
+  };
+  
+  const handleCancel = () => {
+    if (videoId) {
+      navigate(`/preview/${videoId}`);
+    } else {
+      navigate('/projects');
+    }
+  };
+  
+  return <ExportPanel onExport={handleExport} onCancel={handleCancel} />;
+}
 
 // Main App Content (inside router)
 function AppContent() {
@@ -48,7 +81,6 @@ function AppContent() {
   const [projects, setProjects] = useState<VideoListItem[]>([]);
   const [, setSelectedProject] = useState<VideoListItem | null>(null);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
-  const [stitchedVideoUrl, setStitchedVideoUrl] = useState<string | null>(null);
   const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('veo_fast');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -75,9 +107,8 @@ function AppContent() {
   const handleProjectSelect = (project: VideoListItem) => {
     setSelectedProject(project);
     if (project.status === 'complete' && project.final_video_url) {
-      setStitchedVideoUrl(project.final_video_url);
       setTitle(project.title);
-      navigate('/preview');
+      navigate(`/preview/${project.video_id}`);
     } else if (project.status !== 'complete' && project.status !== 'failed') {
       // Navigate to processing page for videos that are still processing
       navigate(`/processing/${project.video_id}`);
@@ -120,8 +151,8 @@ function AppContent() {
 
   useEffect(() => {
     const fetchProjects = async () => {
-      // Only fetch projects when on the projects page AND state is empty
-      if (location.pathname === '/projects' && projects.length === 0) {
+      // Always fetch projects when on the projects page (no caching)
+      if (location.pathname === '/projects') {
         setIsLoadingProjects(true);
         try {
           const response = await listVideos();
@@ -136,11 +167,11 @@ function AppContent() {
     };
 
     fetchProjects();
-  }, [location.pathname, projects]);
+  }, [location.pathname]);
 
   const getCurrentStep = () => {
     if (location.pathname.startsWith('/processing')) return 2;
-    if (location.pathname === '/preview') return 3;
+    if (location.pathname.startsWith('/preview')) return 3;
     if (location.pathname === '/download') return 4;
     return 1;
   };
@@ -182,11 +213,22 @@ function AppContent() {
 
   // Show auth page if user is not logged in
   if (!user) {
-    return <Auth onAuthSuccess={handleAuthSuccess} />;
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      }>
+        <Auth onAuthSuccess={handleAuthSuccess} />
+      </Suspense>
+    );
   }
 
   const showStepIndicator = location.pathname.startsWith('/processing') || 
-                           location.pathname === '/preview' || 
+                           location.pathname.startsWith('/preview') || 
                            location.pathname === '/download';
 
   // Get user display name or email
@@ -359,97 +401,7 @@ function AppContent() {
 
           <Route path="/processing/:videoId" element={<VideoStatus />} />
 
-          <Route path="/preview" element={
-            <div className="card overflow-hidden animate-fade-in">
-              <div className="aspect-video bg-gradient-to-br from-card to-muted flex items-center justify-center">
-                {stitchedVideoUrl ? (
-                  <video
-                    src={stitchedVideoUrl}
-                    controls
-                    className="w-full h-full object-contain"
-                    onError={(e) => {
-                      console.error('Video load error:', e);
-                    }}
-                  >
-                    Your browser does not support the video tag.
-                  </video>
-                ) : (
-                  <div className="text-center text-white">
-                    <Film className="w-20 h-20 mx-auto mb-4 opacity-50 animate-float" />
-                    <p className="text-lg font-medium opacity-75">Your Video is Ready</p>
-                    <p className="text-sm opacity-50 mt-2">Loading video...</p>
-                  </div>
-                )}
-              </div>
-              <div className="p-8 space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground mb-2">
-                    {title}
-                  </h2>
-                  {description && (
-                    <p className="text-muted-foreground">
-                      {description}
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 p-4 bg-card rounded-lg">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Duration</p>
-                    <p className="text-lg font-semibold text-foreground">2:45</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Resolution</p>
-                    <p className="text-lg font-semibold text-foreground">1080p</p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      onClick={() => {
-                        setPrompt('');
-                        setTitle('');
-                        setDescription('');
-                        navigate('/');
-                      }}
-                      className="btn-secondary"
-                    >
-                      Create Another
-                    </button>
-                    <button
-                      onClick={() => navigate('/export')}
-                      className="btn-primary flex items-center justify-center space-x-2"
-                    >
-                      <BarChart3 className="w-5 h-5" />
-                      <span>Export</span>
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => {
-                      if (stitchedVideoUrl) {
-                        const link = document.createElement('a');
-                        link.href = stitchedVideoUrl;
-                        link.download = `${title || 'video'}.mp4`;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        addNotification('success', 'Download Started', 'Your video download has started');
-                        navigate('/download');
-                      } else {
-                        addNotification('error', 'Video Not Ready', 'Video is still processing');
-                      }
-                    }}
-                    disabled={!stitchedVideoUrl}
-                    className="w-full btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Download className="w-5 h-5" />
-                    <span>Download Video</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          } />
+          <Route path="/preview/:videoId" element={<Preview />} />
 
           <Route path="/download" element={
             <div className="space-y-6 animate-fade-in">
@@ -464,44 +416,12 @@ function AppContent() {
                   Download your video or create another one
                 </p>
                 
-                {stitchedVideoUrl && (
-                  <div className="mb-8">
-                    <video
-                      src={stitchedVideoUrl}
-                      controls
-                      className="w-full max-w-2xl mx-auto rounded-lg border border-border"
-                    >
-                      Your browser does not support the video tag.
-                    </video>
-                  </div>
-                )}
-                
                 <div className="flex flex-col space-y-3 max-w-md mx-auto">
-                  {stitchedVideoUrl && (
-                    <button
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = stitchedVideoUrl;
-                        link.download = `${title || 'video'}.mp4`;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        addNotification('success', 'Download Started', 'Your video download has started');
-                      }}
-                      className="w-full btn-primary flex items-center justify-center space-x-2"
-                    >
-                      <Download className="w-5 h-5" />
-                      <span>Download Video</span>
-                    </button>
-                  )}
                   <button
                     onClick={() => {
                       setPrompt('');
                       setTitle('');
                       setDescription('');
-                      setStitchedVideoUrl(null);
-                      // Phase 3 disabled - reference assets not used
-                      // setReferenceAssets(null);
                       navigate('/');
                     }}
                     className="w-full btn-secondary"
@@ -520,15 +440,7 @@ function AppContent() {
             </div>
           } />
 
-          <Route path="/export" element={
-            <ExportPanel 
-              onExport={() => {
-                addNotification('success', 'Export Started', 'Your video is being exported');
-                navigate('/preview');
-              }} 
-              onCancel={() => navigate('/preview')} 
-            />
-          } />
+          <Route path="/export/:videoId" element={<ExportRouteWrapper />} />
 
           <Route path="/asset-library" element={<AssetLibrary />} />
 
