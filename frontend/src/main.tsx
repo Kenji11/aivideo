@@ -9,7 +9,7 @@ import './index.css';
   const saved = localStorage.getItem('darkMode');
   const isDark = saved !== null ? saved === 'true' : true; // Default to dark
   if (isDark) {
-    document.documentElement.classList.add('dark');
+document.documentElement.classList.add('dark');
   }
 })();
 

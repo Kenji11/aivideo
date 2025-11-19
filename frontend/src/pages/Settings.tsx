@@ -2,34 +2,17 @@ import { Moon, Bell, Download, Zap, HelpCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 export function Settings() {
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    // Check localStorage or system preference
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('theme');
-      if (saved === 'dark' || saved === 'light') return saved;
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    return 'light';
-  });
+  // Enforce dark mode
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+    localStorage.setItem('darkMode', 'true');
+    localStorage.setItem('theme', 'dark');
+  }, []);
+
   const [notifications, setNotifications] = useState(true);
   const [autoDownload, setAutoDownload] = useState(false);
   const [quality, setQuality] = useState<'high' | 'medium' | 'ultra'>('high');
   const [emailDigest, setEmailDigest] = useState(true);
-
-  // Apply theme changes
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  const handleThemeChange = (newTheme: 'light' | 'dark') => {
-    setTheme(newTheme);
-  };
 
   // const toggleSwitch = (value: boolean) => value; // Unused helper
 
@@ -57,16 +40,11 @@ export function Settings() {
             <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
               <div>
                 <p className="font-medium text-slate-900 dark:text-slate-100">Theme</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Light or dark mode</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Dark mode (enforced)</p>
               </div>
-              <select
-                value={theme}
-                onChange={(e) => handleThemeChange(e.target.value as 'light' | 'dark')}
-                className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-              >
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </select>
+              <div className="px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-800 text-slate-100">
+                Dark
+              </div>
             </div>
           </div>
         </div>

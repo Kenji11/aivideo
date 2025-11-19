@@ -290,3 +290,7 @@ dump.rdb
 # Postgres Data
 postgres_data/
 !firebase-credentials.json.example
+
+# Claude Code
+.claude
+thoughts

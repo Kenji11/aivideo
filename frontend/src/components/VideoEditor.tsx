@@ -1,5 +1,16 @@
 import { Sliders, Volume2, Palette, Type } from 'lucide-react';
 import { useState } from 'react';
+import { Slider } from '@/components/ui/slider';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface VideoEditorProps {
   onSave: (settings: VideoSettings) => void;
@@ -37,117 +48,113 @@ export function VideoEditor({ onSave, onCancel }: VideoEditorProps) {
       </div>
 
       <div className="space-y-4">
-        <div>
-          <label className="flex items-center justify-between text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            <span>Duration</span>
-            <span className="text-blue-600">{settings.duration}s</span>
-          </label>
-          <input
-            type="range"
-            min="15"
-            max="300"
-            step="5"
-            value={settings.duration}
-            onChange={(e) =>
-              setSettings({ ...settings, duration: parseInt(e.target.value) })
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Duration</Label>
+            <span className="text-sm text-blue-600">{settings.duration}s</span>
+          </div>
+          <Slider
+            min={15}
+            max={300}
+            step={5}
+            value={[settings.duration]}
+            onValueChange={(value) =>
+              setSettings({ ...settings, duration: value[0] })
             }
-            className="w-full"
           />
         </div>
 
-        <div>
-          <label className="flex items-center justify-between text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            <span className="flex items-center space-x-2">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center space-x-2">
               <Volume2 className="w-4 h-4" />
               <span>Volume</span>
-            </span>
-            <span className="text-blue-600">{settings.volume}%</span>
-          </label>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={settings.volume}
-            onChange={(e) =>
-              setSettings({ ...settings, volume: parseInt(e.target.value) })
+            </Label>
+            <span className="text-sm text-blue-600">{settings.volume}%</span>
+          </div>
+          <Slider
+            min={0}
+            max={100}
+            value={[settings.volume]}
+            onValueChange={(value) =>
+              setSettings({ ...settings, volume: value[0] })
             }
-            className="w-full"
           />
         </div>
 
-        <div>
-          <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+        <div className="space-y-2">
+          <Label className="flex items-center space-x-2">
             <Palette className="w-4 h-4" />
             <span>Background Color</span>
-          </label>
+          </Label>
           <div className="flex items-center space-x-3">
-            <input
+            <Input
               type="color"
               value={settings.backgroundColor}
               onChange={(e) =>
                 setSettings({ ...settings, backgroundColor: e.target.value })
               }
-              className="w-12 h-10 rounded border border-slate-300 dark:border-slate-600 cursor-pointer"
+              className="w-12 h-10 rounded border cursor-pointer"
             />
-            <input
+            <Input
               type="text"
               value={settings.backgroundColor}
               onChange={(e) =>
                 setSettings({ ...settings, backgroundColor: e.target.value })
               }
-              className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm"
+              className="flex-1"
             />
           </div>
         </div>
 
-        <div>
-          <label className="flex items-center justify-between text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            <span className="flex items-center space-x-2">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center space-x-2">
               <Type className="w-4 h-4" />
               <span>Text Size</span>
-            </span>
-            <span className="text-blue-600">{settings.fontSize}px</span>
-          </label>
-          <input
-            type="range"
-            min="16"
-            max="72"
-            step="2"
-            value={settings.fontSize}
-            onChange={(e) =>
-              setSettings({ ...settings, fontSize: parseInt(e.target.value) })
+            </Label>
+            <span className="text-sm text-blue-600">{settings.fontSize}px</span>
+          </div>
+          <Slider
+            min={16}
+            max={72}
+            step={2}
+            value={[settings.fontSize]}
+            onValueChange={(value) =>
+              setSettings({ ...settings, fontSize: value[0] })
             }
-            className="w-full"
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Background Music
-          </label>
-          <select
+        <div className="space-y-2">
+          <Label>Background Music</Label>
+          <Select
             value={settings.musicTrack}
-            onChange={(e) =>
-              setSettings({ ...settings, musicTrack: e.target.value })
+            onValueChange={(value) =>
+              setSettings({ ...settings, musicTrack: value })
             }
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
-            <option value="uplifting">Uplifting (Royalty-Free)</option>
-            <option value="ambient">Ambient (Royalty-Free)</option>
-            <option value="energetic">Energetic (Royalty-Free)</option>
-            <option value="dramatic">Dramatic (Royalty-Free)</option>
-            <option value="none">None</option>
-          </select>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="uplifting">Uplifting (Royalty-Free)</SelectItem>
+              <SelectItem value="ambient">Ambient (Royalty-Free)</SelectItem>
+              <SelectItem value="energetic">Energetic (Royalty-Free)</SelectItem>
+              <SelectItem value="dramatic">Dramatic (Royalty-Free)</SelectItem>
+              <SelectItem value="none">None</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       <div className="flex space-x-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-        <button onClick={onCancel} className="flex-1 btn-secondary">
+        <Button onClick={onCancel} variant="secondary" className="flex-1">
           Cancel
-        </button>
-        <button onClick={handleSave} className="flex-1 btn-primary">
+        </Button>
+        <Button onClick={handleSave} className="flex-1">
           Save Settings
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -72,7 +72,7 @@ export function AssetList({ selectedAssetIds, onSelectionChange, disabled = fals
     return (
       <div className="p-6 text-center">
         <Loader2 className="w-6 h-6 text-blue-600 animate-spin mx-auto mb-2" />
-        <p className="text-sm text-slate-600 dark:text-slate-400">Loading assets...</p>
+        <p className="text-sm text-muted-foreground">Loading assets...</p>
       </div>
     );
   }
@@ -93,10 +93,10 @@ export function AssetList({ selectedAssetIds, onSelectionChange, disabled = fals
 
   if (assets.length === 0) {
     return (
-      <div className="p-6 text-center border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl">
-        <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-        <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">No assets uploaded yet</p>
-        <p className="text-xs text-slate-500 dark:text-slate-500">
+      <div className="p-6 text-center border-2 border-dashed border-border rounded-xl">
+        <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+        <p className="text-sm text-muted-foreground mb-2">No assets uploaded yet</p>
+        <p className="text-xs text-muted-foreground">
           Upload files above to see them here
         </p>
       </div>
@@ -106,7 +106,7 @@ export function AssetList({ selectedAssetIds, onSelectionChange, disabled = fals
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">
+        <h3 className="text-sm font-medium text-foreground">
           Previously Uploaded Assets ({assets.length})
         </h3>
         <button
@@ -128,8 +128,8 @@ export function AssetList({ selectedAssetIds, onSelectionChange, disabled = fals
               onClick={() => toggleAsset(asset.asset_id)}
               className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-all ${
                 isSelected
-                  ? 'bg-blue-50 border-blue-300 dark:bg-blue-900/20 dark:border-blue-700'
-                  : 'bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  ? 'bg-primary/10 border-primary'
+                  : 'bg-card border-border hover:bg-accent'
               } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="flex-shrink-0">
@@ -143,15 +143,15 @@ export function AssetList({ selectedAssetIds, onSelectionChange, disabled = fals
                 {getAssetIcon(asset.asset_type)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                <p className="text-sm font-medium text-foreground truncate">
                   {asset.filename}
                 </p>
                 <div className="flex items-center space-x-2 mt-1">
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                  <span className="text-xs text-muted-foreground">
                     {formatFileSize(asset.file_size_bytes)}
                   </span>
-                  <span className="text-xs text-slate-400">•</span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                  <span className="text-xs text-muted-foreground">•</span>
+                  <span className="text-xs text-muted-foreground">
                     {formatDate(asset.created_at)}
                   </span>
                 </div>
@@ -161,7 +161,7 @@ export function AssetList({ selectedAssetIds, onSelectionChange, disabled = fals
                   <img
                     src={asset.s3_url}
                     alt={asset.filename}
-                    className="w-12 h-12 object-cover rounded border border-slate-200"
+                    className="w-12 h-12 object-cover rounded border border-border"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
@@ -174,8 +174,8 @@ export function AssetList({ selectedAssetIds, onSelectionChange, disabled = fals
       </div>
 
       {selectedAssetIds.length > 0 && (
-        <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
-          <p className="text-xs text-blue-800 dark:text-blue-200">
+        <div className="mt-3 p-2 bg-primary/10 rounded-lg border border-primary/20">
+          <p className="text-xs text-primary">
             {selectedAssetIds.length} asset{selectedAssetIds.length !== 1 ? 's' : ''} selected
           </p>
         </div>
