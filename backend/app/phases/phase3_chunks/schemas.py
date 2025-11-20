@@ -19,7 +19,7 @@ class ChunkSpec(BaseModel):
     prompt: str
     fps: int = 24  # FPS for frame calculation
     use_text_to_video: bool = False  # Flag to use text-to-video instead of image-to-video
-    model: Optional[str] = 'hailuo'  # Video generation model to use
+    model: Optional[str] = 'hailuo_fast'  # Video generation model to use
 
 
 class ChunkGenerationOutput(BaseModel):
