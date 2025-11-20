@@ -267,9 +267,12 @@
 **Decisions Made:**
 - Use `gpt-4o` model (not `gpt-4-vision-preview`) for consistency with codebase
 - Use existing `backend/app/api/upload.py` file (not create new `reference_assets.py`)
-- Keep image in memory during upload (no need to download from S3)
+- Keep image in memory during upload (for CLIP embedding generation)
 - Upload endpoint returns success immediately after S3/DB save; analysis runs in background
-- If GPT-4V analysis fails, skip all analysis (don't generate embeddings or run logo detection)
+- **Single GPT-4o Call:** One comprehensive API call returns all analysis fields in JSON (simpler, faster, cheaper than multiple calls)
+  - GPT-4o handles: asset_type, colors, dominant_colors_rgb, style_tags, shot_types, usage_contexts, logo detection
+  - No separate CV2 color extraction or heuristic logo detection needed (GPT-4o does it all)
+- If GPT-4o analysis fails, skip CLIP embedding generation (don't generate embeddings)
 - **CLIP Implementation:** Use self-hosted CLIP with ViT-B/32 (512 dimensions, 350MB model)
 - **Model Caching:** Docker volume caching (`/mnt/models`) - downloads once, cached forever
 - **Embedding Dimensions:** 512 (not 768) - matches ViT-B/32 output
@@ -280,174 +283,133 @@
 
 **File:** `backend/requirements.txt`
 
-- [ ] Add CLIP dependencies:
-  - [ ] `torch>=2.0.0` (CPU version recommended for smaller image)
-  - [ ] `torchvision>=0.15.0`
-  - [ ] `clip-by-openai>=1.0`
-  - [ ] `pillow>=9.0.0` (already installed, verify version)
-- [ ] Add other required packages:
-  - [ ] `opencv-python` (for logo detection and color extraction)
-  - [ ] `scikit-learn` (for K-means clustering in color extraction)
+- [x] Add CLIP dependencies:
+  - [x] `torch>=2.0.0` (CPU version recommended for smaller image)
+  - [x] `torchvision>=0.15.0`
+  - [x] `clip-by-openai>=1.0`
+  - [x] `pillow>=9.0.0` (already installed, verify version)
+- [x] Add other required packages:
+  - [x] `opencv-python` (for logo detection and color extraction)
+  - [x] `scikit-learn` (for K-means clustering in color extraction)
 
 **File:** `backend/Dockerfile`
 
-- [ ] Install system dependencies for OpenCV:
-  - [ ] `libglib2.0-0`, `libsm6`, `libxext6`, `libxrender-dev`
-- [ ] Install PyTorch CPU version (smaller than GPU version):
-  - [ ] Use `--index-url https://download.pytorch.org/whl/cpu`
-- [ ] Set environment variables:
-  - [ ] `ENV CLIP_MODEL=ViT-B/32`
-  - [ ] `ENV CLIP_MODEL_CACHE=/mnt/models`
+- [x] Install system dependencies for OpenCV:
+  - [x] `libglib2.0-0`, `libsm6`, `libxext6`, `libxrender-dev`
+- [x] Install PyTorch CPU version (smaller than GPU version):
+  - [x] Use `--index-url https://download.pytorch.org/whl/cpu`
+- [x] Set environment variables:
+  - [x] `ENV CLIP_MODEL=ViT-B/32`
+  - [x] `ENV CLIP_MODEL_CACHE=/mnt/models`
 
 **File:** `backend/docker-compose.yml`
 
-- [ ] Add Docker volume for CLIP model cache:
-  - [ ] Create volume: `clip-models:/mnt/models`
-  - [ ] Mount volume to backend service
-- [ ] Add environment variables to backend service:
-  - [ ] `CLIP_MODEL=ViT-B/32`
-  - [ ] `CLIP_MODEL_CACHE=/mnt/models`
+- [x] Add Docker volume for CLIP model cache:
+  - [x] Create volume: `clip-models:/mnt/models`
+  - [x] Mount volume to backend service
+- [x] Add environment variables to backend service:
+  - [x] `CLIP_MODEL=ViT-B/32`
+  - [x] `CLIP_MODEL_CACHE=/mnt/models`
 
 ### Task 2.1: CLIP Embedding Service
 
 **File:** `backend/app/services/clip_embeddings.py`
 
-- [ ] Create `CLIPEmbeddingService` class
-- [ ] Implement model loading with volume caching:
-  - [ ] Load CLIP model: `ViT-B/32` (512 dimensions, 350MB model)
-  - [ ] Use `@lru_cache(maxsize=1)` decorator for singleton pattern
-  - [ ] Configure model cache directory: `/mnt/models` (from `CLIP_MODEL_CACHE` env var)
-  - [ ] Use `clip.load()` with `download_root=MODEL_CACHE_DIR` parameter
-  - [ ] Model downloads to volume on first run (~15-20s), loads from cache on subsequent runs (~3-5s)
-  - [ ] Detect GPU availability, fallback to CPU
-- [ ] Implement `generate_image_embedding(image: PIL.Image) -> list[float]`
-  - [ ] Accept PIL Image (from memory, not file path)
-  - [ ] Preprocess image for CLIP using loaded preprocess function
-  - [ ] Encode image to embedding
-  - [ ] Normalize embedding (L2 norm)
-  - [ ] Return as list of 512 floats (ViT-B/32 produces 512-dim embeddings)
-- [ ] Implement `generate_text_embedding(text: str) -> list[float]`
-  - [ ] Tokenize text using `clip.tokenize()`
-  - [ ] Encode text to embedding
-  - [ ] Normalize embedding (L2 norm)
-  - [ ] Return as list of 512 floats
-- [ ] Add error handling:
-  - [ ] Handle corrupted images
-  - [ ] Handle CUDA out of memory (fallback to CPU)
-  - [ ] Handle model download failures
-  - [ ] Log model loading time (cold start vs warm start)
-- [ ] Add optional caching (cache embeddings in Redis for frequently accessed assets)
-- [ ] Write unit tests:
-  - [ ] Test with sample images
-  - [ ] Test with various text queries
-  - [ ] Verify embedding dimensions (512)
-  - [ ] Verify normalization (magnitude ≈ 1.0)
-  - [ ] Test cold start (first load with download)
-  - [ ] Test warm start (load from cache)
-  - [ ] Verify volume persistence (restart container, no re-download)
+- [x] Create `CLIPEmbeddingService` class
+- [x] Implement model loading with volume caching:
+  - [x] Load CLIP model: `ViT-B/32` (512 dimensions, 350MB model)
+  - [x] Use `@lru_cache(maxsize=1)` decorator for singleton pattern
+  - [x] Configure model cache directory: `/mnt/models` (from `CLIP_MODEL_CACHE` env var)
+  - [x] Use `clip.load()` with `download_root=MODEL_CACHE_DIR` parameter
+  - [x] Model downloads to volume on first run (~15-20s), loads from cache on subsequent runs (~3-5s)
+  - [x] Detect GPU availability, fallback to CPU
+- [x] Implement `generate_image_embedding(image: PIL.Image) -> list[float]`
+  - [x] Accept PIL Image (from memory, not file path)
+  - [x] Preprocess image for CLIP using loaded preprocess function
+  - [x] Encode image to embedding
+  - [x] Normalize embedding (L2 norm)
+  - [x] Return as list of 512 floats (ViT-B/32 produces 512-dim embeddings)
+- [x] Implement `generate_text_embedding(text: str) -> list[float]`
+  - [x] Tokenize text using `clip.tokenize()`
+  - [x] Encode text to embedding
+  - [x] Normalize embedding (L2 norm)
+  - [x] Return as list of 512 floats
+- [x] Add error handling:
+  - [x] Handle corrupted images
+  - [x] Handle CUDA out of memory (fallback to CPU)
+  - [x] Handle model download failures
+  - [x] Log model loading time (cold start vs warm start)
+- [x] Add optional caching (cache embeddings in Redis for frequently accessed assets)
+- [x] Write unit tests:
+  - [x] Test with sample images
+  - [x] Test with various text queries
+  - [x] Verify embedding dimensions (512)
+  - [x] Verify normalization (magnitude ≈ 1.0)
+  - [x] Test cold start (first load with download)
+  - [x] Test warm start (load from cache)
+  - [x] Verify volume persistence (restart container, no re-download)
 
 ---
 
-### Task 2.2: GPT-4o Vision Analysis Service
+### Task 2.2: GPT-4o Vision Analysis Service (Single Comprehensive Call)
 
 **File:** `backend/app/services/asset_analysis.py`
+
+**Approach:** Single GPT-4o API call returns all analysis fields in JSON format. Simpler, faster, cheaper than multiple calls.
 
 - [ ] Create `AssetAnalysisService` class
-- [ ] Implement `analyze_reference_asset(image: PIL.Image, image_url: str, user_provided_name: str, user_provided_description: str) -> dict`
-  - [ ] Accept PIL Image (from memory) and S3 URL (for GPT-4o API)
-- [ ] Build comprehensive GPT-4o prompt
-  - [ ] Include instructions for extracting: asset_type, primary_object, colors, style_tags, recommended_shot_types, usage_contexts
-  - [ ] Request JSON response format
-  - [ ] Include examples for clarity
-- [ ] Call OpenAI GPT-4o API
+- [ ] Implement `analyze_reference_asset(image_url: str, user_provided_name: str, user_provided_description: str) -> dict`
+  - [ ] Accept S3 URL (presigned URL for GPT-4o API) and user context
+  - [ ] Note: PIL Image not needed here (GPT-4o uses URL)
+- [ ] Build comprehensive GPT-4o prompt requesting ALL fields in one JSON response:
+  - [ ] `asset_type`: product/logo/person/environment/texture/prop
+  - [ ] `primary_object`: detailed description of main subject
+  - [ ] `colors`: array of color names (e.g., ["white", "red", "black"])
+  - [ ] `dominant_colors_rgb`: array of RGB arrays (e.g., [[255,255,255], [220,20,60]])
+  - [ ] `style_tags`: array of style descriptors (e.g., ["athletic", "modern", "clean"])
+  - [ ] `recommended_shot_types`: array of shot types (e.g., ["close_up", "hero_shot"])
+  - [ ] `usage_contexts`: array of usage contexts (e.g., ["product shots", "action scenes"])
+  - [ ] `is_logo`: boolean (logo detection)
+  - [ ] `logo_position_preference`: string if logo detected (e.g., "bottom-right")
+  - [ ] `confidence`: float 0.0-1.0
+- [ ] Call OpenAI GPT-4o API with structured JSON response:
   - [ ] Model: `gpt-4o` (consistent with codebase)
-  - [ ] Pass image URL (presigned S3 URL) OR base64-encoded image
-  - [ ] Pass user-provided context (name, description)
-  - [ ] Request JSON response
+  - [ ] Pass image URL (presigned S3 URL) in `image_url` format
+  - [ ] Use `response_format={"type": "json_object"}` for guaranteed JSON
+  - [ ] Pass user-provided context (name, description) in prompt
   - [ ] Set max_tokens to 1000
-- [ ] Parse response
-  - [ ] Extract JSON from response
-  - [ ] Validate required fields present
-  - [ ] Handle malformed JSON gracefully
-- [ ] Add retry logic
-  - [ ] Retry up to 3 times on API errors
-  - [ ] Exponential backoff
-- [ ] Add cost tracking
-  - [ ] Log tokens used
-  - [ ] Calculate cost ($0.01-0.03 per image)
-- [ ] Write unit tests
-  - [ ] Test with sample product image
-  - [ ] Test with logo image
-  - [ ] Test with person image
-  - [ ] Verify JSON structure
-  - [ ] Test error handling
+- [ ] Parse and validate response:
+  - [ ] Extract JSON from response (should be clean JSON due to response_format)
+  - [ ] Validate all required fields present
+  - [ ] Validate data types (arrays are arrays, booleans are booleans, etc.)
+  - [ ] Handle malformed JSON gracefully (fallback to empty analysis)
+- [ ] Add retry logic:
+  - [ ] Retry up to 3 times on API errors (rate limits, network errors)
+  - [ ] Exponential backoff between retries
+  - [ ] Log retry attempts
+- [ ] Add cost tracking:
+  - [ ] Log tokens used (input + output)
+  - [ ] Calculate cost (~$0.01-0.03 per image for GPT-4o vision)
+  - [ ] Log cost per analysis
+- [ ] Write unit tests:
+  - [ ] Test with sample product image → verify product type, colors, style tags
+  - [ ] Test with logo image → verify is_logo=true, logo_position_preference
+  - [ ] Test with person image → verify person type
+  - [ ] Test with environment image → verify environment type
+  - [ ] Verify JSON structure matches expected schema
+  - [ ] Test error handling (API failures, malformed JSON, network errors)
+  - [ ] Test retry logic
 
 ---
 
-### Task 2.3: Dominant Color Extraction
+### Task 2.3: (SKIPPED - Handled by GPT-4o)
 
-**File:** `backend/app/services/asset_analysis.py`
+**Note:** Dominant color extraction and logo detection are now handled by GPT-4o in Task 2.2. No separate services needed.
 
-- [ ] Install dependencies: `pip install opencv-python scikit-learn`
-- [ ] Implement `extract_dominant_colors(image: PIL.Image, n_colors: int = 5) -> list[list[int]]`
-  - [ ] Accept PIL Image (from memory, not URL)
-- [ ] Convert image to RGB color space (PIL Image already in RGB)
-- [ ] Reshape image to list of pixels
-- [ ] Apply K-means clustering
-  - [ ] n_clusters = n_colors (default 5)
-  - [ ] Use sklearn.cluster.KMeans
-  - [ ] Random state for reproducibility
-- [ ] Extract cluster centers (dominant colors)
-- [ ] Convert to integer RGB values
-- [ ] Return as list of [R, G, B] arrays
-- [ ] Add error handling
-  - [ ] Handle grayscale images
-  - [ ] Handle images with few unique colors
-- [ ] Write unit tests
-  - [ ] Test with colorful product image
-  - [ ] Test with mostly black/white image
-  - [ ] Verify output format: [[R,G,B], [R,G,B], ...]
-
----
-
-### Task 2.4: Logo Detection Service
-
-**File:** `backend/app/services/logo_detection.py`
-
-- [ ] Create `LogoDetectionService` class
-- [ ] Implement `detect_logo(image: PIL.Image) -> dict`
-  - [ ] Accept PIL Image (from memory, not file path)
-- [ ] Check for transparency (alpha channel)
-  - [ ] Open image with PIL
-  - [ ] Check if mode == 'RGBA'
-  - [ ] Check if any alpha < 255
-  - [ ] Score: +0.3 if transparent
-- [ ] Check file size vs dimensions
-  - [ ] Calculate bytes per pixel
-  - [ ] If < 0.5 bytes/pixel → simple graphics
-  - [ ] Score: +0.2 if simple
-- [ ] Check color palette size
-  - [ ] Convert to grayscale
-  - [ ] Count unique values
-  - [ ] If < 50 unique colors → limited palette
-  - [ ] Score: +0.25 if limited
-- [ ] Check edge density (Canny edges)
-  - [ ] Apply Canny edge detection
-  - [ ] Calculate edge pixel ratio
-  - [ ] If > 0.1 → crisp edges
-  - [ ] Score: +0.15 if crisp
-- [ ] Check aspect ratio
-  - [ ] Calculate width/height
-  - [ ] If 0.5 < ratio < 2.0 → squarish
-  - [ ] Score: +0.1 if squarish
-- [ ] Return result
-  - [ ] `is_logo`: true if score > 0.5
-  - [ ] `confidence`: min(score, 1.0)
-  - [ ] `reasons`: list of contributing factors
-- [ ] Write unit tests
-  - [ ] Test with Nike logo (transparent PNG) → should detect
-  - [ ] Test with product photo → should not detect
-  - [ ] Test with simple icon → should detect
+**Optional Fallback (Future Enhancement):**
+- If GPT-4o color extraction is inaccurate, we can add CV2-based color extraction as fallback
+- If GPT-4o logo detection is unreliable, we can add heuristic-based logo detection as fallback
+- For MVP, GPT-4o analysis is sufficient
 
 ---
 
@@ -457,33 +419,30 @@
 
 - [ ] Update existing `POST /api/upload` endpoint
 - [ ] **Upload flow:**
-  1. [ ] Save file to S3 (keep image in memory)
-  2. [ ] Save asset record to database
+  1. [ ] Save file to S3 (keep image in memory for CLIP embedding)
+  2. [ ] Save asset record to database (basic metadata only)
   3. [ ] **Return success immediately** (don't wait for analysis)
   4. [ ] Trigger background analysis task (see below)
 - [ ] **Background analysis:** Evaluate options for async processing
   - [ ] Option A: Celery task (consistent with existing architecture)
-  - [ ] Option B: LangChain RunnableParallel (for parallelizing analysis steps)
-  - [ ] Option C: FastAPI BackgroundTasks (simpler, no infrastructure)
+  - [ ] Option B: FastAPI BackgroundTasks (simpler, no infrastructure)
   - [ ] **Decision needed:** Which approach to use?
 - [ ] Create background analysis function/task:
   - [ ] Accept: `asset_id`, `s3_url`, `image` (PIL Image from memory), `user_provided_name`, `user_provided_description`
-  - [ ] Call `analyze_reference_asset()` with image and S3 URL
-    - [ ] Pass user-provided name and description
+  - [ ] **Step 1: GPT-4o Analysis** (single comprehensive call)
+    - [ ] Call `analyze_reference_asset(s3_url, user_provided_name, user_provided_description)`
+    - [ ] Returns JSON with all fields: asset_type, primary_object, colors, dominant_colors_rgb, style_tags, recommended_shot_types, usage_contexts, is_logo, logo_position_preference, confidence
     - [ ] Store full analysis JSON in `analysis` field
-    - [ ] Extract and store individual fields: `primary_object`, `colors`, `style_tags`, etc.
-  - [ ] Call `extract_dominant_colors()` with image (from memory)
-    - [ ] Store result in `dominant_colors_rgb` field
-  - [ ] Call `generate_image_embedding()` with image (from memory)
-    - [ ] Store embedding in `embedding` field (pgvector)
-  - [ ] Call `detect_logo()` with image (from memory)
-    - [ ] Store `is_logo` field
-    - [ ] If detected as logo, set default `logo_position_preference` = "bottom-right"
+    - [ ] Extract and store individual fields in database columns
+  - [ ] **Step 2: CLIP Embedding** (only if GPT-4o succeeded)
+    - [ ] Call `generate_image_embedding(image)` with PIL Image from memory
+    - [ ] Store embedding in `embedding` field (pgvector, 512 dimensions)
   - [ ] Update database record with all analysis results
 - [ ] **Error handling:**
-  - [ ] If GPT-4V analysis fails, **skip all analysis** (don't generate embeddings, don't run logo detection)
+  - [ ] If GPT-4o analysis fails, **skip CLIP embedding** (don't generate embeddings)
   - [ ] Log error for debugging
   - [ ] Asset remains in database with basic metadata (no analysis)
+  - [ ] Retry logic handled in AssetAnalysisService
 - [ ] **Frontend:** Update to handle async analysis
   - [ ] Show "Upload successful" immediately
   - [ ] Show "Analysis in progress..." indicator
@@ -585,10 +544,14 @@
 ### Acceptance Criteria
 
 - [ ] All uploaded images are automatically analyzed with GPT-4o (in background)
-- [ ] Analysis includes: asset type, colors, style tags, shot types, usage contexts
-- [ ] CLIP embeddings (512-dim, ViT-B/32) are generated and stored in pgvector
-- [ ] Logo detection works with >85% accuracy
-- [ ] Dominant colors are extracted accurately
+- [ ] Single GPT-4o call returns comprehensive JSON with all fields:
+  - [ ] asset_type, primary_object, colors, dominant_colors_rgb
+  - [ ] style_tags, recommended_shot_types, usage_contexts
+  - [ ] is_logo, logo_position_preference (if logo detected)
+  - [ ] confidence score
+- [ ] CLIP embeddings (512-dim, ViT-B/32) are generated and stored in pgvector (only if GPT-4o succeeds)
+- [ ] Logo detection works with reasonable accuracy (via GPT-4o)
+- [ ] Dominant colors are extracted accurately (via GPT-4o, RGB arrays)
 - [ ] Frontend displays analysis results in detail modal
 - [ ] Users can edit asset metadata
 - [ ] Upload returns success immediately (<2s), analysis runs in background

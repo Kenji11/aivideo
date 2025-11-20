@@ -53,6 +53,7 @@ class StatusResponse(BaseModel):
 class VideoResponse(BaseModel):
     """Response from video endpoint"""
     video_id: str
+    title: str
     status: str
     final_video_url: Optional[str]
     cost_usd: float

@@ -84,7 +84,7 @@ class Asset(Base):
     
     # Semantic Search (pgvector)
     # Note: embedding column will be added via migration (requires pgvector extension)
-    # embedding = Column(Vector(768), nullable=True)  # CLIP embedding for semantic search
+    # embedding = Column(Vector(512), nullable=True)  # CLIP embedding for semantic search (ViT-B/32 produces 512-dim vectors)
     
     # Metadata
     updated_at = Column(DateTime(timezone=True), nullable=True, onupdate=func.now())
