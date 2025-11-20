@@ -328,67 +328,71 @@
 - `backend/app/phases/phase1_validate/service.py` (LLM prompt and beat selection)
 - `backend/app/phases/phase2_storyboard/task.py` (image generation)
 
-### Task 4.1: Investigate Current Beat Generation Logic
+### Task 4.1: Investigate Current Beat Generation Logic ✅
 
-**File:** `backend/app/phases/phase1_validate/service.py`
+**COMPLETED - Investigation revealed:**
+- Pipeline was using OLD template-based system (`task.py`)
+- Old system scaled beats with math → fractional durations
+- NEW intelligent system (`task_intelligent.py`) exists but wasn't active
+- Beat library has proper 5/10/15s constraints
 
-- [ ] Check how beats are selected:
-  - Review LLM prompt for beat selection
-  - Check if duration is considered when selecting beats
-  - Verify beat count validation is applied
+**Files investigated:**
+- `backend/app/phases/phase1_validate/task.py` (old)
+- `backend/app/phases/phase1_validate/task_intelligent.py` (new)
+- `backend/app/phases/phase1_validate/service.py` (template system)
+- `backend/app/phases/phase1_validate/prompts.py` (intelligent system)
+- `backend/app/common/beat_library.py` (15 beats, 5/10/15s only)
 
-- [ ] Check beat count validation:
-  - Review `validate_and_fix_beat_count()` function
-  - Verify it's called after LLM generates beats
-  - Check if validation is working correctly
+### Task 4.2: Switch to Intelligent Planning System ✅
 
-### Task 4.2: Review Beat Count Validation Logic
+**COMPLETED - System migration:**
+- ✅ Swapped pipeline to use `plan_video_intelligent` task
+- ✅ Updated Celery imports to use `task_intelligent` module
+- ✅ Added `validate_llm_beat_durations()` function
+  - Validates LLM output BEFORE building spec
+  - Fixes invalid durations to nearest 5/10/15s
+  - Logs warnings when LLM returns bad values
+- ✅ Removed `validate_and_fix_beat_count()` (no longer needed)
+- ✅ Cleaned up unused imports (math, datetime, Path)
+- ✅ Updated phase name from `phase1_validate` to `phase1_planning`
 
-**File:** `backend/app/phases/phase1_validate/validation.py`
+**Files modified:**
+- `backend/app/orchestrator/pipeline.py`
+- `backend/app/orchestrator/celery_app.py`
+- `backend/app/api/generate.py`
+- `backend/app/phases/phase1_validate/validation.py`
+- `backend/app/phases/phase1_validate/task_intelligent.py`
+- `backend/app/phases/phase1_validate/prompts.py`
 
-- [ ] Check `validate_and_fix_beat_count()` implementation:
-  - Verify `max_beats = ceil(duration / 5)` calculation
-  - Check if truncation is working correctly
-  - Verify truncated beats have correct start times
-  - Check if validation is called in `build_full_spec()`
+### Task 4.3: Enhanced LLM Prompt for Short Videos ✅
 
-- [ ] Test validation with short videos:
-  - 10s video: Should allow max 2 beats (10/5 = 2)
-  - 15s video: Should allow max 3 beats (15/5 = 3)
-  - Verify truncation happens if LLM returns more beats
+**COMPLETED - Prompt improvements:**
+- ✅ Added explicit short video examples:
+  - 5s video = 1 beat
+  - 10s video = 2 beats (5s + 5s)
+  - 15s video = 3 beats
+- ✅ Emphasized NO decimals, NO fractions, NO math
+- ✅ Added stronger validation checklist
+- ✅ Warned that system will reject invalid durations
 
-### Task 4.3: Improve LLM Prompt for Short Videos
+**File:** `backend/app/phases/phase1_validate/prompts.py`
 
-**File:** `backend/app/phases/phase1_validate/service.py`
+### Task 4.4: Multi-Stage Beat Validation ✅
 
-- [ ] Update LLM prompt to consider duration:
-  - Add explicit instruction: "For videos under 20s, select fewer beats"
-  - Add example: "10s video = 2 beats max, 15s video = 3 beats max"
-  - Emphasize that beat count should match duration
+**COMPLETED - Validation strategy:**
+- ✅ Stage 1: `validate_llm_beat_durations()` after LLM call
+  - Checks all durations are 5/10/15s
+  - Fixes to nearest valid if needed
+  - Logs warnings
+- ✅ Stage 2: `build_full_spec()` during construction
+  - Uses beat library durations
+  - Validates beat_ids exist
+- ✅ Stage 3: `validate_spec()` final check
+  - Strict duration validation
+  - Duration sum validation
+  - No auto-fixing (fails if invalid)
 
-- [ ] Add duration-based beat count hint:
-  - Calculate `max_beats = ceil(duration / 5)` before LLM call
-  - Include in prompt: "Select at most {max_beats} beats for this {duration}s video"
-  - This helps LLM make better initial selection
-
-### Task 4.4: Strengthen Beat Count Validation
-
-**File:** `backend/app/phases/phase1_validate/validation.py`
-
-- [ ] Ensure validation is always called:
-  - Verify `validate_and_fix_beat_count()` is called in `build_full_spec()`
-  - Add validation in other code paths if needed
-  - Add logging when truncation occurs
-
-- [ ] Improve truncation logic:
-  - Ensure truncated beats still sum to correct duration
-  - Verify start times are recalculated correctly
-  - Check that beat durations are valid after truncation
-
-- [ ] Add stricter validation:
-  - Log warning if LLM returns more than `max_beats + 1` beats
-  - Consider this a quality issue if it happens frequently
-  - May indicate LLM prompt needs improvement
+**Files:** `backend/app/phases/phase1_validate/validation.py`, `task_intelligent.py`
 
 ### Task 4.5: Testing
 

@@ -51,11 +51,17 @@ Given the user's prompt, you must:
    - Use beats from the library to create a compelling narrative
    - CRITICAL CONSTRAINTS:
      * Total duration MUST equal user's requested duration (or 30s default)
-     * Each beat MUST be 5s, 10s, or 15s (NO other durations allowed)
+     * Each beat MUST be EXACTLY 5s, 10s, or 15s (NO other durations - no decimals, no fractions, no math)
+     * For SHORT videos:
+       - 5s video = 1 beat (5s)
+       - 10s video = 2 beats (5s + 5s)
+       - 15s video = 3 beats (5s + 5s + 5s) OR (5s + 10s)
+       - 20s video = 4 beats maximum
      * First beat should typically be from opening beats (typical_position: "opening")
      * Last beat should typically be from closing beats (typical_position: "closing")
      * Middle beats from middle beats (typical_position: "middle")
      * Sum of all beat durations MUST equal total duration EXACTLY
+     * DO NOT use more beats than necessary for the duration
    - Follow the selected archetype's narrative_structure
    - Maintain appropriate energy_curve
    - Ensure beat_ids match exactly those in the AVAILABLE BEATS library
@@ -101,13 +107,16 @@ Return a JSON object with this EXACT structure:
 ===== VALIDATION CHECKLIST =====
 
 Before returning, verify:
-- ✓ Sum of beat durations == requested duration
+- ✓ Sum of beat durations == requested duration (EXACT match required)
 - ✓ All beat_ids exist in BEAT_LIBRARY
 - ✓ First beat has typical_position: "opening" (recommended)
 - ✓ Last beat has typical_position: "closing" (recommended)
-- ✓ All beat durations are 5, 10, or 15 seconds
+- ✓ ALL beat durations are EXACTLY 5, 10, or 15 seconds (no decimals, no fractions)
+- ✓ Beat count appropriate for duration (e.g., 10s video should have 2 beats, not 5)
 - ✓ Style matches selected archetype and user keywords
 
 If validation fails, adjust your beat sequence until it passes.
+
+IMPORTANT: The system will reject any beat with a duration other than 5, 10, or 15 seconds.
 """
 

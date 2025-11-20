@@ -17,7 +17,7 @@ from app.orchestrator.celery_app import celery_app
 from app.common.schemas import PhaseOutput
 from app.services.openai import openai_client
 from app.phases.phase1_validate.prompts import build_planning_system_prompt
-from app.phases.phase1_validate.validation import validate_spec, build_full_spec
+from app.phases.phase1_validate.validation import validate_spec, build_full_spec, validate_llm_beat_durations
 from app.common.constants import BEAT_COMPOSITION_CREATIVITY, get_planning_temperature
 
 logger = logging.getLogger(__name__)
@@ -93,6 +93,10 @@ def plan_video_intelligent(
         
         logger.info(f"   LLM selected archetype: {llm_output.get('selected_archetype')}")
         logger.info(f"   LLM composed {len(llm_output.get('beat_sequence', []))} beats")
+        
+        # Validate and fix LLM beat durations BEFORE building full spec
+        # Ensures all beat durations are 5s, 10s, or 15s (no fractional/invalid durations)
+        llm_output = validate_llm_beat_durations(llm_output)
         
         # Build full spec from LLM output
         # Fills in beat details from library and substitutes product/style
