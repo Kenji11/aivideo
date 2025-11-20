@@ -39,6 +39,7 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
             src={project.final_video_url}
             className="w-full h-full object-cover"
             muted
+            preload="none"
             onMouseEnter={(e) => e.currentTarget.play()}
             onMouseLeave={(e) => {
               e.currentTarget.pause();
