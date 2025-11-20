@@ -509,6 +509,13 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       ),
     });
 
+    // CNAME record for aivideo-api.gauntlet3.com → videoai-api.gauntlet3.com
+    new route53.CnameRecord(this, 'APICnameRecord', {
+      zone: hostedZone,
+      recordName: 'aivideo-api',
+      domainName: 'videoai-api.gauntlet3.com',
+    });
+
     new cdk.CfnOutput(this, 'APIURL', {
       value: `https://aivideo-api.gauntlet3.com, https://videoai-api.gauntlet3.com`,
       description: 'API endpoint URLs (both domains)',
@@ -581,6 +588,13 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       target: route53.RecordTarget.fromAlias(
         new route53targets.CloudFrontTarget(frontendDistribution)
       ),
+    });
+
+    // CNAME record for aivideo.gauntlet3.com → videoai.gauntlet3.com
+    new route53.CnameRecord(this, 'FrontendCnameRecord', {
+      zone: hostedZone,
+      recordName: 'aivideo',
+      domainName: 'videoai.gauntlet3.com',
     });
 
     // Outputs
