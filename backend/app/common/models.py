@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, DateTime, JSON, Enum as SQLEnum, Integer
+from sqlalchemy import Column, String, Float, DateTime, JSON, Enum as SQLEnum, Integer, Boolean, ARRAY, Text
 from sqlalchemy.sql import func
 from app.database import Base
 import enum
@@ -16,10 +16,19 @@ class VideoStatus(str, enum.Enum):
     FAILED = "failed"
 
 class AssetType(str, enum.Enum):
-    """Asset type"""
+    """Asset type (legacy - for backward compatibility)"""
     IMAGE = "image"
     VIDEO = "video"
     AUDIO = "audio"
+
+class ReferenceAssetType(str, enum.Enum):
+    """Reference asset content type"""
+    PRODUCT = "product"
+    LOGO = "logo"
+    PERSON = "person"
+    ENVIRONMENT = "environment"
+    TEXTURE = "texture"
+    PROP = "prop"
 
 class AssetSource(str, enum.Enum):
     """Asset source"""
@@ -37,7 +46,7 @@ class Asset(Base):
     # Asset details
     s3_key = Column(String, nullable=False)  # S3 key/path
     s3_url = Column(String, nullable=True)  # Full S3 URL or presigned URL
-    asset_type = Column(SQLEnum(AssetType), nullable=False)
+    asset_type = Column(SQLEnum(AssetType), nullable=False)  # Legacy: IMAGE/VIDEO/AUDIO
     source = Column(SQLEnum(AssetSource), nullable=False)
     
     # Metadata
@@ -45,6 +54,41 @@ class Asset(Base):
     file_size_bytes = Column(Integer, nullable=True)
     mime_type = Column(String, nullable=True)
     asset_metadata = Column(JSON, default=dict)  # Additional metadata (dimensions, duration, etc.)
+    
+    # Reference Asset Fields (new)
+    # User-defined metadata
+    name = Column(String, nullable=True)  # User-defined name (editable, defaults to filename)
+    description = Column(Text, nullable=True)  # Optional user description
+    reference_asset_type = Column(SQLEnum(ReferenceAssetType), nullable=True)  # product/logo/person/etc
+    
+    # Storage
+    thumbnail_url = Column(String, nullable=True)  # Optimized thumbnail S3 URL
+    
+    # Image properties
+    width = Column(Integer, nullable=True)  # Image width in pixels
+    height = Column(Integer, nullable=True)  # Image height in pixels
+    has_transparency = Column(Boolean, default=False)  # Whether image has alpha channel
+    
+    # AI Analysis (from GPT-4V)
+    analysis = Column(JSON, nullable=True)  # Full GPT-4V analysis response
+    primary_object = Column(String, nullable=True)  # "Nike Air Max sneaker"
+    colors = Column(ARRAY(String), nullable=True)  # ["white", "red", "black"]
+    dominant_colors_rgb = Column(JSON, nullable=True)  # [[255,255,255], [220,20,60]]
+    style_tags = Column(ARRAY(String), nullable=True)  # ["athletic", "modern", "clean"]
+    recommended_shot_types = Column(ARRAY(String), nullable=True)  # ["close_up", "hero_shot"]
+    usage_contexts = Column(ARRAY(String), nullable=True)  # ["product shots", "action scenes"]
+    
+    # Logo-specific
+    is_logo = Column(Boolean, default=False)  # Logo detection flag
+    logo_position_preference = Column(String, nullable=True)  # "bottom-right", "top-left", etc.
+    
+    # Semantic Search (pgvector)
+    # Note: embedding column will be added via migration (requires pgvector extension)
+    # embedding = Column(Vector(768), nullable=True)  # CLIP embedding for semantic search
+    
+    # Metadata
+    updated_at = Column(DateTime(timezone=True), nullable=True, onupdate=func.now())
+    usage_count = Column(Integer, default=0)  # Track how often used in videos
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

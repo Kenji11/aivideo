@@ -1,18 +1,23 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Form, Query
+import logging
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import uuid
 import tempfile
 import os
 from pathlib import Path
 import mimetypes
+from PIL import Image
 
 from app.database import get_db
-from app.common.models import Asset, AssetType, AssetSource
+from app.common.models import Asset, AssetType, AssetSource, ReferenceAssetType
 from app.common.auth import get_current_user
 from app.common.schemas import UploadedAsset, UploadResponse
 from app.services.s3 import s3_client
+from app.common.constants import get_asset_s3_key
 
 router = APIRouter()
 
@@ -35,8 +40,9 @@ ALLOWED_DOCUMENT_TYPES = {
 
 ALL_ALLOWED_TYPES = ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES | ALLOWED_AUDIO_TYPES | ALLOWED_DOCUMENT_TYPES
 
-# Max file size: 100MB
+# Max file size: 100MB (general), 10MB for images (reference assets)
 MAX_FILE_SIZE = 100 * 1024 * 1024
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB for reference asset images
 
 
 def determine_asset_type(mime_type: str) -> AssetType:
@@ -56,10 +62,19 @@ def determine_asset_type(mime_type: str) -> AssetType:
 async def upload_assets(
     files: List[UploadFile] = File(...),
     user_id: str = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    # Optional form fields for reference assets
+    name: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    reference_asset_type: Optional[str] = Form(None)
 ):
     """
     Upload one or more assets (images, videos, PDFs) to S3 and create database records.
+    
+    For reference assets (images), accepts optional metadata:
+    - name: User-defined name (defaults to filename)
+    - description: Optional description
+    - reference_asset_type: product, logo, person, environment, texture, prop
     
     Returns list of asset IDs that can be used as reference_assets in video generation.
     """
@@ -75,16 +90,21 @@ async def upload_assets(
             file_content = await file.read()
             file_size = len(file_content)
             
-            if file_size > MAX_FILE_SIZE:
-                errors.append(f"{file.filename}: File too large (max {MAX_FILE_SIZE / (1024*1024)}MB)")
+            # Validate MIME type
+            mime_type = file.content_type or mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
+            
+            # Check if it's an image (reference asset)
+            is_image = mime_type in ALLOWED_IMAGE_TYPES
+            
+            # Apply size limit based on file type
+            max_size = MAX_IMAGE_SIZE if is_image else MAX_FILE_SIZE
+            if file_size > max_size:
+                errors.append(f"{file.filename}: File too large (max {max_size / (1024*1024)}MB)")
                 continue
             
             if file_size == 0:
                 errors.append(f"{file.filename}: File is empty")
                 continue
-            
-            # Validate MIME type
-            mime_type = file.content_type or mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
             
             if mime_type not in ALL_ALLOWED_TYPES:
                 errors.append(f"{file.filename}: File type not allowed. Allowed: images, videos, PDFs")
@@ -96,11 +116,14 @@ async def upload_assets(
             # Generate unique asset ID
             asset_id = str(uuid.uuid4())
             
-            # Create S3 key: assets/{user_id}/{asset_id}/{filename}
+            # Get filename and sanitize
             filename = file.filename or f"file_{asset_id}"
-            # Sanitize filename
             safe_filename = "".join(c for c in filename if c.isalnum() or c in "._- ").strip()
-            s3_key = f"assets/{user_id}/{asset_id}/{safe_filename}"
+            if not safe_filename:
+                safe_filename = f"file_{asset_id}"
+            
+            # Create S3 key: {user_id}/assets/{filename} (new flat structure)
+            s3_key = get_asset_s3_key(user_id, safe_filename)
             
             # Save to temporary file
             with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as temp_file:
@@ -108,11 +131,41 @@ async def upload_assets(
                 temp_path = temp_file.name
             
             try:
-                # Upload to S3
+                # Extract image properties if it's an image
+                width = None
+                height = None
+                has_transparency = False
+                thumbnail_url = None
+                
+                if is_image:
+                    try:
+                        with Image.open(temp_path) as img:
+                            width, height = img.size
+                            # Check for transparency (alpha channel)
+                            has_transparency = img.mode in ('RGBA', 'LA') or 'transparency' in img.info
+                            
+                            # Generate and upload thumbnail
+                            thumbnail_url = s3_client.upload_thumbnail(img, user_id, safe_filename)
+                    except Exception as e:
+                        logger.warning(f"Failed to process image properties for {filename}: {str(e)}")
+                
+                # Upload original to S3
                 s3_url = s3_client.upload_file(temp_path, s3_key)
                 
                 # Generate presigned URL for access
                 presigned_url = s3_client.generate_presigned_url(s3_key, expiration=3600 * 24 * 7)  # 7 days
+                
+                # Parse reference_asset_type if provided
+                parsed_reference_type = None
+                if reference_asset_type:
+                    try:
+                        parsed_reference_type = ReferenceAssetType(reference_asset_type.lower())
+                    except ValueError:
+                        # Invalid type, will be None
+                        pass
+                
+                # Set name (default to filename if not provided)
+                asset_name = name or safe_filename
                 
                 # Create asset metadata
                 asset_metadata = {
@@ -128,10 +181,18 @@ async def upload_assets(
                     s3_url=presigned_url,
                     asset_type=asset_type,
                     source=AssetSource.USER_UPLOAD,
-                    file_name=filename,
+                    file_name=safe_filename,
                     file_size_bytes=file_size,
                     mime_type=mime_type,
-                    asset_metadata=asset_metadata
+                    asset_metadata=asset_metadata,
+                    # Reference asset fields
+                    name=asset_name,
+                    description=description,
+                    reference_asset_type=parsed_reference_type,
+                    thumbnail_url=thumbnail_url,
+                    width=width,
+                    height=height,
+                    has_transparency=has_transparency
                 )
                 
                 db.add(asset_record)
@@ -140,10 +201,15 @@ async def upload_assets(
                 
                 uploaded_assets.append({
                     "asset_id": asset_id,
-                    "filename": filename,
+                    "filename": safe_filename,
+                    "name": asset_name,
                     "asset_type": asset_type.value,
+                    "reference_asset_type": parsed_reference_type.value if parsed_reference_type else None,
                     "file_size_bytes": file_size,
-                    "s3_url": presigned_url
+                    "s3_url": presigned_url,
+                    "thumbnail_url": thumbnail_url,
+                    "width": width,
+                    "height": height
                 })
                 
             finally:
@@ -173,15 +239,40 @@ async def upload_assets(
 @router.get("/api/assets")
 async def get_assets(
     user_id: str = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    reference_asset_type: Optional[str] = Query(None, description="Filter by reference asset type"),
+    is_logo: Optional[bool] = Query(None, description="Filter by logo flag"),
+    limit: Optional[int] = Query(20, ge=1, le=100, description="Number of results per page"),
+    offset: Optional[int] = Query(0, ge=0, description="Offset for pagination")
 ):
     """
     Get all assets for the authenticated user.
     
+    Supports filtering by reference_asset_type and is_logo, with pagination.
     Returns list of assets with metadata including presigned URLs for access.
     """
     # Query assets for the authenticated user only
-    assets = db.query(Asset).filter(Asset.user_id == user_id).order_by(Asset.created_at.desc()).all()
+    query = db.query(Asset).filter(
+        Asset.user_id == user_id,
+        Asset.source == AssetSource.USER_UPLOAD
+    )
+    
+    # Apply filters
+    if reference_asset_type:
+        try:
+            ref_type = ReferenceAssetType(reference_asset_type.lower())
+            query = query.filter(Asset.reference_asset_type == ref_type)
+        except ValueError:
+            pass  # Invalid type, ignore filter
+    
+    if is_logo is not None:
+        query = query.filter(Asset.is_logo == is_logo)
+    
+    # Get total count before pagination
+    total = query.count()
+    
+    # Apply pagination and ordering
+    assets = query.order_by(Asset.created_at.desc()).offset(offset).limit(limit).all()
     
     # Convert to response format
     asset_list = []
@@ -192,15 +283,168 @@ async def get_assets(
         asset_list.append({
             "asset_id": asset.id,
             "filename": asset.file_name or "unknown",
+            "name": asset.name or asset.file_name or "unknown",
             "asset_type": asset.asset_type.value,
+            "reference_asset_type": asset.reference_asset_type.value if asset.reference_asset_type else None,
             "file_size_bytes": asset.file_size_bytes or 0,
             "s3_url": presigned_url,
+            "thumbnail_url": asset.thumbnail_url,
+            "width": asset.width,
+            "height": asset.height,
+            "is_logo": asset.is_logo,
             "created_at": asset.created_at.isoformat() if asset.created_at else None,
         })
     
     return {
         "assets": asset_list,
-        "total": len(asset_list),
+        "total": total,
+        "limit": limit,
+        "offset": offset,
         "user_id": user_id
+    }
+
+
+@router.get("/api/assets/{asset_id}")
+async def get_asset(
+    asset_id: str,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get a single asset by ID.
+    
+    Returns full asset details including all reference asset fields.
+    """
+    asset = db.query(Asset).filter(
+        Asset.id == asset_id,
+        Asset.user_id == user_id
+    ).first()
+    
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    # Generate fresh presigned URL
+    presigned_url = s3_client.generate_presigned_url(asset.s3_key, expiration=3600 * 24 * 7)
+    
+    return {
+        "asset_id": asset.id,
+        "filename": asset.file_name or "unknown",
+        "name": asset.name or asset.file_name or "unknown",
+        "description": asset.description,
+        "asset_type": asset.asset_type.value,
+        "reference_asset_type": asset.reference_asset_type.value if asset.reference_asset_type else None,
+        "file_size_bytes": asset.file_size_bytes or 0,
+        "mime_type": asset.mime_type,
+        "s3_url": presigned_url,
+        "thumbnail_url": asset.thumbnail_url,
+        "width": asset.width,
+        "height": asset.height,
+        "has_transparency": asset.has_transparency,
+        "is_logo": asset.is_logo,
+        "logo_position_preference": asset.logo_position_preference,
+        "primary_object": asset.primary_object,
+        "colors": asset.colors,
+        "dominant_colors_rgb": asset.dominant_colors_rgb,
+        "style_tags": asset.style_tags,
+        "recommended_shot_types": asset.recommended_shot_types,
+        "usage_contexts": asset.usage_contexts,
+        "usage_count": asset.usage_count or 0,
+        "created_at": asset.created_at.isoformat() if asset.created_at else None,
+        "updated_at": asset.updated_at.isoformat() if asset.updated_at else None,
+    }
+
+
+@router.patch("/api/assets/{asset_id}")
+async def update_asset(
+    asset_id: str,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    name: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    reference_asset_type: Optional[str] = Form(None),
+    logo_position_preference: Optional[str] = Form(None)
+):
+    """
+    Update asset metadata.
+    
+    Accepts partial updates: name, description, reference_asset_type, logo_position_preference.
+    S3 key remains unchanged - only DB fields update.
+    """
+    asset = db.query(Asset).filter(
+        Asset.id == asset_id,
+        Asset.user_id == user_id
+    ).first()
+    
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    # Update fields if provided
+    if name is not None:
+        asset.name = name
+    if description is not None:
+        asset.description = description
+    if reference_asset_type is not None:
+        try:
+            asset.reference_asset_type = ReferenceAssetType(reference_asset_type.lower())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid reference_asset_type: {reference_asset_type}")
+    if logo_position_preference is not None:
+        if asset.is_logo:
+            asset.logo_position_preference = logo_position_preference
+        else:
+            raise HTTPException(status_code=400, detail="logo_position_preference can only be set for logos")
+    
+    db.commit()
+    db.refresh(asset)
+    
+    # Generate fresh presigned URL
+    presigned_url = s3_client.generate_presigned_url(asset.s3_key, expiration=3600 * 24 * 7)
+    
+    return {
+        "asset_id": asset.id,
+        "filename": asset.file_name or "unknown",
+        "name": asset.name or asset.file_name or "unknown",
+        "description": asset.description,
+        "reference_asset_type": asset.reference_asset_type.value if asset.reference_asset_type else None,
+        "logo_position_preference": asset.logo_position_preference,
+        "s3_url": presigned_url,
+        "updated_at": asset.updated_at.isoformat() if asset.updated_at else None,
+    }
+
+
+@router.delete("/api/assets/{asset_id}")
+async def delete_asset(
+    asset_id: str,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete an asset.
+    
+    Removes the asset from S3 (including thumbnail and related files) and from the database.
+    """
+    asset = db.query(Asset).filter(
+        Asset.id == asset_id,
+        Asset.user_id == user_id
+    ).first()
+    
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    # Get original filename for S3 deletion
+    filename = asset.file_name
+    if not filename:
+        raise HTTPException(status_code=400, detail="Asset filename not found")
+    
+    # Delete from S3 (all related files: original, thumbnail, preprocessed)
+    s3_client.delete_asset_files(user_id, filename)
+    
+    # Delete from database
+    db.delete(asset)
+    db.commit()
+    
+    return {
+        "message": "Asset deleted successfully",
+        "asset_id": asset_id
     }
 

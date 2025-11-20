@@ -133,15 +133,37 @@ export interface UploadResponse {
 export interface AssetListItem {
   asset_id: string;
   filename: string;
+  name?: string;
   asset_type: string;
+  reference_asset_type?: string;
   file_size_bytes: number;
   s3_url: string;
+  thumbnail_url?: string;
+  width?: number;
+  height?: number;
+  is_logo?: boolean;
   created_at?: string;
+}
+
+export interface AssetDetail extends AssetListItem {
+  description?: string;
+  has_transparency?: boolean;
+  logo_position_preference?: string;
+  primary_object?: string;
+  colors?: string[];
+  dominant_colors_rgb?: number[][];
+  style_tags?: string[];
+  recommended_shot_types?: string[];
+  usage_contexts?: string[];
+  usage_count?: number;
+  updated_at?: string;
 }
 
 export interface AssetListResponse {
   assets: AssetListItem[];
   total: number;
+  limit?: number;
+  offset?: number;
   user_id: string;
 }
 
@@ -218,9 +240,89 @@ export const api = {
   /**
    * Get all assets for a user
    */
-  async getAssets(userId?: string): Promise<AssetListResponse> {
-    const params = userId ? { user_id: userId } : {};
+  async getAssets(params?: {
+    reference_asset_type?: string;
+    is_logo?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<AssetListResponse> {
     const response = await apiClient.get<AssetListResponse>('/api/assets', { params });
+    return response.data;
+  },
+
+  /**
+   * Get a single asset by ID
+   */
+  async getAsset(assetId: string): Promise<AssetDetail> {
+    const response = await apiClient.get<AssetDetail>(`/api/assets/${assetId}`);
+    return response.data;
+  },
+
+  /**
+   * Update asset metadata
+   */
+  async updateAsset(
+    assetId: string,
+    updates: {
+      name?: string;
+      description?: string;
+      reference_asset_type?: string;
+      logo_position_preference?: string;
+    }
+  ): Promise<AssetDetail> {
+    const formData = new FormData();
+    if (updates.name !== undefined) formData.append('name', updates.name);
+    if (updates.description !== undefined) formData.append('description', updates.description);
+    if (updates.reference_asset_type !== undefined) formData.append('reference_asset_type', updates.reference_asset_type);
+    if (updates.logo_position_preference !== undefined) formData.append('logo_position_preference', updates.logo_position_preference);
+
+    const response = await apiClient.patch<AssetDetail>(`/api/assets/${assetId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  /**
+   * Delete an asset
+   */
+  async deleteAsset(assetId: string): Promise<void> {
+    await apiClient.delete(`/api/assets/${assetId}`);
+  },
+
+  /**
+   * Upload assets with metadata
+   */
+  async uploadAssetsWithMetadata(
+    files: File[],
+    metadata?: {
+      name?: string;
+      description?: string;
+      reference_asset_type?: string;
+    },
+    onProgress?: (progress: number) => void
+  ): Promise<UploadResponse> {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append('files', file);
+    });
+    if (metadata?.name) formData.append('name', metadata.name);
+    if (metadata?.description) formData.append('description', metadata.description);
+    if (metadata?.reference_asset_type) formData.append('reference_asset_type', metadata.reference_asset_type);
+
+    const response = await apiClient.post<UploadResponse>('/api/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent: any) => {
+        if (onProgress && progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percentCompleted);
+        }
+      },
+    });
+
     return response.data;
   },
 
