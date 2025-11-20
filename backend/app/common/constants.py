@@ -131,6 +131,51 @@ def get_video_s3_key(user_id: str, video_id: str, filename: str) -> str:
     prefix = get_video_s3_prefix(user_id, video_id)
     return f"{prefix}/{filename}"
 
+
+def get_asset_s3_key(user_id: str, filename: str) -> str:
+    """
+    Generate the S3 key for a reference asset file.
+    
+    New standard structure: {user_id}/assets/{filename}
+    Original filename is preserved (sanitized for safety).
+    
+    Args:
+        user_id: User ID
+        filename: Original filename from user upload (e.g., "nike_sneaker.png")
+        
+    Returns:
+        S3 key (e.g., "user123/assets/nike_sneaker.png")
+        
+    Example:
+        >>> get_asset_s3_key("user-123", "nike_sneaker.png")
+        "user-123/assets/nike_sneaker.png"
+    """
+    return f"{user_id}/assets/{filename}"
+
+
+def get_asset_thumbnail_s3_key(user_id: str, filename: str) -> str:
+    """
+    Generate the S3 key for a reference asset thumbnail.
+    
+    Structure: {user_id}/assets/{base_name}_thumbnail.jpg
+    Replaces file extension with _thumbnail.jpg
+    
+    Args:
+        user_id: User ID
+        filename: Original filename (e.g., "nike_sneaker.png")
+        
+    Returns:
+        S3 key (e.g., "user123/assets/nike_sneaker_thumbnail.jpg")
+        
+    Example:
+        >>> get_asset_thumbnail_s3_key("user-123", "nike_sneaker.png")
+        "user-123/assets/nike_sneaker_thumbnail.jpg"
+    """
+    # Extract base name without extension
+    from pathlib import Path
+    base_name = Path(filename).stem
+    return f"{user_id}/assets/{base_name}_thumbnail.jpg"
+
 # Timeouts (seconds)
 PHASE1_TIMEOUT = 60
 PHASE2_TIMEOUT = 300
