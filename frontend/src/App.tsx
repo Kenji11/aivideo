@@ -168,6 +168,7 @@ function AppContent() {
 
     fetchProjects();
   }, [location.pathname]);
+  }, [location.pathname]);
 
   const getCurrentStep = () => {
     if (location.pathname.startsWith('/processing')) return 2;
