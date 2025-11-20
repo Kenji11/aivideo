@@ -233,13 +233,13 @@
 
 **File:** `frontend/src/App.tsx`
 
-- [ ] Check how `stitchedVideoUrl` state is managed:
+- [x] Check how `stitchedVideoUrl` state is managed:
   - Where is state initialized?
   - Where is state set/updated?
   - Is state cleared when navigating away?
   - Is state shared between different videos?
 
-- [ ] Check preview route implementation:
+- [x] Check preview route implementation:
   - How is `stitchedVideoUrl` populated?
   - Is it fetched from API or passed via navigation state?
   - Does it persist across navigation?
@@ -248,18 +248,18 @@
 
 **File:** `frontend/src/App.tsx`
 
-- [ ] Option A: Clear state on navigation
+- [x] Option A: Clear state on navigation
   - Clear `stitchedVideoUrl` when navigating to preview
   - Fetch current video's stitched URL from API
   - Use video ID from route params or navigation state
 
-- [ ] Option B: Pass video ID to preview route
+- [x] Option B: Pass video ID to preview route
   - Add video ID to route: `/preview/:videoId`
   - Fetch video status on preview page load
   - Extract `stitched_video_url` from status response
   - Update state with current video's URL
 
-- [ ] Option C: Use navigation state
+- [x] Option C: Use navigation state
   - Pass `stitchedVideoUrl` via navigation state
   - Don't rely on component state
   - Clear state after navigation
@@ -270,18 +270,18 @@
 
 **File:** `frontend/src/App.tsx`
 
-- [ ] Update preview route to accept video ID:
+- [x] Update preview route to accept video ID:
   - Change route from `/preview` to `/preview/:videoId`
   - Extract `videoId` from route params
   - Fetch video status using `videoId`
   - Extract `stitched_video_url` from status response
 
-- [ ] Add loading state:
+- [x] Add loading state:
   - Show loading indicator while fetching video
   - Show error message if video not found
   - Show error message if video has no stitched URL yet
 
-- [ ] Clear previous state:
+- [x] Clear previous state:
   - Reset `stitchedVideoUrl` when component mounts
   - Only set state after fetching current video's URL
 
@@ -289,24 +289,24 @@
 
 **Files:** `frontend/src/App.tsx`, `frontend/src/pages/VideoStatus.tsx`
 
-- [ ] Update navigation calls:
+- [x] Update navigation calls:
   - Change `navigate('/preview')` to `navigate(`/preview/${videoId}`)`
   - Pass video ID when navigating to preview
   - Remove any code that sets `stitchedVideoUrl` before navigation
 
 ### Task 3.5: Testing
 
-- [ ] Test preview with multiple videos:
+- [x] Test preview with multiple videos:
   - Generate Video A, navigate to preview (should show Video A)
   - Generate Video B, navigate to preview (should show Video B, not Video A)
   - Verify each preview shows correct video
 
-- [ ] Test preview with no video:
+- [x] Test preview with no video:
   - Navigate to preview with invalid video ID
   - Should show error or loading state
   - Should not show previous video
 
-- [ ] Test preview during generation:
+- [x] Test preview during generation:
   - Navigate to preview before video is stitched
   - Should show loading or "not ready" message
   - Should not show previous video
