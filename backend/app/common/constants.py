@@ -46,21 +46,29 @@ COST_FLUX_PRO_IMAGE = 0.04  # Phase 3: Reference assets (best quality, for final
 # Phase 4: Video generation model costs (per chunk generation, typically 5 seconds)
 # NOTE: Costs are per chunk, not per second. Multiply by chunk count for total video cost.
 # Verified pricing marked with [VERIFIED], others are estimates based on model tiers
-COST_WAN = 0.09  # Wan 2.1 (480p) - Estimated
-COST_ZEROSCOPE = 0.10  # Zeroscope v2 XL - Estimated
-COST_ANIMATEDIFF = 0.20  # AnimateDiff - Estimated
-COST_RUNWAY = 0.25  # Runway Gen-2 - Estimated
-COST_HAILUO = 0.19  # Hailuo 2.3 Fast [VERIFIED] - $0.19 per 6s chunk at 768p, ~$0.19 per 5s at 720p
+# Sorted by price (cheapest to most expensive)
+COST_AUDIO_CROP = 0.05  # FFmpeg audio crop (local, no cost)
 COST_SEEDANCE = 0.06  # Seedance 1.0 Pro Fast - Estimated (claimed 60% cheaper than Pro)
-# New models
-COST_KLING = 0.08  # Kling v2.5 Turbo Pro - Estimated (mid-tier pricing)
 COST_PIXVERSE = 0.07  # Pixverse v5 - Estimated (mid-tier pricing)
-COST_WAN_25_T2V = 0.10  # Wan 2.5 T2V - Estimated (similar to Wan 2.1)
+COST_WAN = 0.09  # Wan 2.1 (480p) - Estimated
 COST_WAN_25_I2V = 0.09  # Wan 2.5 I2V Fast - Estimated (similar to Wan 2.1)
+COST_ZEROSCOPE = 0.10  # Zeroscope v2 XL - Estimated
+COST_WAN_25_T2V = 0.10  # Wan 2.5 T2V - Estimated (similar to Wan 2.1)
+COST_STABLE_AUDIO = 0.10  # stackadoc/stable-audio-open-1.0 per 30s (avg $0.06-$0.15)
+COST_BARK_MUSIC = 0.10  # Legacy: suno-ai/bark per 30s
 COST_VEO_FAST = 0.12  # Google Veo 3.1 Fast - Estimated (premium model, fast tier)
 COST_VEO = 0.15  # Google Veo 3.1 - Estimated (premium model, standard tier)
-COST_HAILUO_23 = 0.28  # Minimax Hailuo 2.3 (standard, not fast) - Estimated (~$0.28 per 6s at 768p based on 50% more than fast)
+COST_MUSICGEN = 0.15  # meta/musicgen per 30s
+COST_HAILUO_23_FAST = 0.19  # Hailuo 2.3 Fast [VERIFIED] - $0.19 per 6s chunk at 768p, ~$0.19 per 5s at 720p
+COST_ANIMATEDIFF = 0.20  # AnimateDiff - Estimated
 COST_SORA = 0.20  # OpenAI Sora 2 - Estimated (premium model)
+COST_KLING_21 = 0.25  # Kling 2.1 [VERIFIED] - $0.25 per 5s chunk at 720p (1080p is $0.45)
+COST_RUNWAY = 0.25  # Runway Gen-2 - Estimated
+COST_HAILUO_23 = 0.28  # Minimax Hailuo 2.3 (standard, not fast) [VERIFIED] - $0.28 per 6s chunk
+COST_KLING_25_PRO = 0.35  # Kling 2.5 Turbo Pro [VERIFIED] - $0.35 per 5s chunk
+COST_KLING_21_1080P = 0.45  # Kling 2.1 [VERIFIED] - $0.45 per 5s chunk at 1080p
+COST_KLING_16_PRO = 0.475  # Kling 1.6 Pro [VERIFIED] - $0.475 per 5s chunk
+COST_MINIMAX_VIDEO_01 = 0.5  # Minimax Video-01 [VERIFIED] - $0.5 per chunk (accepts subject reference)
 COST_RUNWAY_GEN4_TURBO = 0.60  # Runway Gen-4 Turbo - Estimated ($0.12/sec * 5s = $0.60 per chunk)
 
 # Legacy constants (kept for backwards compatibility)
@@ -68,10 +76,6 @@ COST_ZEROSCOPE_VIDEO = COST_ZEROSCOPE
 COST_WAN_480P_VIDEO = COST_WAN  # Phase 4: Video chunks per second (current)
 COST_WAN_720P_VIDEO = 0.25  # Phase 4: Video chunks per second (higher quality)
 COST_ANIMATEDIFF_VIDEO = COST_ANIMATEDIFF
-COST_MUSICGEN = 0.15  # meta/musicgen per 30s
-COST_STABLE_AUDIO = 0.10  # stackadoc/stable-audio-open-1.0 per 30s (avg $0.06-$0.15)
-COST_BARK_MUSIC = 0.10  # Legacy: suno-ai/bark per 30s
-COST_AUDIO_CROP = 0.05  # FFmpeg audio crop (local, no cost)
 
 # S3 paths
 # Legacy prefixes (deprecated - kept for backward compatibility with existing test data)

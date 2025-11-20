@@ -157,13 +157,13 @@ def build_chunk_specs_with_storyboard(
         print(f"   ⚠️  Warning: Only {storyboard_images_count}/{len(beats)} beats have storyboard images")
     
     # Get model from spec (or use default)
-    selected_model = spec.get('model', 'hailuo')
+    selected_model = spec.get('model', 'hailuo_fast')
     try:
         model_config = get_model_config(selected_model)
     except Exception as e:
         print(f"   ⚠️  Invalid model '{selected_model}', falling back to default: {str(e)}")
         model_config = get_default_model()
-        selected_model = model_config.get('name', 'hailuo')
+        selected_model = model_config.get('name', 'hailuo_fast')
     
     # Get model's actual chunk duration
     actual_chunk_duration = model_config.get('actual_chunk_duration', 5.0)
@@ -299,12 +299,12 @@ def generate_single_chunk_continuous(chunk_spec_obj: ChunkSpec) -> dict:
     print(f"   🔄 Chunk {chunk_num}: Continuous generation using last frame from chunk {chunk_num - 1}")
     
     # Get model configuration
-    selected_model = chunk_spec_obj.model or 'hailuo'
+    selected_model = chunk_spec_obj.model or 'hailuo_fast'
     try:
         model_config = get_model_config(selected_model)
     except Exception as e:
         model_config = get_default_model()
-        selected_model = model_config.get('name', 'hailuo')
+        selected_model = model_config.get('name', 'hailuo_fast')
     
     model_name = model_config['replicate_model']
     cost_per_second = model_config['cost_per_generation']
@@ -479,12 +479,12 @@ def generate_single_chunk_with_storyboard(
             raise PhaseException(f"Chunk {chunk_num} marked as beat start but has no storyboard image URL")
         
         # Get model configuration
-        selected_model = chunk_spec_obj.model or 'hailuo'
+        selected_model = chunk_spec_obj.model or 'hailuo_fast'
         try:
             model_config = get_model_config(selected_model)
         except Exception as e:
             model_config = get_default_model()
-            selected_model = model_config.get('name', 'hailuo')
+            selected_model = model_config.get('name', 'hailuo_fast')
         
         model_name = model_config['replicate_model']
         cost_per_second = model_config['cost_per_generation']

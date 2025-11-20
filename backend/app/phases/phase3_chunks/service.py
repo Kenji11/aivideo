@@ -48,7 +48,7 @@ class ChunkGenerationService:
         if not self.chunk_to_beat_map:
             # Build reverse mapping: chunk_idx -> beat_idx for all chunks
             from app.phases.phase3_chunks.model_config import get_default_model, get_model_config
-            selected_model = spec.get('model', 'hailuo')
+            selected_model = spec.get('model', 'hailuo_fast')
             try:
                 model_config = get_model_config(selected_model)
             except Exception:
@@ -340,7 +340,7 @@ class ChunkGenerationService:
                         # We need to determine the total number of chunks to check if there's a next chunk
                         from app.phases.phase3_chunks.model_config import get_default_model, get_model_config
                         import math
-                        selected_model = spec.get('model', 'hailuo')
+                        selected_model = spec.get('model', 'hailuo_fast')
                         try:
                             model_config = get_model_config(selected_model)
                         except Exception:
