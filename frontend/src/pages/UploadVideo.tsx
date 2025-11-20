@@ -134,11 +134,16 @@ export function UploadVideo({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="veo_fast">Google Veo 3.1 Fast (Recommended)</SelectItem>
+              <SelectItem value="veo_fast">Google Veo 3.1 Fast (Default)</SelectItem>
+              <SelectItem value="hailuo_fast">Minimax Hailuo 2.3 Fast</SelectItem>
               <SelectItem value="veo">Google Veo 3.1</SelectItem>
-              <SelectItem value="hailuo">Hailuo 2.3 Fast</SelectItem>
               <SelectItem value="hailuo_23">Minimax Hailuo 2.3</SelectItem>
-              <SelectItem value="runway_gen4_turbo">Runway Gen-4 Turbo (Test)</SelectItem>
+              <SelectItem value="kling_16_pro">Kling 1.6 Pro</SelectItem>
+              <SelectItem value="kling_21">Kling 2.1 (720p)</SelectItem>
+              <SelectItem value="kling_21_1080p">Kling 2.1 (1080p)</SelectItem>
+              <SelectItem value="kling_25_pro">Kling 2.5 Turbo Pro</SelectItem>
+              <SelectItem value="minimax_video_01">Minimax Video-01 (Subject Reference)</SelectItem>
+              <SelectItem value="runway_gen4_turbo">Runway Gen-4 Turbo (Final Only)</SelectItem>
               <SelectItem value="runway">Runway Gen-2</SelectItem>
             </SelectContent>
           </Select>

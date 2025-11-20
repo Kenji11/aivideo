@@ -296,7 +296,7 @@ def generate_chunks(
     self,
     phase2_output: dict,
     user_id: str = None,
-    model: str = 'hailuo'
+    model: str = 'hailuo_fast'
 ) -> dict:
     """
     Phase 3: Generate video chunks in parallel and stitch them together.
@@ -305,7 +305,7 @@ def generate_chunks(
         self: Celery task instance
         phase2_output: PhaseOutput dict from Phase 2 (contains spec with storyboard images)
         user_id: User ID for organizing outputs in S3 (required for new structure)
-        model: Video generation model to use (default: 'hailuo')
+        model: Video generation model to use (default: 'hailuo_fast')
         
     Returns:
         PhaseOutput dictionary with status, output_data, cost, etc.
