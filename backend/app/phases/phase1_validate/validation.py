@@ -6,18 +6,12 @@ with full beat details from the beat library.
 """
 
 import logging
-import math
-import os
-from pathlib import Path
-from datetime import datetime
 from app.common.beat_library import BEAT_LIBRARY, OPENING_BEATS, CLOSING_BEATS
 
 logger = logging.getLogger(__name__)
 
-# Ensure logs directory exists
-LOGS_DIR = Path(__file__).parent.parent.parent.parent / "logs"
-LOGS_DIR.mkdir(exist_ok=True)
-TRUNCATION_LOG = LOGS_DIR / "beat_truncation.log"
+# Allowed beat durations
+ALLOWED_BEAT_DURATIONS = {5, 10, 15}
 
 
 def validate_spec(spec: dict) -> None:
@@ -91,67 +85,54 @@ def validate_spec(spec: dict) -> None:
     logger.info(f"✅ Spec validation passed: {len(beats)} beats, {duration}s total")
 
 
-def validate_and_fix_beat_count(spec: dict, video_id: str) -> dict:
+def validate_llm_beat_durations(llm_output: dict) -> dict:
     """
-    Validate beat count against duration and truncate if necessary.
+    Validate and fix beat durations from LLM output BEFORE building full spec.
     
-    This is a guardrail to prevent Phase 1 LLM from returning too many beats.
-    If beats exceed maximum for the duration, truncate and log warning.
+    This ensures LLM-returned beat durations are valid (5s, 10s, or 15s only).
+    If invalid durations found, they are fixed to nearest valid duration.
     
     Args:
-        spec: Video specification with beats
-        video_id: Video ID for logging
+        llm_output: Raw LLM output with beat_sequence
         
     Returns:
-        Fixed spec (may have truncated beats)
+        Fixed llm_output with valid beat durations
+        
+    Raises:
+        ValueError: If beat_sequence is missing or empty
     """
-    duration = spec.get('duration', 30)
-    beats = spec.get('beats', [])
+    if 'beat_sequence' not in llm_output or not llm_output['beat_sequence']:
+        raise ValueError("LLM output missing 'beat_sequence' field")
     
-    # Calculate maximum beats (assuming 5s minimum beat length)
-    max_beats = math.ceil(duration / 5)
+    beat_sequence = llm_output['beat_sequence']
+    fixed_count = 0
     
-    if len(beats) <= max_beats:
-        # Beat count is valid
-        return spec
+    for beat_info in beat_sequence:
+        original_duration = beat_info.get('duration')
+        
+        if original_duration not in ALLOWED_BEAT_DURATIONS:
+            # Fix to nearest valid duration
+            if original_duration <= 7:
+                fixed_duration = 5
+            elif original_duration <= 12:
+                fixed_duration = 10
+            else:
+                fixed_duration = 15
+            
+            logger.warning(
+                f"⚠️  LLM returned invalid beat duration: {original_duration}s "
+                f"(beat_id={beat_info.get('beat_id')}). Fixed to {fixed_duration}s"
+            )
+            beat_info['duration'] = fixed_duration
+            fixed_count += 1
     
-    # Too many beats - truncate
-    original_count = len(beats)
-    truncated_beats = beats[:max_beats]
-    
-    # Recalculate start times to ensure they're sequential
-    current_time = 0
-    for beat in truncated_beats:
-        beat['start'] = current_time
-        current_time += beat['duration']
-    
-    # Update spec with truncated beats
-    spec['beats'] = truncated_beats
-    spec['duration'] = current_time  # Update duration to match truncated beats
-    
-    # Log warning
-    warning_msg = (
-        f"⚠️  Beat count truncation: video_id={video_id}, "
-        f"original_beats={original_count}, truncated_to={max_beats}, "
-        f"original_duration={duration}s, new_duration={current_time}s"
-    )
-    logger.warning(warning_msg)
-    
-    # Save to truncation log file
-    try:
-        timestamp = datetime.now().isoformat()
-        log_entry = (
-            f"{timestamp} | video_id={video_id} | "
-            f"original_beats={original_count} | truncated_to={max_beats} | "
-            f"original_duration={duration}s | new_duration={current_time}s\n"
+    if fixed_count > 0:
+        logger.warning(
+            f"⚠️  Fixed {fixed_count} invalid beat durations from LLM output. "
+            f"All beat durations must be 5s, 10s, or 15s."
         )
-        with open(TRUNCATION_LOG, 'a') as f:
-            f.write(log_entry)
-        logger.info(f"Truncation event logged to: {TRUNCATION_LOG}")
-    except Exception as e:
-        logger.error(f"Failed to write truncation log: {e}")
     
-    return spec
+    return llm_output
 
 
 def build_full_spec(llm_output: dict, video_id: str) -> dict:
@@ -234,9 +215,6 @@ def build_full_spec(llm_output: dict, video_id: str) -> dict:
         f"✅ Built full spec: {len(full_beats)} beats, "
         f"{current_time}s duration, archetype={spec['template']}"
     )
-    
-    # Validate and fix beat count (truncate if too many beats)
-    spec = validate_and_fix_beat_count(spec, video_id)
     
     return spec
 
