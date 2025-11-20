@@ -105,6 +105,7 @@ export interface StatusResponse {
 
 export interface VideoResponse {
   video_id: string;
+  title: string;
   status: string;
   final_video_url?: string;
   cost_usd: number;

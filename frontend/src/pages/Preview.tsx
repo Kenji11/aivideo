@@ -31,7 +31,7 @@ export function Preview() {
           const videoData: VideoResponse = await getVideo(videoId);
           if (videoData.final_video_url) {
             setVideoUrl(videoData.final_video_url);
-            setTitle(videoData.video_id); // VideoResponse doesn't have title, use video_id as fallback
+            setTitle(videoData.title);
             return;
           }
         } catch (err) {
@@ -47,6 +47,18 @@ export function Preview() {
           setVideoUrl(url);
         } else {
           setError('Video is not ready yet. Please wait for generation to complete.');
+        }
+        
+        // Try to get title from video list if status endpoint doesn't have it
+        try {
+          const { listVideos } = await import('../lib/api');
+          const videoList = await listVideos();
+          const matchingVideo = videoList.videos.find(v => v.video_id === videoId);
+          if (matchingVideo) {
+            setTitle(matchingVideo.title);
+          }
+        } catch (err) {
+          console.log('[Preview] Failed to fetch title from video list:', err);
         }
       } catch (err) {
         console.error('[Preview] Failed to fetch video data:', err);
