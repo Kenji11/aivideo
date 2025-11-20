@@ -14,7 +14,7 @@ export function VideoStatus() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [processingProgress, setProcessingProgress] = useState(0);
-  const [animaticUrls, setAnimaticUrls] = useState<string[] | null>(null);
+  const [storyboardUrls, setStoryboardUrls] = useState<string[] | null>(null);
   const [referenceAssets, setReferenceAssets] = useState<StatusResponse['reference_assets'] | null>(null);
   const [stitchedVideoUrl, setStitchedVideoUrl] = useState<string | null>(null);
   const [currentChunkIndex, setCurrentChunkIndex] = useState<number | null>(null);
@@ -23,7 +23,7 @@ export function VideoStatus() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // Use refs to track notification state across renders
-  const hasShownAnimaticNotificationRef = useRef(false);
+  const hasShownStoryboardNotificationRef = useRef(false);
   const hasShownStitchedNotificationRef = useRef(false);
 
   // Map current_phase to processing step index
@@ -78,10 +78,10 @@ export function VideoStatus() {
   useEffect(() => {
     if (videoId) {
       console.log('[VideoStatus] Video ID set:', videoId);
-      hasShownAnimaticNotificationRef.current = false;
+      hasShownStoryboardNotificationRef.current = false;
       hasShownStitchedNotificationRef.current = false;
       // Reset state when starting a new video
-      setAnimaticUrls(null);
+      setStoryboardUrls(null);
       setStitchedVideoUrl(null);
       setCurrentChunkIndex(null);
       setTotalChunks(null);
@@ -118,7 +118,7 @@ export function VideoStatus() {
       status: status.status,
       progress: status.progress,
       current_phase: status.current_phase,
-      has_animatic_urls: !!status.animatic_urls?.length,
+      has_storyboard_urls: !!status.storyboard_urls?.length,
       has_video_url: !!(status.final_video_url || status.stitched_video_url),
       chunk_progress: status.current_chunk_index !== undefined 
         ? `${status.current_chunk_index + 1}/${status.total_chunks}` 
@@ -130,16 +130,16 @@ export function VideoStatus() {
     setProcessingProgress(currentStep);
     setCurrentPhase(status.current_phase);
     
-    // Update animatic URLs (allow updates if they change)
-    if (status.animatic_urls && status.animatic_urls.length > 0) {
+    // Update storyboard URLs (allow updates if they change)
+    if (status.storyboard_urls && status.storyboard_urls.length > 0) {
       // Only show notification on first set, but allow updates
-      setAnimaticUrls(prev => {
+      setStoryboardUrls(prev => {
         const isFirstTime = !prev;
-        if (isFirstTime && !hasShownAnimaticNotificationRef.current) {
-          hasShownAnimaticNotificationRef.current = true;
-          addNotification('success', 'Storyboard Images Generated', `${status.animatic_urls!.length} storyboard image${status.animatic_urls!.length !== 1 ? 's' : ''} ready!`);
+        if (isFirstTime && !hasShownStoryboardNotificationRef.current) {
+          hasShownStoryboardNotificationRef.current = true;
+          addNotification('success', 'Storyboard Images Generated', `${status.storyboard_urls!.length} storyboard image${status.storyboard_urls!.length !== 1 ? 's' : ''} ready!`);
         }
-        return status.animatic_urls!;
+        return status.storyboard_urls!;
       });
     }
     
@@ -192,7 +192,12 @@ export function VideoStatus() {
     if (status.status === 'complete') {
       console.log('[VideoStatus] Video generation complete, navigating to preview');
       setIsProcessing(false);
-      navigate('/preview');
+      if (videoId) {
+        navigate(`/preview/${videoId}`);
+      } else {
+        console.error('[VideoStatus] No videoId available, cannot navigate to preview');
+        navigate('/projects');
+      }
     } else if (status.status === 'failed') {
       console.error('[VideoStatus] Video generation failed:', status.error);
       setIsProcessing(false);
@@ -242,7 +247,7 @@ export function VideoStatus() {
           <ProcessingSteps steps={processingSteps} elapsedTime={elapsedTime} />
         </div>
 
-        {animaticUrls && animaticUrls.length > 0 && (
+        {storyboardUrls && storyboardUrls.length > 0 && (
           <div className="mt-8 pt-8 border-t border-border">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -250,7 +255,7 @@ export function VideoStatus() {
                   🎬 Storyboard Images Generated
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {animaticUrls.length} storyboard image{animaticUrls.length !== 1 ? 's' : ''} ready for video generation
+                  {storyboardUrls.length} storyboard image{storyboardUrls.length !== 1 ? 's' : ''} ready for video generation
                   {currentChunkIndex !== null && totalChunks !== null && (
                     <span className="ml-2 text-primary font-semibold">
                       • Processing chunk {currentChunkIndex + 1} of {totalChunks}
@@ -261,7 +266,7 @@ export function VideoStatus() {
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-              {animaticUrls.map((url, idx) => {
+              {storyboardUrls.map((url, idx) => {
                 const isProcessingChunk = currentChunkIndex === idx && currentPhase === 'phase4_chunks';
                 // Chunk is completed if currentChunkIndex is past this chunk's index
                 // Or if Phase 4 is complete (currentPhase is not phase4_chunks and we have a final video)

@@ -112,6 +112,19 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
             f"cost=${total_cost:.4f}, duration={duration_seconds:.2f}s"
         )
         
+        # Extract storyboard URLs from beats and persist to Redis
+        storyboard_urls = []
+        for beat in beats:
+            image_url = beat.get('image_url')
+            if image_url:
+                storyboard_urls.append(image_url)
+        
+        if storyboard_urls:
+            from app.services.redis import RedisClient
+            redis_client = RedisClient()
+            redis_client.set_video_storyboard_urls(video_id, storyboard_urls)
+            logger.info(f"✅ Persisted {len(storyboard_urls)} storyboard URLs to Redis")
+        
         # Store Phase 2 output in database
         db = SessionLocal()
         try:

@@ -146,6 +146,21 @@ class RedisClient:
             logger.warning(f"Failed to set presigned URLs in Redis: {e}")
             return False
     
+    def set_video_storyboard_urls(self, video_id: str, urls: list) -> bool:
+        """Set storyboard image URLs (from Phase 2)"""
+        if not self._client:
+            return False
+        try:
+            self._client.set(
+                self._key(video_id, "storyboard_urls"),
+                json.dumps(urls),
+                ex=REDIS_TTL
+            )
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to set storyboard URLs in Redis: {e}")
+            return False
+    
     def get_video_data(self, video_id: str) -> Optional[Dict[str, Any]]:
         """Get all video data as dict"""
         if not self._client:
@@ -163,6 +178,7 @@ class RedisClient:
             phase_outputs_str = self._client.get(self._key(video_id, "phase_outputs"))
             spec_str = self._client.get(self._key(video_id, "spec"))
             presigned_urls_str = self._client.get(self._key(video_id, "presigned_urls"))
+            storyboard_urls_str = self._client.get(self._key(video_id, "storyboard_urls"))
             
             # Parse and add to data dict
             if progress is not None:
@@ -195,6 +211,11 @@ class RedisClient:
                     data["presigned_urls"] = json.loads(presigned_urls_str)
                 except json.JSONDecodeError:
                     pass
+            if storyboard_urls_str:
+                try:
+                    data["storyboard_urls"] = json.loads(storyboard_urls_str)
+                except json.JSONDecodeError:
+                    pass
             
             # Add video_id
             data["video_id"] = video_id
@@ -223,6 +244,7 @@ class RedisClient:
                 self._key(video_id, "phase_outputs"),
                 self._key(video_id, "spec"),
                 self._key(video_id, "presigned_urls"),
+                self._key(video_id, "storyboard_urls"),
             ]
             self._client.delete(*keys)
             return True

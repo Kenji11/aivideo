@@ -96,7 +96,7 @@ export interface StatusResponse {
   estimated_time_remaining?: number;
   error?: string;
   reference_assets?: ReferenceAssets;
-  animatic_urls?: string[];
+  storyboard_urls?: string[];
   stitched_video_url?: string;
   final_video_url?: string;  // Phase 5 final video (with audio)
   current_chunk_index?: number;  // Current chunk being processed (0-based)
@@ -231,6 +231,13 @@ export const api = {
     const response = await apiClient.get<VideoListResponse>('/api/videos');
     return response.data;
   },
+
+  /**
+   * Delete a video
+   */
+  async deleteVideo(videoId: string): Promise<void> {
+    await apiClient.delete(`/api/video/${videoId}`);
+  },
 };
 
 // Named exports for convenience
@@ -261,6 +268,20 @@ export async function getVideoStatus(videoId: string): Promise<StatusResponse> {
  */
 export async function listVideos(): Promise<VideoListResponse> {
   return api.getVideos();
+}
+
+/**
+ * Get video details
+ */
+export async function getVideo(videoId: string): Promise<VideoResponse> {
+  return api.getVideo(videoId);
+}
+
+/**
+ * Delete a video
+ */
+export async function deleteVideo(videoId: string): Promise<void> {
+  return api.deleteVideo(videoId);
 }
 
 export default api;
