@@ -261,6 +261,8 @@ chunk_count = math.ceil(video_duration / actual_chunk_duration)
 - **Fallback**: Client automatically falls back to polling if SSE unavailable
 
 ### 2. Asset Storage Pattern
+
+**Video Assets (Legacy):**
 ```
 /videos/:video_id/
   ├── animatic/
@@ -272,6 +274,17 @@ chunk_count = math.ceil(video_duration / actual_chunk_duration)
   │   ├── chunk_00.mp4 through chunk_14.mp4
   └── final.mp4
 ```
+
+**Reference Assets (PR #1):**
+```
+{user_id}/assets/
+  ├── nike_sneaker.png              # Original image (user's filename preserved)
+  ├── nike_sneaker_thumbnail.jpg     # Auto-generated thumbnail (400x400)
+  └── nike_sneaker_edges.png        # Preprocessed edges (optional, future)
+```
+- Flat structure: `{user_id}/assets/{filename}` (no asset_id in path)
+- S3 key remains unchanged when user edits asset name (only DB `name` field updates)
+- Helper functions: `get_asset_s3_key()`, `get_asset_thumbnail_s3_key()`
 
 ### 3. Cleanup Pattern
 - Keep animatic and chunks during generation

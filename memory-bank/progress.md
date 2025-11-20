@@ -100,6 +100,7 @@
 9. ✅ **PR #9**: Parallel chunk generation with LangChain RunnableParallel
 10. ✅ **PR #10**: Redis-based progress tracking with Server-Sent Events (SSE)
 11. ✅ **PR #11**: Phase cleanup and renaming - sequential structure (phase1 → phase2 → phase3 → phase4)
+12. ✅ **PR #1 (Reference Assets)**: Database schema, S3 structure, API endpoints, frontend UI ✅
 
 ---
 
@@ -140,7 +141,7 @@
 - [ ] Real-time progress updates
 - [ ] Video preview before final generation
 - [ ] Template gallery with previews
-- [ ] Asset upload UI
+- [x] **PR #1 (Reference Assets)**: Asset upload UI ✅
 - [ ] Cost estimation before generation
 - [ ] Video history and management
 
