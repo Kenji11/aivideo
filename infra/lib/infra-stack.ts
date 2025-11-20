@@ -500,15 +500,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     // In production, you may want to remove it and only use HTTPS
     // For now, both HTTP and HTTPS will work
 
-    // Route53 A records for API - both domains
-    new route53.ARecord(this, 'APIRecord', {
-      zone: hostedZone,
-      recordName: 'aivideo-api',
-      target: route53.RecordTarget.fromAlias(
-        new route53targets.LoadBalancerTarget(alb)
-      ),
-    });
-
+    // Route53 A records for API - only videoai-api
     new route53.ARecord(this, 'APIRecordVideoAI', {
       zone: hostedZone,
       recordName: 'videoai-api',
@@ -582,15 +574,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
     });
 
-    // Route53 A records for frontend - both domains
-    new route53.ARecord(this, 'FrontendRecord', {
-      zone: hostedZone,
-      recordName: 'aivideo',
-      target: route53.RecordTarget.fromAlias(
-        new route53targets.CloudFrontTarget(frontendDistribution)
-      ),
-    });
-
+    // Route53 A records for frontend - only videoai
     new route53.ARecord(this, 'FrontendRecordVideoAI', {
       zone: hostedZone,
       recordName: 'videoai',
