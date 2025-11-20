@@ -547,6 +547,42 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       validation: acm.CertificateValidation.fromDns(hostedZone),
     });
 
+    // CloudFront Function for domain redirect (302 from aivideo to videoai)
+    const redirectFunction = new cloudfront.Function(this, 'DomainRedirectFunction', {
+      code: cloudfront.FunctionCode.fromInline(`
+        function handler(event) {
+          var request = event.request;
+          var host = request.headers.host.value;
+          
+          // Redirect aivideo.gauntlet3.com to videoai.gauntlet3.com
+          if (host === 'aivideo.gauntlet3.com') {
+            var uri = request.uri;
+            var querystring = request.querystring;
+            var queryString = '';
+            
+            // Build query string if present
+            if (querystring) {
+              var qs = [];
+              for (var key in querystring) {
+                qs.push(key + '=' + querystring[key].value);
+              }
+              queryString = '?' + qs.join('&');
+            }
+            
+            return {
+              statusCode: 302,
+              statusDescription: 'Found',
+              headers: {
+                'location': { value: 'https://videoai.gauntlet3.com' + uri + queryString }
+              }
+            };
+          }
+          
+          return request;
+        }
+      `),
+    });
+
     // CloudFront distribution
     const frontendDistribution = new cloudfront.Distribution(this, 'FrontendDistribution', {
       defaultBehavior: {
@@ -558,6 +594,12 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         compress: true,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        functionAssociations: [
+          {
+            function: redirectFunction,
+            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+          },
+        ],
       },
       // SPA fallback - redirect all 404s to index.html
       errorResponses: [
@@ -581,7 +623,8 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
     });
 
-    // Route53 A records for frontend - only videoai
+    // Route53 A records for frontend - both domains point to CloudFront
+    // videoai.gauntlet3.com (primary domain)
     new route53.ARecord(this, 'FrontendRecordVideoAI', {
       zone: hostedZone,
       recordName: 'videoai',
@@ -590,11 +633,13 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       ),
     });
 
-    // CNAME record for aivideo.gauntlet3.com → videoai.gauntlet3.com
-    new route53.CnameRecord(this, 'FrontendCnameRecord', {
+    // aivideo.gauntlet3.com (redirects to videoai via CloudFront Function)
+    new route53.ARecord(this, 'FrontendRecordAIVideo', {
       zone: hostedZone,
       recordName: 'aivideo',
-      domainName: 'videoai.gauntlet3.com',
+      target: route53.RecordTarget.fromAlias(
+        new route53targets.CloudFrontTarget(frontendDistribution)
+      ),
     });
 
     // Outputs
