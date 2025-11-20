@@ -2,6 +2,13 @@ import { Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { UploadZone } from '../components/UploadZone';
 import { generateVideo } from '../lib/api';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface UploadVideoProps {
   title: string;
@@ -119,18 +126,22 @@ export function UploadVideo({
           <label className="block text-sm font-medium text-foreground mb-2">
             Video Model
           </label>
-          <select
+          <Select
             value={selectedModel}
-            onChange={(e) => onModelChange(e.target.value)}
-            className="input-field"
+            onValueChange={onModelChange}
           >
-            <option value="veo_fast">Google Veo 3.1 Fast (Recommended)</option>
-            <option value="veo">Google Veo 3.1</option>
-            <option value="hailuo">Hailuo 2.3 Fast</option>
-            <option value="hailuo_23">Minimax Hailuo 2.3</option>
-            <option value="runway_gen4_turbo">Runway Gen-4 Turbo (Test)</option>
-            <option value="runway">Runway Gen-2</option>
-          </select>
+            <SelectTrigger className="w-full h-auto py-3">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="veo_fast">Google Veo 3.1 Fast (Recommended)</SelectItem>
+              <SelectItem value="veo">Google Veo 3.1</SelectItem>
+              <SelectItem value="hailuo">Hailuo 2.3 Fast</SelectItem>
+              <SelectItem value="hailuo_23">Minimax Hailuo 2.3</SelectItem>
+              <SelectItem value="runway_gen4_turbo">Runway Gen-4 Turbo (Test)</SelectItem>
+              <SelectItem value="runway">Runway Gen-2</SelectItem>
+            </SelectContent>
+          </Select>
           <p className="mt-1 text-xs text-muted-foreground">
             Choose the AI model for video generation. Different models have different quality, speed, and cost characteristics.
           </p>
