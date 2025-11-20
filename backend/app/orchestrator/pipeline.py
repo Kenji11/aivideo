@@ -4,7 +4,7 @@ import logging
 from celery import chain
 from celery.exceptions import Retry
 from app.orchestrator.celery_app import celery_app
-from app.phases.phase1_validate.task_intelligent import plan_video_intelligent
+from app.phases.phase1_validate.task import plan_video_intelligent
 from app.phases.phase2_storyboard.task import generate_storyboard
 from app.phases.phase3_chunks.task import generate_chunks
 from app.phases.phase4_refine.task import refine_video

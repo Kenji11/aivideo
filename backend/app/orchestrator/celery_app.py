@@ -29,7 +29,7 @@ celery_app.conf.update(
     # Include all task modules so Celery can discover them
     include=[
         "app.orchestrator.pipeline",
-        "app.phases.phase1_validate.task_intelligent",
+        "app.phases.phase1_validate.task",
         "app.phases.phase2_storyboard.task",
         "app.phases.phase3_chunks.task",
         "app.phases.phase4_refine.task",
@@ -47,10 +47,10 @@ except Exception as e:
     raise
 
 try:
-    from app.phases.phase1_validate import task_intelligent as phase1_task  # noqa: F401
-    logger.info("✓ Imported app.phases.phase1_validate.task_intelligent")
+    from app.phases.phase1_validate import task as phase1_task  # noqa: F401
+    logger.info("✓ Imported app.phases.phase1_validate.task")
 except Exception as e:
-    logger.error(f"✗ Failed to import app.phases.phase1_validate.task_intelligent: {e}", exc_info=True)
+    logger.error(f"✗ Failed to import app.phases.phase1_validate.task: {e}", exc_info=True)
     raise
 
 try:
