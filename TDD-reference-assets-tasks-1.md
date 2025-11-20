@@ -13,98 +13,148 @@
 
 **File:** `backend/app/common/models.py`
 
-- [ ] Install `pgvector` extension in PostgreSQL
-- [ ] Create `ReferenceAsset` SQLAlchemy model with all fields from TDD
-  - [ ] Primary fields: `id`, `user_id`, `asset_type`, `name`, `description`
-  - [ ] Storage fields: `image_url`, `thumbnail_url`, `file_size_bytes`, `width`, `height`, `has_transparency`
-  - [ ] AI analysis fields: `analysis`, `primary_object`, `colors`, `dominant_colors_rgb`, `style_tags`, `recommended_shot_types`, `usage_contexts`
-  - [ ] Logo fields: `is_logo`, `logo_position_preference`
-  - [ ] Semantic search field: `embedding` (Vector(768))
-  - [ ] Metadata fields: `created_at`, `updated_at`, `usage_count`
-- [ ] Create `AssetType` enum with values: `product`, `logo`, `person`, `environment`, `texture`, `prop`
+- [ ] Install `pgvector` extension in PostgreSQL (if not already installed)
+- [ ] **Update existing `AssetType` enum** to reference asset content types:
+  - [ ] Change from: `IMAGE`, `VIDEO`, `AUDIO`
+  - [ ] Change to: `product`, `logo`, `person`, `environment`, `texture`, `prop`
+  - [ ] Note: The `assets` table was always meant for reference assets, consolidating now
+- [ ] Extend existing `Asset` model with reference asset fields:
+  - [ ] Add `name` column (String, nullable=True) - User-defined name (editable, defaults to filename)
+  - [ ] Add `description` column (String, nullable=True) - Optional user description
+  - [ ] Add `thumbnail_url` column (String, nullable=True) - Optimized thumbnail S3 URL
+  - [ ] Add `width` column (Integer, nullable=True) - Image width in pixels
+  - [ ] Add `height` column (Integer, nullable=True) - Image height in pixels
+  - [ ] Add `has_transparency` column (Boolean, default=False) - Whether image has alpha channel
+  - [ ] Add `analysis` column (JSON, nullable=True) - Full GPT-4V analysis response
+  - [ ] Add `primary_object` column (String, nullable=True, index=True) - "Nike Air Max sneaker"
+  - [ ] Add `colors` column (ARRAY(String), nullable=True) - ["white", "red", "black"]
+  - [ ] Add `dominant_colors_rgb` column (JSON, nullable=True) - [[255,255,255], [220,20,60]]
+  - [ ] Add `style_tags` column (ARRAY(String), nullable=True, index=True) - ["athletic", "modern", "clean"]
+  - [ ] Add `recommended_shot_types` column (ARRAY(String), nullable=True) - ["close_up", "hero_shot"]
+  - [ ] Add `usage_contexts` column (ARRAY(String), nullable=True) - ["product shots", "action scenes"]
+  - [ ] Add `is_logo` column (Boolean, default=False, index=True) - Logo detection flag
+  - [ ] Add `logo_position_preference` column (String, nullable=True) - "bottom-right", "top-left", etc.
+  - [ ] Add `embedding` column (Vector(768), nullable=True) - CLIP embedding for semantic search
+  - [ ] Add `updated_at` column (DateTime(timezone=True), nullable=True, onupdate=func.now())
+  - [ ] Add `usage_count` column (Integer, default=0) - Track how often used in videos
 - [ ] Add database indexes:
-  - [ ] Index on `user_id`
-  - [ ] Index on `asset_type`
+  - [ ] Index on `asset_type` (already exists, but verify it works with new enum values)
   - [ ] Index on `is_logo`
-  - [ ] IVFFlat index on `embedding` for vector search
-- [ ] Create Alembic migration script
-- [ ] Test migration on dev database
+  - [ ] IVFFlat index on `embedding` for vector search (using pgvector)
+- [ ] Create SQL migration script: `backend/migrations/004_add_reference_asset_fields.sql`
+  - [ ] Install pgvector extension: `CREATE EXTENSION IF NOT EXISTS vector;`
+  - [ ] **Alter existing `assettype` enum** to add new values (PostgreSQL doesn't support removing enum values easily, so we'll add new ones)
+  - [ ] **OR**: Create new enum and migrate (safer approach):
+    - [ ] Create new enum `reference_asset_type` with values: `product`, `logo`, `person`, `environment`, `texture`, `prop`
+    - [ ] Add column `reference_asset_type` (nullable, for new assets)
+    - [ ] Keep old `asset_type` column for backward compatibility during migration
+    - [ ] **Decision needed**: Full migration or gradual? For now, add new column and migrate enum later
+  - [ ] Add all new columns to `assets` table
+  - [ ] Create indexes
+  - [ ] Use `DO $$ BEGIN ... END $$;` blocks for idempotency
+- [ ] Test migration on dev database using `python migrate.py up`
 
 ---
 
 ### Task 1.2: S3 Storage Structure
 
-**File:** `backend/app/services/s3.py`
+**File:** `backend/app/common/constants.py` and `backend/app/services/s3.py`
 
-- [ ] Define S3 bucket structure:
+- [ ] Define S3 bucket structure (flat structure, preserve original filename):
   ```
-  reference-assets/
-    {user_id}/
-      {asset_id}/
-        original.png
-        thumbnail.jpg
-        preprocessed/
-          edges.png
+  {user_id}/assets/
+    nike_sneaker.png              # Original image (user's filename preserved)
+    nike_sneaker_thumbnail.jpg    # Thumbnail (400x400, auto-generated)
+    nike_sneaker_edges.png        # Preprocessed edges for ControlNet (optional, generated later)
   ```
-- [ ] Add `upload_reference_asset()` method
-  - [ ] Accept PIL Image or file path
-  - [ ] Generate S3 key with proper structure
-  - [ ] Set appropriate content-type and ACL
-  - [ ] Return S3 URL
-- [ ] Add `upload_thumbnail()` method
-  - [ ] Resize image to 400x400 (maintain aspect ratio)
-  - [ ] Optimize quality (JPEG 85%)
+  - [ ] Note: S3 key uses original filename from user upload
+  - [ ] Thumbnails and preprocessed files use `{original_filename}_thumbnail.jpg` pattern
+  - [ ] S3 key should remain unchanged when user edits asset name in DB (name is separate from S3 key)
+- [ ] Add helper function in `constants.py`: `get_asset_s3_key(user_id: str, filename: str) -> str`
+  - [ ] Returns: `f"{user_id}/assets/{filename}"`
+  - [ ] Example: `get_asset_s3_key("user123", "nike_sneaker.png")` → `"user123/assets/nike_sneaker.png"`
+- [ ] Add helper function in `constants.py`: `get_asset_thumbnail_s3_key(user_id: str, filename: str) -> str`
+  - [ ] Returns: `f"{user_id}/assets/{base_name}_thumbnail.jpg"` (replaces extension with `_thumbnail.jpg`)
+  - [ ] Example: `get_asset_thumbnail_s3_key("user123", "nike_sneaker.png")` → `"user123/assets/nike_sneaker_thumbnail.jpg"`
+- [ ] **Update existing upload endpoint** (`backend/app/api/upload.py`):
+  - [ ] Change S3 key structure from `assets/{user_id}/{asset_id}/{filename}` to `{user_id}/assets/{filename}`
+  - [ ] Keep original filename as-is (sanitize for safety but preserve user's naming)
+  - [ ] Store original filename in `file_name` column (already done)
+  - [ ] Set `name` column to filename by default (user can edit later)
+- [ ] Add `upload_thumbnail()` method to `S3Client` class
+  - [ ] Accept PIL Image or file path, `user_id`, and `original_filename`
+  - [ ] Resize image to 400x400 (maintain aspect ratio, pad if needed)
+  - [ ] Optimize quality (JPEG 85% if JPEG, PNG if PNG)
+  - [ ] Generate S3 key using `get_asset_thumbnail_s3_key(user_id, original_filename)`
   - [ ] Upload to S3
-- [ ] Add `delete_reference_asset()` method
-  - [ ] Delete all files for asset (original + thumbnail + preprocessed)
-- [ ] Add `get_presigned_url()` for secure downloads
+  - [ ] Return S3 URL
+- [ ] Add `delete_asset_files()` method to `S3Client` class
+  - [ ] Accept `user_id` and `filename` (original filename)
+  - [ ] Delete all files for asset: `{filename}`, `{filename}_thumbnail.jpg`, `{filename}_edges.png`
+  - [ ] Use `list_files()` with prefix `{user_id}/assets/{base_name}` to find all related files
+  - [ ] Delete all matching files
+- [ ] Note: `generate_presigned_url()` already exists in S3Client, can be reused
 - [ ] Write unit tests for S3 operations
 
 ---
 
 ### Task 1.3: Base API Endpoints
 
-**File:** `backend/app/api/reference_assets.py`
+**File:** `backend/app/api/upload.py` (extend existing)
 
-- [ ] Create new router: `router = APIRouter(prefix="/api/reference-assets", tags=["reference_assets"])`
-- [ ] Implement `POST /api/reference-assets/upload` endpoint
-  - [ ] Accept multipart/form-data with image file
-  - [ ] Accept optional fields: `name`, `description`, `asset_type`
-  - [ ] Validate file type (PNG, JPG, WEBP only)
-  - [ ] Validate file size (max 10MB)
-  - [ ] Generate unique asset ID (UUID)
-  - [ ] Extract image dimensions and file size
-  - [ ] Check for transparency (alpha channel)
-  - [ ] Upload original to S3
-  - [ ] Generate and upload thumbnail
-  - [ ] Create database record (without AI analysis yet - will add in Task 2.1)
-  - [ ] Return asset metadata
-- [ ] Implement `GET /api/reference-assets` endpoint
-  - [ ] Query user's assets with pagination
-  - [ ] Filter by `asset_type` (optional query param)
-  - [ ] Filter by `is_logo` (optional query param)
+- [ ] **Update existing `POST /api/upload` endpoint**:
+  - [ ] Change S3 key structure from `assets/{user_id}/{asset_id}/{filename}` to `{user_id}/assets/{filename}`
+  - [ ] Accept optional fields in form data: `name`, `description`, `asset_type` (product/logo/person/etc)
+  - [ ] Validate file type (PNG, JPG, WEBP only for reference assets - keep existing validation for now)
+  - [ ] Validate file size (max 10MB for images - keep existing 100MB limit for other types)
+  - [ ] Extract image dimensions and file size using PIL (for images only)
+  - [ ] Check for transparency (alpha channel) using PIL (for images only)
+  - [ ] Upload original to S3 using new S3 key structure: `{user_id}/assets/{filename}`
+  - [ ] Generate and upload thumbnail using `upload_thumbnail()` → `{user_id}/assets/{filename}_thumbnail.jpg`
+  - [ ] Create/update database record in `assets` table:
+    - [ ] Set `asset_type` to provided value or default (product/logo/etc)
+    - [ ] Set `source = AssetSource.USER_UPLOAD`
+    - [ ] Set `s3_key` and `s3_url` for original image
+    - [ ] Set `thumbnail_url` for thumbnail
+    - [ ] Set `name` to provided value or default to `file_name` (user can edit later)
+    - [ ] Set `description`, `width`, `height`, `has_transparency`, `file_size_bytes`, `mime_type`
+    - [ ] Leave AI analysis fields null for now (will add in Task 2.5)
+  - [ ] Return asset metadata including new fields
+- [ ] **Update existing `GET /api/assets` endpoint**:
+  - [ ] Add query parameters:
+    - [ ] `asset_type` (optional): Filter by asset_type (product/logo/person/etc)
+    - [ ] `is_logo` (optional): Filter by is_logo (true/false)
+    - [ ] `limit` and `offset` for pagination
+  - [ ] Query user's assets from `assets` table where `source = USER_UPLOAD`
+  - [ ] Apply filters if provided
   - [ ] Sort by `created_at` DESC (newest first)
-  - [ ] Return list of assets with thumbnails
-- [ ] Implement `GET /api/reference-assets/{asset_id}` endpoint
-  - [ ] Fetch single asset by ID
-  - [ ] Verify ownership (user_id matches)
-  - [ ] Return full asset details
-- [ ] Implement `DELETE /api/reference-assets/{asset_id}` endpoint
+  - [ ] Return list of assets with thumbnails and all reference asset fields
+- [ ] **Add new `GET /api/assets/{asset_id}` endpoint**:
+  - [ ] Fetch single asset by ID from `assets` table
+  - [ ] Verify ownership (user_id matches current user)
+  - [ ] Return full asset details including all reference asset fields
+- [ ] **Add new `PATCH /api/assets/{asset_id}` endpoint**:
+  - [ ] Accept partial updates: `name`, `description`, `asset_type`, `logo_position_preference`
   - [ ] Verify ownership
-  - [ ] Delete from S3
-  - [ ] Delete from database
+  - [ ] Update database record (S3 key remains unchanged - only DB fields update)
+  - [ ] Return updated asset
+- [ ] **Add new `DELETE /api/assets/{asset_id}` endpoint**:
+  - [ ] Verify ownership
+  - [ ] Get asset record to find `file_name` (original filename)
+  - [ ] Delete from S3 using `delete_asset_files(user_id, file_name)`
+  - [ ] Delete from database (`assets` table)
   - [ ] Return success response
-- [ ] Add authentication middleware (require valid user token)
+- [ ] Note: Authentication already handled by `get_current_user` dependency
 - [ ] Write API integration tests
 
 ---
 
 ### Task 1.4: Frontend Asset Library Page (Basic)
 
-**File:** `frontend/src/pages/ReferenceAssets.tsx`
+**File:** `frontend/src/pages/Assets.tsx` (or extend existing if it exists)
 
-- [ ] Create new page component `ReferenceAssets`
-- [ ] Add route to React Router: `/reference-assets`
+- [ ] Create new page component `Assets` (or update existing)
+- [ ] Add route to React Router: `/assets`
 - [ ] Implement asset grid layout
   - [ ] Display thumbnails in responsive grid (3-4 columns)
   - [ ] Show asset name below thumbnail
@@ -163,7 +213,7 @@
 ### Task 1.6: Testing & Documentation
 
 **Tests:**
-- [ ] Write unit tests for `ReferenceAsset` model
+- [ ] Write unit tests for extended `Asset` model (reference asset fields)
 - [ ] Write unit tests for S3 upload/delete operations
 - [ ] Write API integration tests for all endpoints
 - [ ] Write frontend component tests (upload modal, asset grid)
@@ -174,17 +224,17 @@
 
 **Documentation:**
 - [ ] Add API documentation (OpenAPI/Swagger)
-- [ ] Document S3 bucket structure
-- [ ] Document database schema
+- [ ] Document S3 bucket structure: `{user_id}/assets/` for reference assets
+- [ ] Document database schema changes (new columns on `assets` table)
 - [ ] Add developer guide for reference assets
 - [ ] Update main README with new feature
 
 **Deployment:**
-- [ ] Run database migration on staging
+- [ ] Run database migration on staging: `python migrate.py up`
 - [ ] Test on staging environment
-- [ ] Create S3 bucket if not exists
-- [ ] Set appropriate S3 bucket policies
+- [ ] Verify S3 bucket exists and has appropriate policies
 - [ ] Deploy to production
+- [ ] Run migration on production: `python migrate.py up`
 - [ ] Verify production works
 
 ---
@@ -414,7 +464,7 @@
 - [ ] Style with Tailwind CSS
 - [ ] Open modal when clicking asset in grid
 
-**File:** `frontend/src/pages/ReferenceAssets.tsx`
+**File:** `frontend/src/pages/Assets.tsx`
 
 - [ ] Update grid to show AI-detected asset type badge
 - [ ] Add filter by asset type (dropdown)

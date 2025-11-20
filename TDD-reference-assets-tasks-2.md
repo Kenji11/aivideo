@@ -14,7 +14,7 @@
 **File:** `backend/app/services/asset_search.py`
 
 - [ ] Create `AssetSearchService` class
-- [ ] Implement `search_assets_by_text(user_id: str, query: str, asset_type: AssetType = None, limit: int = 10) -> list[ReferenceAsset]`
+- [ ] Implement `search_assets_by_text(user_id: str, query: str, asset_type: AssetType = None, limit: int = 10) -> list[Asset]`
   - [ ] Generate query embedding using CLIP text encoder
   - [ ] Build SQLAlchemy query filtering by user_id
   - [ ] If asset_type provided, add filter
@@ -23,7 +23,7 @@
   - [ ] Calculate similarity score for each result
   - [ ] Attach similarity_score as attribute to each asset
   - [ ] Return list of assets
-- [ ] Implement `find_similar_assets(reference_asset_id: str, limit: int = 10, exclude_self: bool = True) -> list[ReferenceAsset]`
+- [ ] Implement `find_similar_assets(reference_asset_id: str, limit: int = 10, exclude_self: bool = True) -> list[Asset]`
   - [ ] Fetch reference asset from database
   - [ ] Get its embedding
   - [ ] Query for similar embeddings
@@ -56,7 +56,7 @@
 
 **File:** `backend/app/services/asset_search.py`
 
-- [ ] Implement `check_duplicate_asset(user_id: str, new_image_embedding: list[float], similarity_threshold: float = 0.95) -> list[ReferenceAsset]`
+- [ ] Implement `check_duplicate_asset(user_id: str, new_image_embedding: list[float], similarity_threshold: float = 0.95) -> list[Asset]`
 - [ ] Query for assets with similar embeddings
   - [ ] Filter by user_id
   - [ ] Order by cosine distance to new embedding
@@ -75,7 +75,7 @@
 
 **File:** `backend/app/services/asset_search.py`
 
-- [ ] Implement `recommend_style_consistent_assets(user_id: str, selected_asset_ids: list[str], limit: int = 10) -> list[ReferenceAsset]`
+- [ ] Implement `recommend_style_consistent_assets(user_id: str, selected_asset_ids: list[str], limit: int = 10) -> list[Asset]`
 - [ ] Fetch selected assets from database
 - [ ] Extract embeddings from selected assets
 - [ ] Calculate centroid (average embedding)
@@ -94,30 +94,30 @@
 
 ### Task 3.4: Search API Endpoints
 
-**File:** `backend/app/api/reference_assets.py`
+**File:** `backend/app/api/upload.py` (extend existing) or create `backend/app/api/assets.py`
 
-- [ ] Implement `GET /api/reference-assets/search` endpoint
+- [ ] Implement `GET /api/assets/search` endpoint
   - [ ] Accept query parameters:
     - [ ] `q` (query string, required)
-    - [ ] `asset_type` (optional filter)
+    - [ ] `asset_type` (optional filter: product/logo/person/etc)
     - [ ] `limit` (default 10, max 50)
   - [ ] Call `search_assets_by_text()`
   - [ ] Return list of assets with similarity scores
   - [ ] Include thumbnails in response
-- [ ] Implement `GET /api/reference-assets/{asset_id}/similar` endpoint
+- [ ] Implement `GET /api/assets/{asset_id}/similar` endpoint
   - [ ] Accept query parameters:
     - [ ] `limit` (default 10, max 50)
     - [ ] `exclude_self` (default true)
   - [ ] Verify asset ownership
   - [ ] Call `find_similar_assets()`
   - [ ] Return list of similar assets
-- [ ] Implement `POST /api/reference-assets/check-duplicate` endpoint
+- [ ] Implement `POST /api/assets/check-duplicate` endpoint
   - [ ] Accept request body with image file (multipart)
   - [ ] Generate embedding for uploaded image
   - [ ] Call `check_duplicate_asset()`
   - [ ] Return potential duplicates with similarity scores
   - [ ] If duplicates found, suggest using existing asset
-- [ ] Implement `POST /api/reference-assets/recommend` endpoint
+- [ ] Implement `POST /api/assets/recommend` endpoint
   - [ ] Accept request body: `{"selected_asset_ids": ["id1", "id2"]}`
   - [ ] Call `recommend_style_consistent_assets()`
   - [ ] Return recommended assets
@@ -132,7 +132,7 @@
 - [ ] Create search bar component
 - [ ] Implement text input with search icon
 - [ ] Add debounced search (wait 300ms after typing stops)
-- [ ] Call `/api/reference-assets/search` on input change
+- [ ] Call `/api/assets/search` on input change
 - [ ] Display results in dropdown
   - [ ] Show thumbnail + name
   - [ ] Show asset type badge
@@ -143,7 +143,7 @@
 - [ ] Handle empty results gracefully
 - [ ] Style with Tailwind CSS
 
-**File:** `frontend/src/pages/ReferenceAssets.tsx`
+**File:** `frontend/src/pages/Assets.tsx`
 
 - [ ] Add search bar to top of page
 - [ ] When search active, show search results instead of full grid
@@ -158,7 +158,7 @@
 
 - [ ] After file selected, before upload:
   - [ ] Generate preview
-  - [ ] Call `/api/reference-assets/check-duplicate` endpoint
+  - [ ] Call `/api/assets/check-duplicate` endpoint
   - [ ] If duplicates found (similarity > 0.95):
     - [ ] Show warning message
     - [ ] Display potential duplicate thumbnails
@@ -177,7 +177,7 @@
 
 - [ ] Add "Find Similar" button to asset detail modal
 - [ ] On click:
-  - [ ] Call `/api/reference-assets/{asset_id}/similar`
+  - [ ] Call `/api/assets/{asset_id}/similar`
   - [ ] Show results in modal or new view
   - [ ] Display thumbnails of similar assets
   - [ ] Show similarity scores
