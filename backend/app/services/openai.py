@@ -30,6 +30,10 @@ class OpenAIClient:
     @property
     def chat(self):
         return self.client.chat
+    
+    @property
+    def beta(self):
+        return self.client.beta
 
 # Initialize with error handling - don't crash on import
 try:
