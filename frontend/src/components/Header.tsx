@@ -61,7 +61,6 @@ export function Header({ userName, onLogout }: HeaderProps) {
                   <Button variant="ghost" className="flex items-center space-x-3 pl-4 border-l">
                     <div className="text-right">
                       <p className="text-sm font-medium">{userName}</p>
-                      <p className="text-xs text-muted-foreground">Creator</p>
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
@@ -69,7 +68,6 @@ export function Header({ userName, onLogout }: HeaderProps) {
                   <DropdownMenuLabel>
                     <div>
                       <p className="font-medium">{userName}</p>
-                      <p className="text-xs text-muted-foreground">Creator</p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
@@ -109,7 +107,6 @@ export function Header({ userName, onLogout }: HeaderProps) {
                   <>
                     <div className="pt-4 border-t">
                       <p className="px-2 py-1 text-sm font-medium">{userName}</p>
-                      <p className="px-2 text-xs text-muted-foreground">Creator</p>
                     </div>
                     <Button
                       variant="ghost"
