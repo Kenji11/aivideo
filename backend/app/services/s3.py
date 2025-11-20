@@ -98,6 +98,85 @@ class S3Client:
         except Exception as e:
             print(f"⚠️  Error listing S3 files with prefix '{prefix}': {str(e)}")
             return []
+    
+    def delete_file(self, key: str) -> bool:
+        """Delete a single file from S3
+        
+        Args:
+            key: S3 key (e.g., 'user123/videos/video456/file.mp4') or S3 URL (e.g., 's3://bucket/user123/videos/video456/file.mp4')
+            
+        Returns:
+            True on success, False on failure
+        """
+        try:
+            # Extract key from S3 URL if needed
+            if key.startswith('s3://'):
+                # Remove s3:// prefix and bucket name
+                key = key.replace(f's3://{self.bucket}/', '')
+            
+            self.client.delete_object(Bucket=self.bucket, Key=key)
+            logger.info(f"Deleted S3 file: {key}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete S3 file '{key}': {str(e)}")
+            return False
+    
+    def delete_directory(self, prefix: str) -> bool:
+        """Delete all files with given prefix (e.g., user_id/videos/video_id/)
+        
+        Args:
+            prefix: S3 key prefix (e.g., 'user123/videos/video456/')
+            
+        Returns:
+            True if all deletions succeed, False otherwise
+        """
+        try:
+            # Ensure prefix ends with / for directory-like behavior
+            if not prefix.endswith('/'):
+                prefix = prefix + '/'
+            
+            # List all files with this prefix
+            files = self.list_files(prefix)
+            
+            if not files:
+                logger.info(f"No files found with prefix '{prefix}'")
+                return True
+            
+            # Delete files in batches (S3 allows up to 1000 objects per delete request)
+            batch_size = 1000
+            all_succeeded = True
+            
+            for i in range(0, len(files), batch_size):
+                batch = files[i:i + batch_size]
+                try:
+                    # Prepare delete objects
+                    delete_objects = [{'Key': key} for key in batch]
+                    
+                    # Delete batch
+                    response = self.client.delete_objects(
+                        Bucket=self.bucket,
+                        Delete={'Objects': delete_objects}
+                    )
+                    
+                    # Check for errors
+                    if 'Errors' in response and response['Errors']:
+                        for error in response['Errors']:
+                            logger.error(f"Failed to delete {error['Key']}: {error['Message']}")
+                            all_succeeded = False
+                    
+                    deleted_count = len(response.get('Deleted', []))
+                    logger.info(f"Deleted {deleted_count} files from prefix '{prefix}' (batch {i//batch_size + 1})")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to delete batch of files from prefix '{prefix}': {str(e)}")
+                    all_succeeded = False
+            
+            logger.info(f"Deleted {len(files)} total files from prefix '{prefix}'")
+            return all_succeeded
+            
+        except Exception as e:
+            logger.error(f"Failed to delete directory with prefix '{prefix}': {str(e)}")
+            return False
 
 # Initialize with error handling - don't crash on import
 try:

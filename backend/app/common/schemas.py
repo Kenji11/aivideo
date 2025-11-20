@@ -43,7 +43,7 @@ class StatusResponse(BaseModel):
     current_phase: Optional[str]
     estimated_time_remaining: Optional[int]
     error: Optional[str]
-    animatic_urls: Optional[List[str]] = None  # Phase 2 animatic frames
+    storyboard_urls: Optional[List[str]] = None  # Phase 2 storyboard images
     reference_assets: Optional[Dict] = None  # Phase 3 reference assets
     stitched_video_url: Optional[str] = None  # Phase 4 stitched video
     final_video_url: Optional[str] = None  # Phase 5 final video (with audio)
