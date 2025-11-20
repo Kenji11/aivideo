@@ -477,8 +477,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     });
 
     const certificate = new acm.Certificate(this, 'Certificate', {
-      domainName: 'aivideo-api.gauntlet3.com',
-      subjectAlternativeNames: ['videoai-api.gauntlet3.com'],
+      domainName: 'videoai-api.gauntlet3.com',
       validation: acm.CertificateValidation.fromDns(hostedZone),
     });
 
@@ -509,16 +508,9 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       ),
     });
 
-    // CNAME record for aivideo-api.gauntlet3.com → videoai-api.gauntlet3.com
-    new route53.CnameRecord(this, 'APICnameRecord', {
-      zone: hostedZone,
-      recordName: 'aivideo-api',
-      domainName: 'videoai-api.gauntlet3.com',
-    });
-
     new cdk.CfnOutput(this, 'APIURL', {
-      value: `https://aivideo-api.gauntlet3.com, https://videoai-api.gauntlet3.com`,
-      description: 'API endpoint URLs (both domains)',
+      value: `https://videoai-api.gauntlet3.com`,
+      description: 'API endpoint URL',
     });
 
     // Stage 7: Frontend S3 + CloudFront
@@ -540,47 +532,10 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     // Grant CloudFront access to S3 bucket
     frontendBucket.grantRead(originAccessIdentity);
 
-    // ACM Certificate for frontend domain - supports both domains
+    // ACM Certificate for frontend domain
     const frontendCertificate = new acm.Certificate(this, 'FrontendCertificate', {
-      domainName: 'aivideo.gauntlet3.com',
-      subjectAlternativeNames: ['videoai.gauntlet3.com'],
+      domainName: 'videoai.gauntlet3.com',
       validation: acm.CertificateValidation.fromDns(hostedZone),
-    });
-
-    // CloudFront Function for domain redirect (302 from aivideo to videoai)
-    const redirectFunction = new cloudfront.Function(this, 'DomainRedirectFunction', {
-      code: cloudfront.FunctionCode.fromInline(`
-        function handler(event) {
-          var request = event.request;
-          var host = request.headers.host.value;
-          
-          // Redirect aivideo.gauntlet3.com to videoai.gauntlet3.com
-          if (host === 'aivideo.gauntlet3.com') {
-            var uri = request.uri;
-            var querystring = request.querystring;
-            var queryString = '';
-            
-            // Build query string if present
-            if (querystring) {
-              var qs = [];
-              for (var key in querystring) {
-                qs.push(key + '=' + querystring[key].value);
-              }
-              queryString = '?' + qs.join('&');
-            }
-            
-            return {
-              statusCode: 302,
-              statusDescription: 'Found',
-              headers: {
-                'location': { value: 'https://videoai.gauntlet3.com' + uri + queryString }
-              }
-            };
-          }
-          
-          return request;
-        }
-      `),
     });
 
     // CloudFront distribution
@@ -594,12 +549,6 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         compress: true,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
-        functionAssociations: [
-          {
-            function: redirectFunction,
-            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
-          },
-        ],
       },
       // SPA fallback - redirect all 404s to index.html
       errorResponses: [
@@ -616,27 +565,17 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
           ttl: cdk.Duration.seconds(0),
         },
       ],
-      domainNames: ['aivideo.gauntlet3.com', 'videoai.gauntlet3.com'],
+      domainNames: ['videoai.gauntlet3.com'],
       certificate: frontendCertificate,
       defaultRootObject: 'index.html',
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100, // Use only North America and Europe
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
     });
 
-    // Route53 A records for frontend - both domains point to CloudFront
-    // videoai.gauntlet3.com (primary domain)
+    // Route53 A record for frontend - videoai.gauntlet3.com
     new route53.ARecord(this, 'FrontendRecordVideoAI', {
       zone: hostedZone,
       recordName: 'videoai',
-      target: route53.RecordTarget.fromAlias(
-        new route53targets.CloudFrontTarget(frontendDistribution)
-      ),
-    });
-
-    // aivideo.gauntlet3.com (redirects to videoai via CloudFront Function)
-    new route53.ARecord(this, 'FrontendRecordAIVideo', {
-      zone: hostedZone,
-      recordName: 'aivideo',
       target: route53.RecordTarget.fromAlias(
         new route53targets.CloudFrontTarget(frontendDistribution)
       ),
@@ -654,8 +593,8 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'FrontendURL', {
-      value: `https://aivideo.gauntlet3.com, https://videoai.gauntlet3.com`,
-      description: 'Frontend URLs (both domains)',
+      value: `https://videoai.gauntlet3.com`,
+      description: 'Frontend URL',
     });
   }
 }
