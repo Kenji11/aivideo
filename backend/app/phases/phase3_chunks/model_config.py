@@ -11,7 +11,7 @@ CRITICAL: Models output different chunk durations regardless of parameters!
 - Use 'duration_controllable' to know if you can change it
 
 Available Models:
-- 'hailuo': Hailuo 2.3 Fast (minimax/hailuo-2.3-fast) - Default, outputs 5s chunks, 720p @ 30fps
+- 'hailuo_fast': Hailuo 2.3 Fast (minimax/hailuo-2.3-fast) - Default, outputs 6s chunks, 720p @ 30fps
 - 'seedance': Seedance 1.0 Pro Fast (bytedance/seedance-1-pro-fast) - 2-12s clips, 3x faster, 60% cheaper
 - 'wan': Wan 2.1 (wavespeedai/wan-2.1-i2v-480p) - Outputs 5s chunks
 - 'zeroscope': Zeroscope v2 XL - Outputs 3s chunks
@@ -54,20 +54,24 @@ from app.common.constants import (
     COST_ZEROSCOPE,
     COST_ANIMATEDIFF,
     COST_RUNWAY,
-    COST_HAILUO,
+    COST_HAILUO_23_FAST,
     COST_SEEDANCE,
-    COST_KLING,
+    COST_KLING_25_PRO,
+    COST_KLING_16_PRO,
+    COST_KLING_21,
+    COST_KLING_21_1080P,
     COST_PIXVERSE,
     COST_WAN_25_T2V,
     COST_WAN_25_I2V,
     COST_VEO_FAST,
     COST_VEO,
     COST_HAILUO_23,
+    COST_MINIMAX_VIDEO_01,
     COST_SORA,
 )
 
 # Default model (currently used model)
-DEFAULT_MODEL = 'hailuo'
+DEFAULT_MODEL = 'hailuo_fast'
 
 # Model configurations dictionary
 MODEL_CONFIGS: Dict[str, Dict] = {
@@ -139,10 +143,10 @@ MODEL_CONFIGS: Dict[str, Dict] = {
         'supports_text_to_video': True,
         'supports_image_to_video': True,
     },
-    'hailuo': {
-        'name': 'hailuo',
+    'hailuo_fast': {
+        'name': 'hailuo_fast',
         'replicate_model': 'minimax/hailuo-2.3-fast',  # Official, fastest, cheapest high-quality version
-        'cost_per_generation': COST_HAILUO,  # $0.04 per 5s chunk ($0.008/second)
+        'cost_per_generation': COST_HAILUO_23_FAST,  # $0.19 per 6s chunk ($0.19 per chunk)
         'params': {
             'num_frames': 151,      # 151 frames @ 30fps = ~5.03s (max reliable)
             'fps': 30,              # Native 30fps, smoother motion
@@ -155,7 +159,7 @@ MODEL_CONFIGS: Dict[str, Dict] = {
             'num_frames': 'num_frames',
             'fps': 'fps',
         },
-        'actual_chunk_duration': 5.0,  # Trained on 5s clips, outputs ~5s consistently
+        'actual_chunk_duration': 6.0,  # Outputs 6s chunks (not 5s)
         'duration_controllable': True,  # Can control via num_frames (30–151 frames)
         'supports_multi_image': False,  # Single image input only
         'max_reference_assets': 0,      # No extra assets
@@ -186,10 +190,85 @@ MODEL_CONFIGS: Dict[str, Dict] = {
         'supports_text_to_video': True,
         'supports_image_to_video': True,
     },
-    'kling': {
-        'name': 'kling',
+    'kling_16_pro': {
+        'name': 'kling_16_pro',
+        'replicate_model': 'kwaivgi/kling-v1.6-pro',
+        'cost_per_generation': COST_KLING_16_PRO,
+        'params': {
+            'num_frames': 120,
+            'fps': 24,
+            'width': 1280,
+            'height': 720,
+        },
+        'param_names': {
+            'image': 'image',
+            'prompt': 'prompt',
+            'num_frames': 'num_frames',
+            'fps': 'fps',
+            'width': 'width',
+            'height': 'height',
+        },
+        'actual_chunk_duration': 5.0,
+        'duration_controllable': True,
+        'supports_multi_image': False,
+        'max_reference_assets': 0,
+        'supports_text_to_video': True,
+        'supports_image_to_video': True,
+    },
+    'kling_21': {
+        'name': 'kling_21',
+        'replicate_model': 'kwaivgi/kling-v2.1',
+        'cost_per_generation': COST_KLING_21,
+        'params': {
+            'num_frames': 120,
+            'fps': 24,
+            'width': 1280,
+            'height': 720,
+        },
+        'param_names': {
+            'image': 'image',
+            'prompt': 'prompt',
+            'num_frames': 'num_frames',
+            'fps': 'fps',
+            'width': 'width',
+            'height': 'height',
+        },
+        'actual_chunk_duration': 5.0,
+        'duration_controllable': True,
+        'supports_multi_image': False,
+        'max_reference_assets': 0,
+        'supports_text_to_video': True,
+        'supports_image_to_video': True,
+    },
+    'kling_21_1080p': {
+        'name': 'kling_21_1080p',
+        'replicate_model': 'kwaivgi/kling-v2.1',
+        'cost_per_generation': COST_KLING_21_1080P,
+        'params': {
+            'num_frames': 120,
+            'fps': 24,
+            'width': 1920,
+            'height': 1080,
+        },
+        'param_names': {
+            'image': 'image',
+            'prompt': 'prompt',
+            'num_frames': 'num_frames',
+            'fps': 'fps',
+            'width': 'width',
+            'height': 'height',
+        },
+        'actual_chunk_duration': 5.0,
+        'duration_controllable': True,
+        'supports_multi_image': False,
+        'max_reference_assets': 0,
+        'supports_text_to_video': True,
+        'supports_image_to_video': True,
+    },
+    'kling_25_pro': {
+        'name': 'kling_25_pro',
         'replicate_model': 'kwaivgi/kling-v2.5-turbo-pro',
-        'cost_per_generation': COST_KLING,
+        'cost_per_generation': COST_KLING_25_PRO,
         'params': {
             'num_frames': 120,
             'fps': 24,
@@ -336,6 +415,31 @@ MODEL_CONFIGS: Dict[str, Dict] = {
         'supports_text_to_video': True,
         'supports_image_to_video': True,
     },
+    'minimax_video_01': {
+        'name': 'minimax_video_01',
+        'replicate_model': 'minimax/video-01',
+        'cost_per_generation': COST_MINIMAX_VIDEO_01,
+        'params': {
+            'num_frames': 151,
+            'fps': 30,
+            'width': 1280,
+            'height': 720,
+        },
+        'param_names': {
+            'image': 'first_frame_image',
+            'prompt': 'prompt',
+            'num_frames': 'num_frames',
+            'fps': 'fps',
+            'width': 'width',
+            'height': 'height',
+        },
+        'actual_chunk_duration': 5.0,
+        'duration_controllable': True,
+        'supports_multi_image': False,
+        'max_reference_assets': 1,  # Accepts subject reference
+        'supports_text_to_video': True,
+        'supports_image_to_video': True,
+    },
     'hailuo_23': {
         'name': 'hailuo_23',
         'replicate_model': 'minimax/hailuo-2.3',
@@ -354,7 +458,7 @@ MODEL_CONFIGS: Dict[str, Dict] = {
             'width': 'width',
             'height': 'height',
         },
-        'actual_chunk_duration': 5.0,
+        'actual_chunk_duration': 6.0,  # Outputs 6s chunks (not 5s)
         'duration_controllable': True,
         'supports_multi_image': False,
         'max_reference_assets': 0,
