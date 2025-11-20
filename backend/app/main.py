@@ -18,9 +18,13 @@ app = FastAPI(
 )
 
 # CORS middleware
+# Allow both frontend domains to access both API domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Update for production
+    allow_origins=[
+        "https://aivideo.gauntlet3.com",
+        "https://videoai.gauntlet3.com",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
