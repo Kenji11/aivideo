@@ -149,7 +149,7 @@ BEGIN
         WHERE table_name = 'assets' AND column_name = 'embedding'
     ) THEN
         BEGIN
-            ALTER TABLE assets ADD COLUMN embedding vector(768);
+            ALTER TABLE assets ADD COLUMN embedding vector(512);
         EXCEPTION
             WHEN OTHERS THEN
                 -- If vector type is not available, log warning
