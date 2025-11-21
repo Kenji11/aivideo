@@ -158,6 +158,7 @@ async def stream_status(
     
     async def event_generator():
         last_data = None
+        last_checkpoint_id = None
         while True:
             try:
                 # Check Redis first
@@ -167,42 +168,55 @@ async def stream_status(
                         redis_data = redis_client.get_video_data(video_id)
                     except Exception:
                         pass
-                
+
                 # Fallback to DB if Redis missing
                 if not redis_data:
                     video = db.query(VideoGeneration).filter(
                         VideoGeneration.id == video_id,
                         VideoGeneration.user_id == user_id
                     ).first()
-                    
+
                     if not video:
                         yield f"event: error\ndata: {json.dumps({'error': 'Video not found'})}\n\n"
                         break
-                    
+
                     # Re-add to Redis
                     if redis_client._client:
                         _re_add_to_redis(video)
-                    
+
                     # Build response from DB
                     status_response = build_status_response_from_db(video)
                 else:
                     # Build response from Redis
                     status_response = build_status_response_from_redis_video_data(redis_data)
-                
-                # Only send event if data changed
+
+                # Check for checkpoint changes
+                current_checkpoint_id = status_response.current_checkpoint.checkpoint_id if status_response.current_checkpoint else None
+
+                # Emit checkpoint_created event if checkpoint changed
+                if current_checkpoint_id and current_checkpoint_id != last_checkpoint_id:
+                    checkpoint_event = {
+                        "checkpoint_id": current_checkpoint_id,
+                        "phase": status_response.current_checkpoint.phase_number,
+                        "branch": status_response.current_checkpoint.branch_name
+                    }
+                    yield f"event: checkpoint_created\ndata: {json.dumps(checkpoint_event)}\n\n"
+                    last_checkpoint_id = current_checkpoint_id
+
+                # Only send status update if data changed
                 current_data = status_response.dict()
                 if current_data != last_data:
                     yield f"data: {json.dumps(current_data)}\n\n"
                     last_data = current_data
-                
+
                 # Check if complete or failed (stop streaming)
                 if status_response.status in ['complete', 'failed']:
                     yield "event: close\ndata: {}\n\n"
                     break
-                
+
                 # Poll every 1.5 seconds
                 await asyncio.sleep(1.5)
-                
+
             except Exception as e:
                 logger.error(f"Error in SSE stream: {e}")
                 yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
