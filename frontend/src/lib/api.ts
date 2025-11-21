@@ -68,6 +68,7 @@ export interface GenerateRequest {
   assets?: string[]; // For backward compatibility, can also be reference_assets
   reference_assets?: string[];
   model?: string; // Video generation model to use (e.g., 'hailuo', 'kling', 'sora')
+  auto_continue?: boolean; // YOLO mode - auto-continue without pausing at checkpoints
 }
 
 export interface GenerateResponse {
@@ -101,6 +102,96 @@ export interface StatusResponse {
   final_video_url?: string;  // Phase 5 final video (with audio)
   current_chunk_index?: number;  // Current chunk being processed (0-based)
   total_chunks?: number;  // Total number of chunks
+  // Checkpoint fields
+  current_checkpoint?: CheckpointInfo;
+  checkpoint_tree?: CheckpointTreeNode[];
+  active_branches?: BranchInfo[];
+}
+
+// Checkpoint-related types
+export interface CheckpointInfo {
+  checkpoint_id: string;
+  branch_name: string;
+  phase_number: number;
+  version: number;
+  status: 'pending' | 'approved' | 'abandoned';
+  created_at: string;
+  artifacts: Record<string, ArtifactResponse>;
+}
+
+export interface ArtifactResponse {
+  id: string;
+  artifact_type: string;
+  artifact_key: string;
+  s3_url: string;
+  version: number;
+  metadata?: any;
+  created_at: string;
+}
+
+export interface CheckpointResponse {
+  id: string;
+  video_id: string;
+  branch_name: string;
+  phase_number: number;
+  version: number;
+  status: 'pending' | 'approved' | 'abandoned';
+  approved_at?: string;
+  created_at: string;
+  cost_usd: number;
+  parent_checkpoint_id?: string;
+  artifacts?: ArtifactResponse[];
+}
+
+export interface CheckpointTreeNode {
+  checkpoint: CheckpointResponse;
+  children: CheckpointTreeNode[];
+}
+
+export interface BranchInfo {
+  branch_name: string;
+  latest_checkpoint_id: string;
+  phase_number: number;
+  status: string;
+  can_continue: boolean;
+}
+
+export interface ContinueRequest {
+  checkpoint_id: string;
+}
+
+export interface ContinueResponse {
+  message: string;
+  next_phase: number;
+  branch_name: string;
+  created_new_branch: boolean;
+}
+
+export interface SpecEditRequest {
+  beats?: any[];
+  style?: any;
+  product?: any;
+  audio?: any;
+}
+
+export interface RegenerateBeatRequest {
+  beat_index: number;
+  prompt_override?: string;
+}
+
+export interface RegenerateChunkRequest {
+  chunk_index: number;
+  model_override?: string;
+}
+
+export interface CheckpointListResponse {
+  checkpoints: CheckpointResponse[];
+  tree: CheckpointTreeNode[];
+}
+
+export interface CheckpointDetailResponse {
+  checkpoint: CheckpointResponse;
+  artifacts: ArtifactResponse[];
 }
 
 export interface VideoResponse {
@@ -238,6 +329,143 @@ export const api = {
   async deleteVideo(videoId: string): Promise<void> {
     await apiClient.delete(`/api/video/${videoId}`);
   },
+
+  // Checkpoint endpoints
+
+  /**
+   * List all checkpoints for a video
+   */
+  async listCheckpoints(videoId: string, branch?: string): Promise<CheckpointListResponse> {
+    const params = branch ? { branch } : {};
+    const response = await apiClient.get<CheckpointListResponse>(
+      `/api/video/${videoId}/checkpoints`,
+      { params }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get checkpoint details
+   */
+  async getCheckpoint(videoId: string, checkpointId: string): Promise<CheckpointDetailResponse> {
+    const response = await apiClient.get<CheckpointDetailResponse>(
+      `/api/video/${videoId}/checkpoints/${checkpointId}`
+    );
+    return response.data;
+  },
+
+  /**
+   * Get current checkpoint (most recent pending)
+   */
+  async getCurrentCheckpoint(videoId: string): Promise<{ checkpoint: CheckpointResponse | null }> {
+    const response = await apiClient.get<{ checkpoint: CheckpointResponse | null }>(
+      `/api/video/${videoId}/checkpoints/current`
+    );
+    return response.data;
+  },
+
+  /**
+   * Get checkpoint tree structure
+   */
+  async getCheckpointTree(videoId: string): Promise<{ tree: CheckpointTreeNode[] }> {
+    const response = await apiClient.get<{ tree: CheckpointTreeNode[] }>(
+      `/api/video/${videoId}/checkpoints/tree`
+    );
+    return response.data;
+  },
+
+  /**
+   * List active branches
+   */
+  async listBranches(videoId: string): Promise<{ branches: BranchInfo[] }> {
+    const response = await apiClient.get<{ branches: BranchInfo[] }>(
+      `/api/video/${videoId}/branches`
+    );
+    return response.data;
+  },
+
+  /**
+   * Continue pipeline from checkpoint
+   */
+  async continueVideo(videoId: string, checkpointId: string): Promise<ContinueResponse> {
+    const response = await apiClient.post<ContinueResponse>(
+      `/api/video/${videoId}/continue`,
+      { checkpoint_id: checkpointId }
+    );
+    return response.data;
+  },
+
+  // Artifact editing endpoints
+
+  /**
+   * Edit spec at Phase 1
+   */
+  async editSpec(
+    videoId: string,
+    checkpointId: string,
+    edits: SpecEditRequest
+  ): Promise<{ artifact_id: string; version: number }> {
+    const response = await apiClient.patch<{ artifact_id: string; version: number }>(
+      `/api/video/${videoId}/checkpoints/${checkpointId}/spec`,
+      edits
+    );
+    return response.data;
+  },
+
+  /**
+   * Upload replacement image for beat at Phase 2
+   */
+  async uploadBeatImage(
+    videoId: string,
+    checkpointId: string,
+    beatIndex: number,
+    file: File
+  ): Promise<{ artifact_id: string; s3_url: string; version: number }> {
+    const formData = new FormData();
+    formData.append('beat_index', beatIndex.toString());
+    formData.append('image', file);
+
+    const response = await apiClient.post<{ artifact_id: string; s3_url: string; version: number }>(
+      `/api/video/${videoId}/checkpoints/${checkpointId}/upload-image`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Regenerate beat image at Phase 2
+   */
+  async regenerateBeat(
+    videoId: string,
+    checkpointId: string,
+    request: RegenerateBeatRequest
+  ): Promise<{ artifact_id: string; s3_url: string; version: number }> {
+    const response = await apiClient.post<{ artifact_id: string; s3_url: string; version: number }>(
+      `/api/video/${videoId}/checkpoints/${checkpointId}/regenerate-beat`,
+      request
+    );
+    return response.data;
+  },
+
+  /**
+   * Regenerate video chunk at Phase 3
+   */
+  async regenerateChunk(
+    videoId: string,
+    checkpointId: string,
+    request: RegenerateChunkRequest
+  ): Promise<{ artifact_id: string; s3_url: string; version: number }> {
+    const response = await apiClient.post<{ artifact_id: string; s3_url: string; version: number }>(
+      `/api/video/${videoId}/checkpoints/${checkpointId}/regenerate-chunk`,
+      request
+    );
+    return response.data;
+  },
 };
 
 // Named exports for convenience
@@ -282,6 +510,95 @@ export async function getVideo(videoId: string): Promise<VideoResponse> {
  */
 export async function deleteVideo(videoId: string): Promise<void> {
   return api.deleteVideo(videoId);
+}
+
+// Checkpoint convenience exports
+
+/**
+ * List checkpoints for a video
+ */
+export async function listCheckpoints(videoId: string, branch?: string): Promise<CheckpointListResponse> {
+  return api.listCheckpoints(videoId, branch);
+}
+
+/**
+ * Get checkpoint details
+ */
+export async function getCheckpoint(videoId: string, checkpointId: string): Promise<CheckpointDetailResponse> {
+  return api.getCheckpoint(videoId, checkpointId);
+}
+
+/**
+ * Get current checkpoint
+ */
+export async function getCurrentCheckpoint(videoId: string): Promise<{ checkpoint: CheckpointResponse | null }> {
+  return api.getCurrentCheckpoint(videoId);
+}
+
+/**
+ * Get checkpoint tree
+ */
+export async function getCheckpointTree(videoId: string): Promise<{ tree: CheckpointTreeNode[] }> {
+  return api.getCheckpointTree(videoId);
+}
+
+/**
+ * List active branches
+ */
+export async function listBranches(videoId: string): Promise<{ branches: BranchInfo[] }> {
+  return api.listBranches(videoId);
+}
+
+/**
+ * Continue pipeline from checkpoint
+ */
+export async function continueVideo(videoId: string, checkpointId: string): Promise<ContinueResponse> {
+  return api.continueVideo(videoId, checkpointId);
+}
+
+/**
+ * Edit spec at Phase 1
+ */
+export async function editSpec(
+  videoId: string,
+  checkpointId: string,
+  edits: SpecEditRequest
+): Promise<{ artifact_id: string; version: number }> {
+  return api.editSpec(videoId, checkpointId, edits);
+}
+
+/**
+ * Upload replacement image for beat
+ */
+export async function uploadBeatImage(
+  videoId: string,
+  checkpointId: string,
+  beatIndex: number,
+  file: File
+): Promise<{ artifact_id: string; s3_url: string; version: number }> {
+  return api.uploadBeatImage(videoId, checkpointId, beatIndex, file);
+}
+
+/**
+ * Regenerate beat image
+ */
+export async function regenerateBeat(
+  videoId: string,
+  checkpointId: string,
+  request: RegenerateBeatRequest
+): Promise<{ artifact_id: string; s3_url: string; version: number }> {
+  return api.regenerateBeat(videoId, checkpointId, request);
+}
+
+/**
+ * Regenerate video chunk
+ */
+export async function regenerateChunk(
+  videoId: string,
+  checkpointId: string,
+  request: RegenerateChunkRequest
+): Promise<{ artifact_id: string; s3_url: string; version: number }> {
+  return api.regenerateChunk(videoId, checkpointId, request);
 }
 
 export default api;

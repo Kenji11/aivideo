@@ -92,6 +92,18 @@ export function useVideoStatusStream(
             }
           };
 
+          // Listen for checkpoint_created events
+          eventSource.addEventListener('checkpoint_created', (event: MessageEvent) => {
+            try {
+              const checkpointData = JSON.parse(event.data);
+              console.log('[SSE] Checkpoint created:', checkpointData);
+              // Checkpoint data is included in status updates, so this is primarily for logging
+              // The actual checkpoint info will be in the next status_update event
+            } catch (err) {
+              console.error('[SSE] Failed to parse checkpoint event:', err);
+            }
+          });
+
           eventSource.addEventListener('close', () => {
             console.log('[SSE] Stream closed by server');
             if (eventSourceRef.current) {
