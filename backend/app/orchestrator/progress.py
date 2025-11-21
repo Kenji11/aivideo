@@ -22,7 +22,7 @@ def update_progress(
 ) -> None:
     """
     Update video generation progress in Redis (primary) and DB (fallback/critical updates).
-    
+
     Args:
         video_id: Unique identifier for the video
         status: Status string (e.g., "validating", "generating_animatic", "complete", "failed")
@@ -35,6 +35,7 @@ def update_progress(
             - total_cost: float
             - generation_time: float
             - phase_outputs: dict (nested JSON structure)
+            - checkpoint_id: str (current checkpoint ID for video)
     """
     redis_write_failed = False
     
@@ -86,15 +87,19 @@ def update_progress(
                 # Get existing phase_outputs from Redis or create new
                 existing_data = redis_client.get_video_data(video_id)
                 phase_outputs = existing_data.get("phase_outputs", {}) if existing_data else {}
-                
+
                 if "phase3_chunks" not in phase_outputs:
                     phase_outputs["phase3_chunks"] = {}
                 phase_outputs["phase3_chunks"]["current_chunk_index"] = kwargs["current_chunk_index"]
                 if "total_chunks" in kwargs:
                     phase_outputs["phase3_chunks"]["total_chunks"] = kwargs["total_chunks"]
-                
+
                 redis_client.set_video_phase_outputs(video_id, phase_outputs)
-            
+
+            # Set checkpoint ID
+            if "checkpoint_id" in kwargs:
+                redis_client.set_video_checkpoint(video_id, kwargs["checkpoint_id"])
+
         except Exception as e:
             logger.warning(f"Redis update failed, falling back to DB: {e}")
             redis_write_failed = True

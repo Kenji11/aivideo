@@ -160,14 +160,40 @@ class RedisClient:
         except Exception as e:
             logger.warning(f"Failed to set storyboard URLs in Redis: {e}")
             return False
-    
+
+    def set_video_checkpoint(self, video_id: str, checkpoint_id: str) -> bool:
+        """Set current checkpoint ID for video"""
+        if not self._client:
+            return False
+        try:
+            self._client.set(
+                self._key(video_id, "checkpoint_id"),
+                checkpoint_id,
+                ex=REDIS_TTL
+            )
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to set checkpoint ID in Redis: {e}")
+            return False
+
+    def get_video_checkpoint(self, video_id: str) -> Optional[str]:
+        """Get current checkpoint ID"""
+        if not self._client:
+            return None
+        try:
+            val = self._client.get(self._key(video_id, "checkpoint_id"))
+            return val if val else None
+        except Exception as e:
+            logger.warning(f"Failed to get checkpoint ID from Redis: {e}")
+            return None
+
     def get_video_data(self, video_id: str) -> Optional[Dict[str, Any]]:
         """Get all video data as dict"""
         if not self._client:
             return None
         try:
             data = {}
-            
+
             # Get all fields
             progress = self._client.get(self._key(video_id, "progress"))
             status = self._client.get(self._key(video_id, "status"))
@@ -179,6 +205,7 @@ class RedisClient:
             spec_str = self._client.get(self._key(video_id, "spec"))
             presigned_urls_str = self._client.get(self._key(video_id, "presigned_urls"))
             storyboard_urls_str = self._client.get(self._key(video_id, "storyboard_urls"))
+            checkpoint_id = self._client.get(self._key(video_id, "checkpoint_id"))
             
             # Parse and add to data dict
             if progress is not None:
@@ -216,7 +243,9 @@ class RedisClient:
                     data["storyboard_urls"] = json.loads(storyboard_urls_str)
                 except json.JSONDecodeError:
                     pass
-            
+            if checkpoint_id is not None:
+                data["checkpoint_id"] = checkpoint_id
+
             # Add video_id
             data["video_id"] = video_id
             
@@ -245,6 +274,7 @@ class RedisClient:
                 self._key(video_id, "spec"),
                 self._key(video_id, "presigned_urls"),
                 self._key(video_id, "storyboard_urls"),
+                self._key(video_id, "checkpoint_id"),
             ]
             self._client.delete(*keys)
             return True
