@@ -359,6 +359,78 @@ export function AssetDetailModal({ isOpen, onClose, assetId }: AssetDetailModalP
                   </div>
                 </div>
               )}
+              {asset.dominant_colors_rgb && asset.dominant_colors_rgb.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
+                    Dominant Colors
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {asset.dominant_colors_rgb.map((rgb: number[], i: number) => {
+                      const [r, g, b] = rgb;
+                      const colorHex = `#${[r, g, b].map(x => {
+                        const hex = x.toString(16);
+                        return hex.length === 1 ? '0' + hex : hex;
+                      }).join('')}`;
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 px-2 py-1 rounded border border-border"
+                          style={{ backgroundColor: `rgb(${r}, ${g}, ${b})` }}
+                        >
+                          <div
+                            className="w-6 h-6 rounded border-2 border-white/50"
+                            style={{ backgroundColor: colorHex }}
+                          />
+                          <span className="text-xs text-foreground font-mono">
+                            rgb({r}, {g}, {b})
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {asset.recommended_shot_types && asset.recommended_shot_types.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
+                    Recommended Shot Types
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {asset.recommended_shot_types.map((shotType, i) => (
+                      <span
+                        key={i}
+                        className="px-2 py-1 text-xs rounded bg-blue-500/20 text-blue-600 dark:text-blue-400"
+                      >
+                        {shotType.replace(/_/g, ' ')}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {asset.usage_contexts && asset.usage_contexts.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
+                    Usage Contexts
+                  </label>
+                  <ul className="list-disc list-inside space-y-1">
+                    {asset.usage_contexts.map((context, i) => (
+                      <li key={i} className="text-sm text-foreground">
+                        {context}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {asset.analysis && (
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
+                    Analysis Status
+                  </label>
+                  <span className="inline-block px-2 py-1 text-xs font-semibold rounded bg-green-600 text-white">
+                    ✓ AI Analyzed
+                  </span>
+                </div>
+              )}
               {asset.style_tags && asset.style_tags.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">

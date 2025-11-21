@@ -1,7 +1,7 @@
-import { Sparkles } from 'lucide-react';
+import { Sparkles, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { UploadZone } from '../components/UploadZone';
 import { generateVideo } from '../lib/api';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -117,9 +117,29 @@ export function UploadVideo({
           <label className="block text-sm font-medium text-foreground mb-2">
             Reference Materials
           </label>
-          <UploadZone 
-            onAssetsUploaded={onAssetsUploaded}
-          />
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {uploadedAssetIds.length > 0
+                ? `${uploadedAssetIds.length} asset(s) selected`
+                : 'Upload reference assets from the Asset Library to use in your video'}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate('/asset-library')}
+              className="flex items-center gap-2"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Go to Asset Library
+            </Button>
+            {uploadedAssetIds.length > 0 && (
+              <div className="mt-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                <p className="text-xs text-muted-foreground">
+                  Selected assets will be used as reference materials for video generation.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         <div>

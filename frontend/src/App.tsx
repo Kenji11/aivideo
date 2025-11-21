@@ -23,7 +23,6 @@ import { ExportPanel } from './components/ExportPanel';
 // Lazy load Auth component (contains Firebase which is a large bundle)
 const Auth = lazy(() => import('./pages/Auth').then(module => ({ default: module.Auth })));
 import { AssetLibrary } from './pages/AssetLibrary';
-import { Assets } from './pages/Assets';
 import { UploadVideo } from './pages/UploadVideo';
 import { VideoStatus } from './pages/VideoStatus';
 import { Preview } from './pages/Preview';
@@ -444,7 +443,6 @@ function AppContent() {
           <Route path="/export/:videoId" element={<ExportRouteWrapper />} />
 
           <Route path="/asset-library" element={<AssetLibrary />} />
-          <Route path="/assets" element={<Assets />} />
 
           {/* Commented out - may use later */}
           {/* <Route path="/dashboard" element={<Dashboard />} /> */}

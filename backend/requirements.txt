@@ -33,9 +33,9 @@ langchain-core>=0.1.0
 firebase-admin>=6.0.0
 
 # CLIP Embeddings (for reference asset analysis)
-torch>=2.0.0
-torchvision>=0.15.0
-clip-by-openai>=1.0
+# Note: torch and torchvision are installed separately in Dockerfile from PyTorch CPU index
+# Using open_clip instead of clip-by-openai (supports modern PyTorch versions)
+open-clip-torch>=2.20.0
 
 # Image Processing & Analysis
 opencv-python>=4.8.0

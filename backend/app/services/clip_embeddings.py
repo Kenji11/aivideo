@@ -10,7 +10,7 @@ import logging
 from functools import lru_cache
 from typing import List
 import torch
-import clip
+import open_clip
 from PIL import Image
 from app.config import get_settings
 
@@ -49,25 +49,34 @@ class CLIPEmbeddingService:
         logger.info(f"Model cache directory: {cache_dir}")
         
         try:
-            # Load model with caching
-            # clip.load() will download to cache_dir on first run, load from cache on subsequent runs
-            self.model, self.preprocess = clip.load(
-                model_name,
-                device=self.device,
-                download_root=cache_dir
+            # Load model with caching using open_clip
+            # open_clip.create_model() will download to cache_dir on first run, load from cache on subsequent runs
+            # ViT-B/32 in open_clip is 'ViT-B-32'
+            open_clip_model_name = 'ViT-B-32' if model_name == 'ViT-B/32' else model_name
+            
+            # Set cache directory via environment variable (open_clip respects HF_HOME)
+            os.environ['HF_HOME'] = cache_dir
+            os.environ['TORCH_HOME'] = cache_dir
+            
+            self.model, self.preprocess, _ = open_clip.create_model_and_transforms(
+                open_clip_model_name,
+                pretrained='openai',  # Use OpenAI pretrained weights
+                device=self.device
             )
+            # Move model to device explicitly
+            self.model = self.model.to(self.device)
             self.model.eval()  # Set to evaluation mode
             
             load_time = time.time() - start_time
             self._model_loaded = True
             
             # Check if this was a cold start (download) or warm start (cached)
-            model_path = os.path.join(cache_dir, f"{model_name.replace('/', '_')}.pt")
-            if os.path.exists(model_path):
-                model_size_mb = os.path.getsize(model_path) / (1024 * 1024)
+            # open_clip stores models in HF_HOME or TORCH_HOME
+            model_cache_path = os.path.join(cache_dir, 'checkpoints')
+            if os.path.exists(model_cache_path) and os.listdir(model_cache_path):
                 logger.info(
                     f"✓ CLIP model loaded successfully (warm start, cached) "
-                    f"in {load_time:.2f}s (model size: {model_size_mb:.1f}MB)"
+                    f"in {load_time:.2f}s"
                 )
             else:
                 logger.info(
@@ -100,7 +109,7 @@ class CLIPEmbeddingService:
             # Preprocess image for CLIP
             image_input = self.preprocess(image).unsqueeze(0).to(self.device)
             
-            # Generate embedding
+            # Generate embedding using open_clip
             with torch.no_grad():
                 embedding = self.model.encode_image(image_input)
                 # Normalize embedding (L2 norm)
@@ -141,8 +150,8 @@ class CLIPEmbeddingService:
             raise RuntimeError("CLIP model not loaded. Call _load_model() first.")
         
         try:
-            # Tokenize text
-            text_input = clip.tokenize([text]).to(self.device)
+            # Tokenize text using open_clip
+            text_input = open_clip.tokenize([text]).to(self.device)
             
             # Generate embedding
             with torch.no_grad():

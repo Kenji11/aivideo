@@ -59,7 +59,7 @@ class Asset(Base):
     # User-defined metadata
     name = Column(String, nullable=True)  # User-defined name (editable, defaults to filename)
     description = Column(Text, nullable=True)  # Optional user description
-    reference_asset_type = Column(SQLEnum(ReferenceAssetType), nullable=True)  # product/logo/person/etc
+    reference_asset_type = Column(String(20), nullable=True)  # product/logo/person/etc - stored as string to avoid enum name issues
     
     # Storage
     thumbnail_url = Column(String, nullable=True)  # Optimized thumbnail S3 URL

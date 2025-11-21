@@ -143,6 +143,8 @@ export interface AssetListItem {
   width?: number;
   height?: number;
   is_logo?: boolean;
+  primary_object?: string;  // For hover tooltip
+  analysis?: any;  // Analysis status indicator
   created_at?: string;
 }
 

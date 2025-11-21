@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Form, Query
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Form, Query, BackgroundTasks
 import logging
 
 logger = logging.getLogger(__name__)
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List, Optional
 import uuid
 import tempfile
@@ -12,12 +13,14 @@ from pathlib import Path
 import mimetypes
 from PIL import Image
 
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.common.models import Asset, AssetType, AssetSource, ReferenceAssetType
 from app.common.auth import get_current_user
 from app.common.schemas import UploadedAsset, UploadResponse
 from app.services.s3 import s3_client
 from app.common.constants import get_asset_s3_key
+from app.services.asset_analysis import asset_analysis_service
+from app.services.clip_embeddings import clip_service
 
 router = APIRouter()
 
@@ -58,11 +61,115 @@ def determine_asset_type(mime_type: str) -> AssetType:
         return AssetType.IMAGE
 
 
+def analyze_asset_background(
+    asset_id: str,
+    s3_url: str,
+    image_path: str,
+    user_provided_name: Optional[str],
+    user_provided_description: Optional[str]
+):
+    """
+    Background task to analyze asset with GPT-4o and generate CLIP embedding.
+    
+    This runs after the upload endpoint returns success to the user.
+    """
+    db = SessionLocal()
+    try:
+        # Get asset record
+        asset = db.query(Asset).filter(Asset.id == asset_id).first()
+        if not asset:
+            logger.error(f"Asset {asset_id} not found for analysis")
+            return
+        
+        # Generate presigned URL for GPT-4o (valid for 1 hour)
+        from app.services.s3 import s3_client
+        presigned_url = s3_client.generate_presigned_url(asset.s3_key, expiration=3600)
+        
+        # Step 1: GPT-4o Analysis
+        try:
+            logger.info(f"Starting GPT-4o analysis for asset {asset_id}")
+            analysis_result = asset_analysis_service.analyze_reference_asset(
+                image_url=presigned_url,
+                user_provided_name=user_provided_name,
+                user_provided_description=user_provided_description
+            )
+            
+            # Log the full analysis result for debugging
+            logger.info(f"GPT-4o analysis result for asset {asset_id}: {analysis_result}")
+            logger.info(f"asset_type from analysis: {analysis_result.get('asset_type')} (type: {type(analysis_result.get('asset_type'))})")
+            
+            # Extract fields from analysis
+            asset.analysis = analysis_result
+            asset.primary_object = analysis_result.get("primary_object")
+            asset.colors = analysis_result.get("colors", [])
+            asset.dominant_colors_rgb = analysis_result.get("dominant_colors_rgb", [])
+            asset.style_tags = analysis_result.get("style_tags", [])
+            asset.recommended_shot_types = analysis_result.get("recommended_shot_types", [])
+            asset.usage_contexts = analysis_result.get("usage_contexts", [])
+            asset.is_logo = analysis_result.get("is_logo", False)
+            asset.logo_position_preference = analysis_result.get("logo_position_preference")
+            
+            # Update reference_asset_type if not already set
+            if not asset.reference_asset_type and analysis_result.get("asset_type"):
+                asset_type_str = analysis_result["asset_type"].lower().strip()
+                # Validate it's a valid enum value
+                valid_values = {e.value for e in ReferenceAssetType}
+                if asset_type_str in valid_values:
+                    asset.reference_asset_type = asset_type_str
+                else:
+                    logger.warning(f"Invalid asset_type from GPT-4o: '{analysis_result.get('asset_type')}' (normalized: '{asset_type_str}')")
+            
+            logger.info(f"✓ GPT-4o analysis complete for asset {asset_id}")
+            
+            # Step 2: CLIP Embedding (only if GPT-4o succeeded)
+            try:
+                # Load image from file path
+                with Image.open(image_path) as img:
+                    # Convert to RGB if needed (CLIP expects RGB)
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    logger.info(f"Generating CLIP embedding for asset {asset_id}")
+                    embedding = clip_service.generate_image_embedding(img)
+                    
+                    # Store embedding (pgvector format)
+                    # Use raw SQL to set embedding since it's a pgvector type
+                    # Format: '[0.1, 0.2, ...]' as string for pgvector
+                    embedding_str = '[' + ','.join(str(f) for f in embedding) + ']'
+                    db.execute(
+                        text("UPDATE assets SET embedding = CAST(:embedding AS vector) WHERE id = :asset_id"),
+                        {"embedding": embedding_str, "asset_id": asset_id}
+                    )
+                    
+                    logger.info(f"✓ CLIP embedding generated for asset {asset_id}")
+            except Exception as e:
+                logger.error(f"Failed to generate CLIP embedding for asset {asset_id}: {str(e)}", exc_info=True)
+                # Continue without embedding - asset still has GPT-4o analysis
+            
+            db.commit()
+            logger.info(f"✓ Asset {asset_id} analysis complete and saved")
+            
+        except Exception as e:
+            logger.error(f"GPT-4o analysis failed for asset {asset_id}: {str(e)}", exc_info=True)
+            # Asset remains in database with basic metadata (no analysis)
+            db.rollback()
+        
+    finally:
+        db.close()
+        # Clean up temporary image file
+        if os.path.exists(image_path):
+            try:
+                os.unlink(image_path)
+            except Exception as e:
+                logger.warning(f"Failed to delete temp file {image_path}: {str(e)}")
+
+
 @router.post("/api/upload")
 async def upload_assets(
     files: List[UploadFile] = File(...),
     user_id: str = Depends(get_current_user),
     db: Session = Depends(get_db),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     # Optional form fields for reference assets
     name: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
@@ -137,6 +244,8 @@ async def upload_assets(
                 has_transparency = False
                 thumbnail_url = None
                 
+                # Keep image in memory for CLIP embedding (if it's an image)
+                image_for_analysis = None
                 if is_image:
                     try:
                         with Image.open(temp_path) as img:
@@ -146,6 +255,10 @@ async def upload_assets(
                             
                             # Generate and upload thumbnail
                             thumbnail_url = s3_client.upload_thumbnail(img, user_id, safe_filename)
+                            
+                            # Keep image copy for background analysis (save to new temp file)
+                            # We'll pass the temp_path to background task, but need to ensure it's not deleted
+                            image_for_analysis = temp_path
                     except Exception as e:
                         logger.warning(f"Failed to process image properties for {filename}: {str(e)}")
                 
@@ -199,6 +312,24 @@ async def upload_assets(
                 db.commit()
                 db.refresh(asset_record)
                 
+                # Trigger background analysis for images (reference assets)
+                if is_image and image_for_analysis:
+                    # Create a copy of the temp file for background task (since we'll delete original)
+                    import shutil
+                    analysis_temp_path = temp_path + "_analysis"
+                    shutil.copy2(temp_path, analysis_temp_path)
+                    
+                    # Add background task for analysis
+                    background_tasks.add_task(
+                        analyze_asset_background,
+                        asset_id=asset_id,
+                        s3_url=s3_url,
+                        image_path=analysis_temp_path,
+                        user_provided_name=asset_name,
+                        user_provided_description=description
+                    )
+                    logger.info(f"Queued background analysis for asset {asset_id}")
+                
                 uploaded_assets.append({
                     "asset_id": asset_id,
                     "filename": safe_filename,
@@ -209,11 +340,12 @@ async def upload_assets(
                     "s3_url": presigned_url,
                     "thumbnail_url": thumbnail_url,
                     "width": width,
-                    "height": height
+                    "height": height,
+                    "analysis_status": "pending" if is_image else None
                 })
                 
             finally:
-                # Clean up temporary file
+                # Clean up temporary file (background task has its own copy)
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
                     
@@ -285,7 +417,7 @@ async def get_assets(
             "filename": asset.file_name or "unknown",
             "name": asset.name or asset.file_name or "unknown",
             "asset_type": asset.asset_type.value,
-            "reference_asset_type": asset.reference_asset_type.value if asset.reference_asset_type else None,
+            "reference_asset_type": asset.reference_asset_type,
             "file_size_bytes": asset.file_size_bytes or 0,
             "s3_url": presigned_url,
             "thumbnail_url": asset.thumbnail_url,
@@ -332,7 +464,7 @@ async def get_asset(
         "name": asset.name or asset.file_name or "unknown",
         "description": asset.description,
         "asset_type": asset.asset_type.value,
-        "reference_asset_type": asset.reference_asset_type.value if asset.reference_asset_type else None,
+        "reference_asset_type": asset.reference_asset_type,
         "file_size_bytes": asset.file_size_bytes or 0,
         "mime_type": asset.mime_type,
         "s3_url": presigned_url,
@@ -405,7 +537,7 @@ async def update_asset(
         "filename": asset.file_name or "unknown",
         "name": asset.name or asset.file_name or "unknown",
         "description": asset.description,
-        "reference_asset_type": asset.reference_asset_type.value if asset.reference_asset_type else None,
+        "reference_asset_type": asset.reference_asset_type,
         "logo_position_preference": asset.logo_position_preference,
         "s3_url": presigned_url,
         "updated_at": asset.updated_at.isoformat() if asset.updated_at else None,
