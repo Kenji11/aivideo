@@ -15,6 +15,57 @@ from app.services.clip_embeddings import clip_service
 logger = logging.getLogger(__name__)
 
 
+def get_user_asset_library(user_id: str, db: Session) -> list[dict]:
+    """
+    Get all reference assets for a user with relevant metadata.
+    
+    Used by Phase 0 to fetch user's complete asset library for matching.
+    
+    Args:
+        user_id: User ID
+        db: Database session
+        
+    Returns:
+        List of asset dicts with metadata needed for matching:
+            - asset_id, asset_type, reference_asset_type
+            - name, primary_object, colors, style_tags
+            - recommended_shot_types, usage_contexts
+            - thumbnail_url, created_at, usage_count
+    """
+    try:
+        assets = db.query(Asset).filter(
+            Asset.user_id == user_id,
+            Asset.source == AssetSource.USER_UPLOAD.name  # User-uploaded assets only
+        ).all()
+        
+        # Convert to dicts with relevant metadata
+        asset_list = []
+        for asset in assets:
+            asset_dict = {
+                "asset_id": asset.id,
+                "asset_type": asset.asset_type.value if asset.asset_type else None,
+                "reference_asset_type": asset.reference_asset_type,
+                "name": asset.name,
+                "primary_object": asset.primary_object,
+                "colors": asset.colors or [],
+                "style_tags": asset.style_tags or [],
+                "recommended_shot_types": asset.recommended_shot_types or [],
+                "usage_contexts": asset.usage_contexts or [],
+                "thumbnail_url": asset.thumbnail_url,
+                "created_at": asset.created_at.isoformat() if asset.created_at else None,
+                "usage_count": asset.usage_count or 0,
+                "is_logo": asset.is_logo or False
+            }
+            asset_list.append(asset_dict)
+        
+        logger.info(f"Retrieved {len(asset_list)} assets for user {user_id}")
+        return asset_list
+        
+    except Exception as e:
+        logger.error(f"Error retrieving user asset library: {str(e)}", exc_info=True)
+        raise
+
+
 def cosine_distance(vec1: List[float], vec2: List[float]) -> float:
     """
     Calculate cosine distance between two vectors.
