@@ -53,7 +53,8 @@ async def generate_video(
         prompt=request.prompt,
         reference_assets=request.reference_assets,  # Store asset IDs
         status=VideoStatus.QUEUED,
-        progress=0.0
+        progress=0.0,
+        auto_continue=request.auto_continue  # YOLO mode flag
     )
     
     db.add(video_record)

@@ -83,6 +83,7 @@ class GenerateRequest(BaseModel):
     prompt: str = Field(..., min_length=10, max_length=1000)
     reference_assets: List[str] = Field(default_factory=list, description="List of asset IDs to use as references")
     model: Optional[str] = Field(None, description="Video generation model to use (e.g., 'hailuo', 'kling', 'sora'). Defaults to 'hailuo'")
+    auto_continue: bool = Field(False, description="YOLO mode: auto-approve checkpoints and run pipeline to completion without pausing")
 
 class GenerateResponse(BaseModel):
     """Response from generate endpoint"""

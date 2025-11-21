@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, DateTime, JSON, Enum as SQLEnum, Integer
+from sqlalchemy import Column, String, Float, DateTime, JSON, Enum as SQLEnum, Integer, Boolean
 from sqlalchemy.sql import func
 from app.database import Base
 import enum
@@ -79,6 +79,9 @@ class VideoGeneration(Base):
     progress = Column(Float, default=0.0)
     current_phase = Column(String, nullable=True)
     error_message = Column(String, nullable=True)
+
+    # Checkpoint settings
+    auto_continue = Column(Boolean, default=False)  # YOLO mode: auto-approve checkpoints
     
     # Phase Outputs
     animatic_urls = Column(JSON, default=list)
