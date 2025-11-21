@@ -25,31 +25,37 @@ class ProductSelectorService:
         self,
         user_assets: list[dict],
         entities: dict,
-        prompt: str
+        prompt: str,
+        product_mentioned: bool = False,
+        brand_mentioned: bool = False
     ) -> dict:
         """
         Select the best matching product from user's asset library.
         
-        Selection priority:
-        1. Exact product match: entities['product'] matches asset's primary_object
-        2. Brand match: entities['brand'] matches asset metadata
-        3. Category match: entities['product_category'] matches asset type → rank by style
-        4. Generic prompt: Rank all products by similarity, recency, popularity
-        5. Fallback: Most recently uploaded product
+        Flow logic:
+        - If product_mentioned = True OR brand_mentioned = True:
+            - Find MOST SIMILAR product using similarity ranking
+            - If similarity < 0.25, return None (empty)
+            - If similarity >= 0.25, return the best match
+        - If product_mentioned = False AND brand_mentioned = False:
+            - Rank all products by similarity + recency + popularity
+            - Fallback to most recently uploaded product if no good matches
         
         Args:
             user_assets: List of user's available assets with metadata
             entities: Extracted entities (product, brand, category, style_keywords)
             prompt: Original user prompt for semantic similarity
+            product_mentioned: Whether a specific product was mentioned in the prompt
+            brand_mentioned: Whether a specific brand was mentioned in the prompt
             
         Returns:
             dict with:
                 - selected_product: asset dict or None
-                - selected_logo: asset dict or None
                 - selection_rationale: string explaining selection
                 - confidence: float 0.0-1.0
         """
-        logger.info("Selecting best product from asset library")
+        specific_entity_mentioned = product_mentioned or brand_mentioned
+        logger.info(f"Selecting best product from asset library (product_mentioned={product_mentioned}, brand_mentioned={brand_mentioned})")
         
         # Filter to products only
         products = [
@@ -65,64 +71,44 @@ class ProductSelectorService:
                 "confidence": 0.0
             }
         
-        # Priority 1: Exact product match
-        if entities.get("product"):
-            product_name = entities["product"].lower()
-            for asset in products:
-                if asset.get("primary_object"):
-                    if product_name in asset["primary_object"].lower() or asset["primary_object"].lower() in product_name:
-                        logger.info(f"Exact product match found: {asset['name']}")
-                        return {
-                            "selected_product": asset,
-                            "selection_rationale": f"Exact match: prompt mentions '{entities['product']}', which matches asset '{asset.get('name', asset['primary_object'])}'",
-                            "confidence": 0.95
-                        }
-        
-        # Priority 2: Brand match
-        if entities.get("brand"):
-            brand_name = entities["brand"].lower()
-            for asset in products:
-                # Check in name, primary_object, or style_tags
-                matches_name = brand_name in asset.get("name", "").lower()
-                matches_object = brand_name in asset.get("primary_object", "").lower()
-                matches_tags = any(brand_name in tag.lower() for tag in asset.get("style_tags", []))
-                
-                if matches_name or matches_object or matches_tags:
-                    logger.info(f"Brand match found: {asset['name']}")
-                    return {
-                        "selected_product": asset,
-                        "selection_rationale": f"Brand match: prompt mentions '{entities['brand']}', which matches asset '{asset.get('name', asset['primary_object'])}'",
-                        "confidence": 0.90
-                    }
-        
-        # Priority 3: Category match → rank by style
-        if entities.get("product_category") and entities["product_category"] != "product":
-            category = entities["product_category"].lower()
-            category_matches = []
+        # Flow 2 & 3: Product or brand mentioned - use similarity-based selection with threshold
+        if specific_entity_mentioned:
+            entity_type = "product" if product_mentioned else "brand"
+            logger.info(f"{entity_type.capitalize()} mentioned in prompt - using similarity-based selection with threshold")
+            ranked_products = self.rank_products_by_similarity(products, prompt)
             
-            for asset in products:
-                # Check if category appears in name, primary_object, or style_tags
-                in_name = category in asset.get("name", "").lower()
-                in_object = category in asset.get("primary_object", "").lower()
-                in_tags = any(category in tag.lower() for tag in asset.get("style_tags", []))
-                
-                if in_name or in_object or in_tags:
-                    category_matches.append(asset)
+            if not ranked_products:
+                logger.info("No products ranked - returning empty")
+                return {
+                    "selected_product": None,
+                    "selection_rationale": f"{entity_type.capitalize()} mentioned but no suitable matches found",
+                    "confidence": 0.0
+                }
             
-            if category_matches:
-                # Rank by style similarity
-                ranked = self.rank_products_by_similarity(category_matches, prompt)
-                if ranked:
-                    best = ranked[0]
-                    logger.info(f"Category match with best style: {best['name']}")
-                    return {
-                        "selected_product": best,
-                        "selection_rationale": f"Category match: asset '{best.get('name', best['primary_object'])}' matches category '{entities['product_category']}' with best style similarity (score: {best.get('_rank_score', 0.0):.2f})",
-                        "confidence": 0.80
-                    }
+            best = ranked_products[0]
+            similarity_score = best.get("_similarity", 0.0)
+            
+            # Similarity threshold: 0.25
+            SIMILARITY_THRESHOLD = 0.25
+            if similarity_score < SIMILARITY_THRESHOLD:
+                logger.info(f"Best match similarity ({similarity_score:.2f}) below threshold ({SIMILARITY_THRESHOLD}) - returning empty")
+                return {
+                    "selected_product": None,
+                    "selection_rationale": f"{entity_type.capitalize()} mentioned but best match similarity ({similarity_score:.2f}) is below threshold ({SIMILARITY_THRESHOLD})",
+                    "confidence": similarity_score
+                }
+            
+            logger.info(f"Best match found: {best['name']} (similarity: {similarity_score:.2f})")
+            return {
+                "selected_product": best,
+                "selection_rationale": f"{entity_type.capitalize()} mentioned: selected most similar product '{best.get('name', best['primary_object'])}' (similarity: {similarity_score:.2f})",
+                "confidence": similarity_score
+            }
         
-        # Priority 4: Generic prompt → rank all by similarity + recency + popularity
+        # Flow 1: No product or brand mentioned - use fallback flow (rank all or most recent)
+        logger.info("No product or brand mentioned - using fallback flow")
         ranked_products = self.rank_products_by_similarity(products, prompt)
+        
         if ranked_products:
             best = ranked_products[0]
             logger.info(f"Best match from ranking: {best['name']}")
@@ -132,7 +118,7 @@ class ProductSelectorService:
                 "confidence": 0.70
             }
         
-        # Priority 5: Fallback → most recent
+        # Fallback: Most recent product
         most_recent = max(products, key=lambda x: x.get("created_at", ""))
         logger.info(f"Fallback to most recent: {most_recent['name']}")
         return {
@@ -263,8 +249,10 @@ class ProductSelectorService:
             
         except Exception as e:
             logger.error(f"Error ranking products: {e}", exc_info=True)
-            # Fallback: sort by recency
+            # Fallback: sort by recency, set similarity to 0.0 since we couldn't calculate it
             logger.warning("Falling back to recency-based sorting")
+            for product in products:
+                product["_similarity"] = 0.0
             return sorted(products, key=lambda x: x.get("created_at", ""), reverse=True)
     
     def _fetch_product_embeddings(self, db: Session, products: list[dict]) -> dict:
