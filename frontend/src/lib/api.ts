@@ -145,6 +145,7 @@ export interface AssetListItem {
   is_logo?: boolean;
   primary_object?: string;  // For hover tooltip
   analysis?: any;  // Analysis status indicator
+  similarity_score?: number;  // For search results
   created_at?: string;
 }
 
@@ -342,6 +343,49 @@ export const api = {
    */
   async deleteVideo(videoId: string): Promise<void> {
     await apiClient.delete(`/api/video/${videoId}`);
+  },
+
+  /**
+   * Search assets by text query
+   */
+  async searchAssets(params: {
+    q: string;
+    asset_type?: string;
+    limit?: number;
+  }): Promise<AssetListResponse & { query: string }> {
+    const response = await apiClient.get<AssetListResponse & { query: string }>('/api/assets/search', { params });
+    return response.data;
+  },
+
+  /**
+   * Find similar assets to a given asset
+   */
+  async getSimilarAssets(
+    assetId: string,
+    params?: {
+      limit?: number;
+      exclude_self?: boolean;
+    }
+  ): Promise<AssetListResponse & { reference_asset_id: string }> {
+    const response = await apiClient.get<AssetListResponse & { reference_asset_id: string }>(
+      `/api/assets/${assetId}/similar`,
+      { params }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get style-consistent asset recommendations
+   */
+  async recommendAssets(selectedAssetIds: string[], limit?: number): Promise<AssetListResponse & { selected_asset_ids: string[] }> {
+    const response = await apiClient.post<AssetListResponse & { selected_asset_ids: string[] }>(
+      '/api/assets/recommend',
+      {
+        selected_asset_ids: selectedAssetIds,
+        limit: limit || 10,
+      }
+    );
+    return response.data;
   },
 };
 

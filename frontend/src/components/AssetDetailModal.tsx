@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api, AssetDetail } from '../lib/api';
-import { X, Edit2, Save, Trash2, Image as ImageIcon } from 'lucide-react';
+import { X, Edit2, Save, Trash2, Image as ImageIcon, Search, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -40,6 +40,10 @@ export function AssetDetailModal({ isOpen, onClose, assetId }: AssetDetailModalP
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [similarAssets, setSimilarAssets] = useState<AssetDetail[]>([]);
+  const [isLoadingSimilar, setIsLoadingSimilar] = useState(false);
+  const [showSimilar, setShowSimilar] = useState(false);
+  const similarAssetsRef = useRef<HTMLDivElement>(null);
   
   // Editable fields
   const [name, setName] = useState('');
@@ -104,6 +108,28 @@ export function AssetDetailModal({ isOpen, onClose, assetId }: AssetDetailModalP
     }
   };
 
+  const handleFindSimilar = async () => {
+    setIsLoadingSimilar(true);
+    setShowSimilar(true);
+    try {
+      const response = await api.getSimilarAssets(assetId, { limit: 10 });
+      setSimilarAssets(response.assets as AssetDetail[]);
+      // Scroll to similar assets section after results load
+      setTimeout(() => {
+        similarAssetsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 100);
+    } catch (error) {
+      console.error('Failed to find similar assets:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to find similar assets',
+      });
+    } finally {
+      setIsLoadingSimilar(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!asset) return;
     if (!confirm('Are you sure you want to delete this asset? This action cannot be undone.')) {
@@ -155,6 +181,10 @@ export function AssetDetailModal({ isOpen, onClose, assetId }: AssetDetailModalP
             <div className="flex items-center gap-2">
               {!isEditing ? (
                 <>
+                  <Button variant="outline" size="sm" onClick={handleFindSimilar} disabled={isLoadingSimilar}>
+                    <Search className="w-4 h-4 mr-2" />
+                    {isLoadingSimilar ? 'Finding...' : 'Find Similar'}
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
                     <Edit2 className="w-4 h-4 mr-2" />
                     Edit
@@ -464,6 +494,58 @@ export function AssetDetailModal({ isOpen, onClose, assetId }: AssetDetailModalP
               </div>
             </div>
           </div>
+
+          {/* Similar Assets Section */}
+          {showSimilar && (
+            <div ref={similarAssetsRef} className="col-span-full mt-6 pt-6 border-t border-border">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-foreground">Similar Assets</h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowSimilar(false)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              {isLoadingSimilar ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : similarAssets.length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {similarAssets.map((similar) => (
+                    <div
+                      key={similar.asset_id}
+                      className="group relative aspect-square bg-muted rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                      onClick={() => {
+                        // Close current modal and open new one (parent should handle this)
+                        onClose();
+                        // Note: This would need to be handled by parent component
+                        // For now, just show the asset in a new modal would require parent state management
+                      }}
+                    >
+                      <img
+                        src={similar.thumbnail_url || similar.s3_url}
+                        alt={similar.name || similar.filename}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                        <p className="text-xs font-medium text-white truncate">
+                          {similar.name || similar.filename}
+                        </p>
+                        {similar.similarity_score !== undefined && (
+                          <p className="text-xs text-white/80">
+                            {(similar.similarity_score * 100).toFixed(0)}% match
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No similar assets found
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

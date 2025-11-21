@@ -293,7 +293,7 @@ async def upload_assets(
                     s3_key=s3_key,
                     s3_url=presigned_url,
                     asset_type=asset_type,
-                    source=AssetSource.USER_UPLOAD,
+                    source=AssetSource.USER_UPLOAD.name,  # Use .name to get "USER_UPLOAD" for database enum
                     file_name=safe_filename,
                     file_size_bytes=file_size,
                     mime_type=mime_type,
@@ -366,74 +366,6 @@ async def upload_assets(
         response_data["partial_success"] = True
     
     return JSONResponse(content=response_data)
-
-
-@router.get("/api/assets")
-async def get_assets(
-    user_id: str = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    reference_asset_type: Optional[str] = Query(None, description="Filter by reference asset type"),
-    is_logo: Optional[bool] = Query(None, description="Filter by logo flag"),
-    limit: Optional[int] = Query(20, ge=1, le=100, description="Number of results per page"),
-    offset: Optional[int] = Query(0, ge=0, description="Offset for pagination")
-):
-    """
-    Get all assets for the authenticated user.
-    
-    Supports filtering by reference_asset_type and is_logo, with pagination.
-    Returns list of assets with metadata including presigned URLs for access.
-    """
-    # Query assets for the authenticated user only
-    query = db.query(Asset).filter(
-        Asset.user_id == user_id,
-        Asset.source == AssetSource.USER_UPLOAD
-    )
-    
-    # Apply filters
-    if reference_asset_type:
-        try:
-            ref_type = ReferenceAssetType(reference_asset_type.lower())
-            query = query.filter(Asset.reference_asset_type == ref_type)
-        except ValueError:
-            pass  # Invalid type, ignore filter
-    
-    if is_logo is not None:
-        query = query.filter(Asset.is_logo == is_logo)
-    
-    # Get total count before pagination
-    total = query.count()
-    
-    # Apply pagination and ordering
-    assets = query.order_by(Asset.created_at.desc()).offset(offset).limit(limit).all()
-    
-    # Convert to response format
-    asset_list = []
-    for asset in assets:
-        # Generate fresh presigned URL (7 days expiration)
-        presigned_url = s3_client.generate_presigned_url(asset.s3_key, expiration=3600 * 24 * 7)
-        
-        asset_list.append({
-            "asset_id": asset.id,
-            "filename": asset.file_name or "unknown",
-            "name": asset.name or asset.file_name or "unknown",
-            "asset_type": asset.asset_type.value,
-            "reference_asset_type": asset.reference_asset_type,
-            "file_size_bytes": asset.file_size_bytes or 0,
-            "s3_url": presigned_url,
-            "thumbnail_url": asset.thumbnail_url,
-            "width": asset.width,
-            "height": asset.height,
-            "is_logo": asset.is_logo,
-            "created_at": asset.created_at.isoformat() if asset.created_at else None,
-        })
-    
-    return {
-        "assets": asset_list,
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-        "user_id": user_id
-    }
 
 
 @router.get("/api/assets/{asset_id}")
