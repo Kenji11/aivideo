@@ -122,7 +122,7 @@ def plan_video_intelligent(
             # Try gpt-4o-mini first
             try:
                 logger.info("   Attempting gpt-4o-mini...")
-                result = plan_with_gpt4o_mini(video_id, prompt, creativity_level, start_time, reference_context)
+                result = plan_with_gpt4o_mini(video_id, prompt, creativity_level, start_time, reference_context, phase0_output)
                 logger.info("✅ gpt-4o-mini succeeded")
                 return result
             
@@ -131,7 +131,7 @@ def plan_video_intelligent(
                 
                 if GPT4O_MINI_FALLBACK:
                     logger.info("🔄 Falling back to gpt-4-turbo-preview")
-                    result = plan_with_gpt4_turbo(video_id, prompt, creativity_level, start_time, reference_context)
+                    result = plan_with_gpt4_turbo(video_id, prompt, creativity_level, start_time, reference_context, phase0_output)
                     logger.info("✅ gpt-4-turbo-preview fallback succeeded")
                     return result
                 else:
@@ -139,7 +139,7 @@ def plan_video_intelligent(
         else:
             # Use gpt-4-turbo-preview directly
             logger.info("   Using gpt-4-turbo-preview (direct)")
-            result = plan_with_gpt4_turbo(video_id, prompt, creativity_level, start_time, reference_context)
+            result = plan_with_gpt4_turbo(video_id, prompt, creativity_level, start_time, reference_context, phase0_output)
             logger.info("✅ gpt-4-turbo-preview succeeded")
             return result
         
@@ -169,7 +169,8 @@ def plan_with_gpt4o_mini(
     prompt: str,
     creativity_level: float,
     start_time: float,
-    reference_context: dict = None
+    reference_context: dict = None,
+    phase0_output: dict = None
 ) -> dict:
     """
     Plan video using gpt-4o-mini with Structured Outputs.
@@ -277,7 +278,8 @@ def plan_with_gpt4_turbo(
     prompt: str,
     creativity_level: float,
     start_time: float,
-    reference_context: dict = None
+    reference_context: dict = None,
+    phase0_output: dict = None
 ) -> dict:
     """
     Plan video using gpt-4-turbo-preview with JSON mode (fallback or direct use).
@@ -442,17 +444,35 @@ def build_reference_asset_guidelines(reference_context: dict) -> str:
         logger.info("📋 No reference assets to include in prompt")
         return ""
     
-    section = "\n===== REFERENCE ASSETS =====\n\n"
+    product_id = recommended_product.get('asset_id') if recommended_product else None
+    product_name = recommended_product.get('name', 'Product') if recommended_product else None
+    logo_id = recommended_logo.get('asset_id') if recommended_logo else None
+    logo_name = recommended_logo.get('name', 'Logo') if recommended_logo else None
     
-    if recommended_product:
-        product_id = recommended_product.get('asset_id')
-        product_name = recommended_product.get('name', 'Product')
-        section += f"User has uploaded product '{product_name}' (ID: {product_id}) - decide when/if to include in beats using reference_mapping.\n"
+    # Build example mapping parts
+    product_example = f'    "hero_shot": {{\n      "asset_ids": ["{product_id}"],\n      "usage_type": "product",\n      "rationale": "Hero shot showcases the product"\n    }}' if recommended_product else ''
+    logo_example = f'    "call_to_action": {{\n      "asset_ids": ["{logo_id}"],\n      "usage_type": "logo",\n      "rationale": "Closing beat includes brand logo"\n    }}' if recommended_logo else ''
+    comma = ',' if (recommended_product and recommended_logo) else ''
     
-    if recommended_logo:
-        logo_id = recommended_logo.get('asset_id')
-        logo_name = recommended_logo.get('name', 'Logo')
-        section += f"User has uploaded logo '{logo_name}' (ID: {logo_id}) - always include in closing beats using reference_mapping.\n"
+    section = f"""
+===== REFERENCE ASSETS =====
+
+{'' if not recommended_product else f"User has uploaded product '{product_name}' (ID: {product_id}) - decide when/if to include in beats using reference_mapping."}
+{'' if not recommended_logo else f"User has uploaded logo '{logo_name}' (ID: {logo_id}) - always include in closing beats using reference_mapping."}
+
+**CRITICAL: reference_mapping Structure**
+Keys MUST be beat_ids from your beat_sequence (e.g., 'hero_shot', 'dynamic_intro'), NOT asset IDs.
+
+**Example reference_mapping:**
+```json
+{{
+  "reference_mapping": {{
+{product_example}{comma}
+{logo_example}
+  }}
+}}
+```
+"""
     
     logger.info("📋 Built reference asset guidelines section:")
     logger.info(section)

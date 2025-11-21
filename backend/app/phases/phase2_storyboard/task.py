@@ -10,7 +10,7 @@ import logging
 from app.orchestrator.celery_app import celery_app
 from app.common.schemas import PhaseOutput
 from app.phases.phase2_storyboard.image_generation import generate_beat_image
-from app.common.constants import COST_FLUX_DEV_IMAGE
+from app.common.constants import COST_FLUX_DEV_IMAGE, COST_FLUX_DEV_CONTROLNET_IMAGE
 from app.common.exceptions import PhaseException
 from app.orchestrator.progress import update_progress, update_cost
 from app.database import SessionLocal
@@ -106,8 +106,11 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None, re
                 all_referenced_asset_ids.update(referenced_assets)
                 logger.info(f"  Referenced assets: {referenced_assets}")
             
-            # Track cost (FLUX Dev: $0.025 per image)
-            total_cost += COST_FLUX_DEV_IMAGE
+            # Track cost (varies based on whether ControlNet was used)
+            if beat_image_info.get('used_controlnet'):
+                total_cost += COST_FLUX_DEV_CONTROLNET_IMAGE
+            else:
+                total_cost += COST_FLUX_DEV_IMAGE
             
             logger.info(
                 f"✅ Generated storyboard image {beat_index + 1}/{len(beats)}: "
