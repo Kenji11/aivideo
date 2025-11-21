@@ -108,3 +108,55 @@ class AssetListResponse(BaseModel):
     assets: List[AssetListItem]
     total: int
     user_id: str
+
+# ============ Checkpoint Schemas ============
+
+class ArtifactResponse(BaseModel):
+    """Artifact response schema"""
+    id: str
+    artifact_type: str
+    artifact_key: str
+    s3_url: str
+    version: int
+    metadata: Optional[Dict] = None
+    created_at: datetime
+
+class CheckpointResponse(BaseModel):
+    """Checkpoint response schema"""
+    id: str
+    video_id: str
+    branch_name: str
+    phase_number: int
+    version: int
+    status: str
+    approved_at: Optional[datetime] = None
+    created_at: datetime
+    cost_usd: float
+    parent_checkpoint_id: Optional[str] = None
+    artifacts: List[ArtifactResponse] = Field(default_factory=list)
+    user_id: str
+    edit_description: Optional[str] = None
+
+class CheckpointTreeNode(BaseModel):
+    """Checkpoint tree node for hierarchical display"""
+    checkpoint: CheckpointResponse
+    children: List['CheckpointTreeNode'] = Field(default_factory=list)
+
+class BranchInfo(BaseModel):
+    """Active branch information"""
+    branch_name: str
+    latest_checkpoint_id: str
+    phase_number: int
+    status: str
+    can_continue: bool
+
+class ContinueRequest(BaseModel):
+    """Request to continue pipeline from checkpoint"""
+    checkpoint_id: str
+
+class ContinueResponse(BaseModel):
+    """Response from continue endpoint"""
+    message: str
+    next_phase: int
+    branch_name: str
+    created_new_branch: bool

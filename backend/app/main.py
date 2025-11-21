@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import generate, status, video, health, upload
+from app.api import generate, status, video, health, upload, checkpoints
 from app.database import init_db
 from app.common.logging import setup_logging
 from app.services.firebase_auth import initialize_firebase
@@ -50,6 +50,7 @@ app.include_router(generate.router, tags=["generation"])
 app.include_router(status.router, tags=["status"])
 app.include_router(video.router, tags=["video"])
 app.include_router(upload.router, tags=["upload"])
+app.include_router(checkpoints.router, tags=["checkpoints"])
 
 # Startup event
 @app.on_event("startup")
