@@ -110,8 +110,8 @@ function AppContent() {
     if (project.status === 'complete' && project.final_video_url) {
       setTitle(project.title);
       navigate(`/preview/${project.video_id}`);
-    } else if (project.status !== 'complete' && project.status !== 'failed') {
-      // Navigate to processing page for videos that are still processing
+    } else if (project.status !== 'complete') {
+      // Navigate to processing page for videos that are still processing or failed
       navigate(`/processing/${project.video_id}`);
     }
   };

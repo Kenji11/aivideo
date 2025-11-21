@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Video } from 'lucide-react';
+import { Video, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import { Button } from '../components/ui/button';
 import { ProcessingSteps } from '../components/ProcessingSteps';
 import { NotificationCenter, Notification } from '../components/NotificationCenter';
 import { CheckpointCard } from '../components/CheckpointCard';
@@ -29,6 +31,10 @@ export function VideoStatus() {
   const [totalChunks, setTotalChunks] = useState<number | null>(null);
   const [currentPhase, setCurrentPhase] = useState<string | undefined>(undefined);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [failedPhase, setFailedPhase] = useState<{
+    phase: string;
+    error: string;
+  } | null>(null);
 
   // Checkpoint state
   const [currentCheckpoint, setCurrentCheckpoint] = useState<CheckpointInfo | null>(null);
@@ -81,11 +87,11 @@ export function VideoStatus() {
 
   // Checkpoint handlers
   const handleContinue = async () => {
-    if (!currentCheckpoint || !videoId || isContinuing) return;
+    if (!activeCheckpoint || !videoId || isContinuing) return;
 
     setIsContinuing(true);
     try {
-      const response = await continueVideo(videoId, currentCheckpoint.checkpoint_id);
+      const response = await continueVideo(videoId, activeCheckpoint.checkpoint_id);
 
       if (response.created_new_branch) {
         toast({
@@ -280,6 +286,12 @@ export function VideoStatus() {
       console.error('[VideoStatus] Video generation failed:', status.error);
       setIsProcessing(false);
       addNotification('error', 'Generation Failed', status.error || 'Unknown error');
+
+      // Track failed phase for display
+      setFailedPhase({
+        phase: status.current_phase || 'unknown',
+        error: status.error || 'Unknown error',
+      });
     }
   }, [streamStatus, isProcessing, navigate, videoId]);
 
@@ -302,6 +314,113 @@ export function VideoStatus() {
     return () => clearInterval(interval);
   }, [isProcessing]);
 
+  // Filter checkpoint tree to only show checkpoints before the failed phase
+  const filteredCheckpointTree = useMemo(() => {
+    if (!failedPhase) return checkpointTree;
+
+    // Extract phase number from failed phase (e.g., "phase2_storyboard" -> 2)
+    const match = failedPhase.phase.match(/phase(\d+)/);
+    if (!match) return checkpointTree;
+
+    const failedPhaseNumber = parseInt(match[1]);
+
+    // Recursively filter checkpoint tree nodes
+    const filterNodes = (nodes: CheckpointTreeNode[]): CheckpointTreeNode[] => {
+      return nodes
+        .filter(node => node.checkpoint.phase_number < failedPhaseNumber)
+        .map(node => ({
+          ...node,
+          children: filterNodes(node.children)
+        }));
+    };
+
+    return filterNodes(checkpointTree);
+  }, [checkpointTree, failedPhase]);
+
+  // Get the last checkpoint from filtered tree (for failed videos where current_checkpoint is null)
+  const lastCheckpointFromTree = useMemo(() => {
+    // Find the last checkpoint in the filtered tree (deepest, rightmost)
+    const findLastCheckpoint = (nodes: CheckpointTreeNode[]): CheckpointInfo | null => {
+      if (nodes.length === 0) return null;
+
+      // Get the last node at this level
+      const lastNode = nodes[nodes.length - 1];
+
+      // Check if it has children (go deeper if it does)
+      const childCheckpoint = findLastCheckpoint(lastNode.children);
+      if (childCheckpoint) return childCheckpoint;
+
+      // Convert CheckpointResponse to CheckpointInfo
+      const response = lastNode.checkpoint;
+      const artifactsRecord: Record<string, any> = {};
+      if (response.artifacts) {
+        response.artifacts.forEach(artifact => {
+          artifactsRecord[artifact.artifact_key] = artifact;
+        });
+      }
+
+      return {
+        checkpoint_id: response.id,
+        branch_name: response.branch_name,
+        phase_number: response.phase_number,
+        version: response.version,
+        status: response.status,
+        created_at: response.created_at,
+        artifacts: artifactsRecord,
+      };
+    };
+
+    return findLastCheckpoint(filteredCheckpointTree);
+  }, [filteredCheckpointTree]);
+
+  // Use either current checkpoint or last checkpoint from tree
+  const activeCheckpoint = currentCheckpoint || lastCheckpointFromTree;
+
+  // Render error card for failed phase
+  const renderFailedPhaseCard = () => {
+    if (!failedPhase) return null;
+
+    return (
+      <div className="card p-6 border-destructive/50 bg-destructive/5">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 mt-0.5">
+            <AlertCircle className="w-5 h-5 text-destructive" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-semibold text-foreground mb-1">
+              Phase Failed: {failedPhase.phase}
+            </h3>
+            <Alert variant="destructive" className="mt-2">
+              <AlertDescription className="text-sm">
+                {failedPhase.error}
+              </AlertDescription>
+            </Alert>
+
+            {/* Action buttons */}
+            {activeCheckpoint && (
+              <div className="flex gap-2 mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleEdit}
+                  disabled={isContinuing}
+                >
+                  Edit Previous Phase
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleContinue}
+                  disabled={isContinuing}
+                >
+                  {isContinuing ? 'Retrying...' : 'Retry from Last Checkpoint'}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -326,10 +445,10 @@ export function VideoStatus() {
         </div>
 
         {/* Checkpoint UI */}
-        {currentCheckpoint && videoId && (
+        {(currentCheckpoint || failedPhase) && videoId && (
           <div className="mt-8 pt-8 border-t border-border max-w-4xl mx-auto space-y-6">
             {/* Branch Selector */}
-            {activeBranches.length > 0 && (
+            {activeBranches.length > 0 && currentCheckpoint && (
               <div className="flex justify-end">
                 <BranchSelector
                   branches={activeBranches}
@@ -339,31 +458,38 @@ export function VideoStatus() {
               </div>
             )}
 
-            {/* Current Checkpoint Card */}
-            <CheckpointCard
-              checkpoint={currentCheckpoint}
-              videoId={videoId}
-              onEdit={handleEdit}
-              onContinue={handleContinue}
-              isProcessing={isContinuing}
-            />
+            {/* Current Checkpoint Card (if exists) */}
+            {currentCheckpoint && (
+              <CheckpointCard
+                checkpoint={currentCheckpoint}
+                videoId={videoId}
+                onEdit={handleEdit}
+                onContinue={handleContinue}
+                isProcessing={isContinuing}
+              />
+            )}
+
+            {/* Failed Phase Card (if exists) */}
+            {failedPhase && renderFailedPhaseCard()}
 
             {/* Checkpoint Tree */}
-            {checkpointTree.length > 0 && (
+            {filteredCheckpointTree.length > 0 && (
               <CheckpointTree
-                tree={checkpointTree}
-                currentCheckpointId={currentCheckpoint.checkpoint_id}
+                tree={filteredCheckpointTree}
+                currentCheckpointId={activeCheckpoint?.checkpoint_id}
               />
             )}
 
             {/* Artifact Editor Modal */}
-            <ArtifactEditor
-              open={editDialogOpen}
-              onOpenChange={setEditDialogOpen}
-              checkpoint={currentCheckpoint}
-              videoId={videoId}
-              onArtifactUpdated={handleArtifactUpdated}
-            />
+            {activeCheckpoint && (
+              <ArtifactEditor
+                open={editDialogOpen}
+                onOpenChange={setEditDialogOpen}
+                checkpoint={activeCheckpoint}
+                videoId={videoId}
+                onArtifactUpdated={handleArtifactUpdated}
+              />
+            )}
           </div>
         )}
 

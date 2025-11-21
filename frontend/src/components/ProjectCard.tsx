@@ -29,8 +29,11 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
   const hasVideo = project.final_video_url || project.status === 'complete';
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg group cursor-pointer animate-fade-in">
-      <div 
+    <Card
+      className="overflow-hidden hover:shadow-lg group cursor-pointer animate-fade-in"
+      title={project.status === 'failed' ? 'Click to view error details' : undefined}
+    >
+      <div
         className="aspect-video bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center relative overflow-hidden"
         onClick={() => onSelect?.(project)}
       >
