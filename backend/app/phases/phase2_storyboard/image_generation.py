@@ -263,8 +263,8 @@ def generate_beat_image(
                                     control_strength=0.5,  # ControlNet strength for edge structure (default for Canny)
                                     aspect_ratio="16:9",
                                     negative_prompt=negative_prompt,
-                                    steps=40,  # Higher steps for better quality
-                                    guidance_scale=4.0,  # Higher guidance for better prompt adherence
+                                    steps=45,  # Higher steps for better quality
+                                    guidance_scale=5.0,  # Higher guidance for better prompt adherence
                                     reference_image_path=product_image_path,  # Original product/image asset for image-to-image
                                     image_to_image_strength=image_to_image_strength  # 0.25 for logo scenes, 0.15 for product-only
                                 )
@@ -301,6 +301,7 @@ def generate_beat_image(
                     "aspect_ratio": "16:9",  # 1280x720 aspect ratio
                     "output_format": "png",
                     "output_quality": 90,  # High quality for storyboards
+                    "guidance": 5.0,  # Higher guidance for better prompt adherence
                 },
                 timeout=60
             )
