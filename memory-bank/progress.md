@@ -34,10 +34,14 @@
 - [x] **Today**: Respect user-specified durations (override ad optimization)
 - [x] **Today**: Enhanced logging (duration optimization + chunk calculation)
 
-### Phase 2: Animatic Generation
+### Phase 2: Storyboard Generation
 - [x] Initial implementation complete
-- [x] **Temporarily disabled for MVP** (simpler workflow)
-- [x] May re-enable post-MVP for multi-image consistency
+- [x] **PR #5**: ControlNet integration for product consistency ✅
+- [x] ControlNet preprocessing service (Canny edge detection with OpenCV)
+- [x] ControlNet generation using flux-dev-controlnet ($0.058/image)
+- [x] Dual-path generation: ControlNet when product references exist, regular flux-dev fallback
+- [x] Reference mapping integration (beat_ids as keys)
+- [x] Cost tracking for both paths (ControlNet vs regular flux-dev)
 
 ### Phase 3: Reference Assets (REMOVED in PR #11)
 - [x] **PR #11**: Removed phase3_references from pipeline ✅
@@ -118,6 +122,7 @@
 11. ✅ **PR #11**: Phase cleanup and renaming - sequential structure (phase1 → phase2 → phase3 → phase4)
 12. ✅ **PR #1 (Reference Assets)**: Database schema, S3 structure, API endpoints, frontend UI ✅
 13. ✅ **PR #3 (Semantic Search)**: CLIP embeddings, pgvector similarity search, search API endpoints, frontend search UI ✅
+14. ✅ **PR #5 (ControlNet)**: ControlNet preprocessing and generation service, Phase 2 integration, reference mapping fix ✅
 
 ---
 

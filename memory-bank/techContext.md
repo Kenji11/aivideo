@@ -26,6 +26,7 @@
 - **OpenAI**: GPT-4 Turbo (prompt validation & beat composition)
 - **Replicate API**:
   - FLUX Dev: Storyboard image generation (Phase 2) - $0.025/image
+  - FLUX Dev ControlNet: Storyboard with product references (Phase 2) - $0.058/image
   - Hailuo 2.3 Fast: Video generation (default) - $0.04/5s chunk
   - Veo 3.1 Fast: Video generation (native audio) - $0.50/5s chunk
   - MusicGen: Background music generation (Phase 5) - $0.15/video
@@ -169,6 +170,7 @@ python-multipart==0.0.6        # File uploads
 torch>=2.0.0                   # PyTorch (for CLIP)
 transformers>=4.30.0           # Hugging Face (for CLIP)
 pillow>=10.0.0                 # Image processing
+opencv-python>=4.8.0           # Image preprocessing for ControlNet (Canny edge detection)
 numpy>=1.24.0                  # Numerical operations (for embeddings)
 pgvector                       # PostgreSQL vector extension (via migration)
 ```
@@ -191,6 +193,8 @@ pgvector                       # PostgreSQL vector extension (via migration)
 
 ### Replicate API
 - **Rate Limits**: 50 concurrent predictions per account
+- **FLUX Dev**: $0.025 per image (regular storyboard generation)
+- **FLUX Dev ControlNet**: $0.058 per image (storyboard with product references)
 - **SDXL**: $0.0055 per image
 - **Zeroscope**: ~$0.10 per 2s video chunk
 - **AnimateDiff**: ~$0.20 per 2s video chunk

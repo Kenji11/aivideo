@@ -58,13 +58,20 @@ Each video generation flows through 6 sequential phases:
 - Key Change: LLM composes custom sequences, not just template selection
 
 **Phase 2: Storyboard Generation (TDD v2.0)** ✅ ACTIVE
-- Input: Spec with beats from Phase 1
-- Process: Generate 1 SDXL image per beat (1:1 mapping)
+- Input: Spec with beats from Phase 1 + reference_mapping (from Phase 1)
+- Process: Generate 1 image per beat (1:1 mapping) with dual-path generation
+  - **ControlNet Path** (when product reference exists):
+    - Download product image from S3
+    - Preprocess with Canny edge detection (OpenCV)
+    - Generate with flux-dev-controlnet ($0.058/image)
+  - **Regular Path** (no product reference):
+    - Generate with regular flux-dev ($0.025/image)
 - Output: N storyboard images (N = number of beats)
-- Cost: $0.0055 per image | Time: ~8s per image
-- Key Change: REPLACES Phase 3 reference generation
+- Cost: $0.025 (regular) or $0.058 (ControlNet) per image | Time: ~8s per image
+- Key Change: REPLACES Phase 3 reference generation, adds ControlNet for product consistency
 - Images used at beat boundaries in Phase 4
 - Example: 3 beats = 3 images, 6 beats = 6 images
+- Reference Mapping: Uses beat_ids as keys to look up product references per beat
 
 **Phase 3: Reference Assets** ❌ DISABLED (TDD v2.0)
 - Status: Explicitly disabled, kept in codebase for backward compatibility
