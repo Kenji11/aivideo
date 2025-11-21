@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -19,6 +21,58 @@ class PhaseOutput(BaseModel):
     duration_seconds: float
     error_message: Optional[str] = None
     checkpoint_id: Optional[str] = None  # ID of checkpoint created by this phase
+
+# ============ Checkpoint Schemas (Status-related) ============
+# These need to be defined before StatusResponse
+
+class ArtifactResponse(BaseModel):
+    """Artifact response schema"""
+    id: str
+    artifact_type: str
+    artifact_key: str
+    s3_url: str
+    version: int
+    metadata: Optional[Dict] = None
+    created_at: datetime
+
+class CheckpointResponse(BaseModel):
+    """Checkpoint response schema"""
+    id: str
+    video_id: str
+    branch_name: str
+    phase_number: int
+    version: int
+    status: str
+    approved_at: Optional[datetime] = None
+    created_at: datetime
+    cost_usd: float
+    parent_checkpoint_id: Optional[str] = None
+    artifacts: List[ArtifactResponse] = Field(default_factory=list)
+    user_id: str
+    edit_description: Optional[str] = None
+
+class CheckpointTreeNode(BaseModel):
+    """Checkpoint tree node for hierarchical display"""
+    checkpoint: CheckpointResponse
+    children: List[CheckpointTreeNode] = Field(default_factory=list)
+
+class BranchInfo(BaseModel):
+    """Active branch information"""
+    branch_name: str
+    latest_checkpoint_id: str
+    phase_number: int
+    status: str
+    can_continue: bool
+
+class CheckpointInfo(BaseModel):
+    """Current checkpoint information for status endpoint"""
+    checkpoint_id: str
+    branch_name: str
+    phase_number: int
+    version: int
+    status: str
+    created_at: datetime
+    artifacts: Dict[str, ArtifactResponse] = Field(default_factory=dict)  # Keyed by artifact_key
 
 # ============ API Schemas ============
 
@@ -50,6 +104,11 @@ class StatusResponse(BaseModel):
     final_video_url: Optional[str] = None  # Phase 5 final video (with audio)
     current_chunk_index: Optional[int] = None  # Current chunk being processed in Phase 4
     total_chunks: Optional[int] = None  # Total number of chunks in Phase 4
+
+    # Checkpoint fields
+    current_checkpoint: Optional[CheckpointInfo] = None
+    checkpoint_tree: Optional[List[CheckpointTreeNode]] = None
+    active_branches: Optional[List[BranchInfo]] = None
 
 class VideoResponse(BaseModel):
     """Response from video endpoint"""
@@ -109,46 +168,7 @@ class AssetListResponse(BaseModel):
     total: int
     user_id: str
 
-# ============ Checkpoint Schemas ============
-
-class ArtifactResponse(BaseModel):
-    """Artifact response schema"""
-    id: str
-    artifact_type: str
-    artifact_key: str
-    s3_url: str
-    version: int
-    metadata: Optional[Dict] = None
-    created_at: datetime
-
-class CheckpointResponse(BaseModel):
-    """Checkpoint response schema"""
-    id: str
-    video_id: str
-    branch_name: str
-    phase_number: int
-    version: int
-    status: str
-    approved_at: Optional[datetime] = None
-    created_at: datetime
-    cost_usd: float
-    parent_checkpoint_id: Optional[str] = None
-    artifacts: List[ArtifactResponse] = Field(default_factory=list)
-    user_id: str
-    edit_description: Optional[str] = None
-
-class CheckpointTreeNode(BaseModel):
-    """Checkpoint tree node for hierarchical display"""
-    checkpoint: CheckpointResponse
-    children: List['CheckpointTreeNode'] = Field(default_factory=list)
-
-class BranchInfo(BaseModel):
-    """Active branch information"""
-    branch_name: str
-    latest_checkpoint_id: str
-    phase_number: int
-    status: str
-    can_continue: bool
+# ============ Additional Checkpoint Schemas ============
 
 class ContinueRequest(BaseModel):
     """Request to continue pipeline from checkpoint"""
