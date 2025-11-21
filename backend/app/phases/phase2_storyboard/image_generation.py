@@ -195,16 +195,6 @@ def generate_beat_image(
     else:
         logger.info(f"   ⚠️ Not using ControlNet - reference_info={reference_info is not None}, user_assets={user_assets is not None}")
     
-    # DEBUG: Exit early after model decision
-    if DEBUG_EXIT_AFTER_MODEL_DECISION:
-        logger.info("=" * 80)
-        logger.info("🔴 DEBUG MODE: Exiting early after model decision")
-        logger.info(f"   Model selected: {'flux-dev-controlnet' if use_controlnet else 'flux-dev'}")
-        logger.info(f"   Product asset ID: {product_asset_id}")
-        logger.info(f"   Beat ID: {beat_id}")
-        logger.info("=" * 80)
-        raise PhaseException(f"DEBUG: Early exit after model decision - would use {'ControlNet' if use_controlnet else 'regular flux-dev'}")
-    
     try:
         temp_path = None
         if use_controlnet and product_asset_id:
@@ -235,8 +225,11 @@ def generate_beat_image(
                                 generated_image_url = controlnet_service.generate_with_controlnet(
                                     prompt=full_prompt,
                                     control_image_path=control_image_path,
-                                    conditioning_scale=0.75,
-                                    aspect_ratio="16:9"
+                                    control_strength=0.5,  # Canny works best with 0.5
+                                    aspect_ratio="16:9",
+                                    negative_prompt=negative_prompt,
+                                    steps=40,  # Higher steps for better quality
+                                    guidance_scale=4.0  # Higher guidance for better prompt adherence
                                 )
                                 
                                 # Download generated image
