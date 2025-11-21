@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import generate, status, video, health, upload
+from app.api import generate, status, video, health, upload, assets
 from app.database import init_db
 from app.common.logging import setup_logging
 from app.services.firebase_auth import initialize_firebase
@@ -49,12 +49,14 @@ app.include_router(health.router, tags=["health"])
 app.include_router(generate.router, tags=["generation"])
 app.include_router(status.router, tags=["status"])
 app.include_router(video.router, tags=["video"])
+# Register assets router BEFORE upload router to ensure more specific routes match first
+app.include_router(assets.router, tags=["assets"])
 app.include_router(upload.router, tags=["upload"])
 
 # Startup event
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database and Firebase on startup"""
+    """Initialize database, Firebase, and CLIP model on startup"""
     init_db()
     
     # Initialize Firebase Admin SDK
@@ -63,6 +65,24 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"Firebase initialization failed: {e}")
         logger.warning("Authentication will not work until Firebase is properly configured")
+    
+    # Load CLIP model in background (non-blocking)
+    # This happens after app is ready to serve requests
+    import asyncio
+    from app.services.clip_embeddings import clip_service
+    
+    async def load_clip_model():
+        """Background task to load CLIP model"""
+        try:
+            logger.info("🔄 Loading CLIP model in background...")
+            await asyncio.to_thread(clip_service.load_model)
+            logger.info("✅ CLIP model loaded successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to load CLIP model: {e}", exc_info=True)
+            logger.warning("CLIP-based semantic search will not be available")
+    
+    # Start loading in background (don't await - let it run while app serves requests)
+    asyncio.create_task(load_clip_model())
 
 # Root endpoint
 @app.get("/")

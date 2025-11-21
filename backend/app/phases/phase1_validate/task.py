@@ -33,8 +33,9 @@ GPT4O_MINI_FALLBACK = True  # Auto-fallback to gpt-4-turbo-preview if gpt-4o-min
 @celery_app.task(bind=True)
 def plan_video_intelligent(
     self,
-    video_id: str,
-    prompt: str,
+    phase0_output: dict,
+    video_id: str = None,
+    prompt: str = None,
     creativity_level: float = None,
     force_model: str = None  # "gpt-4o-mini
 ) -> dict:
@@ -43,8 +44,10 @@ def plan_video_intelligent(
     Falls back to gpt-4o if gpt-4o-mini fails.
     
     Args:
-        video_id: Unique video identifier
-        prompt: Natural language user prompt describing desired video
+        phase0_output: Output from Phase 0 (reference preparation) containing:
+                      - video_id, entities, user_assets, recommended_product, recommended_logo
+        video_id: Unique video identifier (fallback if not in phase0_output)
+        prompt: Natural language user prompt (fallback if not in phase0_output)
         creativity_level: 0.0-1.0 controlling creative freedom
                          (0.0 = strict template adherence, 1.0 = creative reinterpretation)
                          Defaults to BEAT_COMPOSITION_CREATIVITY config value
@@ -53,12 +56,32 @@ def plan_video_intelligent(
     Returns:
         PhaseOutput dict with:
         - status: "success" or "failed"
-        - output_data: {"spec": complete_video_spec, "model_used": "...", ...}
+        - output_data: {"spec": complete_video_spec, "reference_mapping": {...}, "model_used": "...", ...}
         - cost_usd: API cost
         - duration_seconds: Time taken
         - error_message: Error details if failed
     """
     start_time = time.time()
+    
+    # Extract data from phase0_output
+    if phase0_output:
+        video_id = phase0_output.get('video_id', video_id)
+        # Note: prompt should be passed separately, not from phase0
+        output_data = phase0_output.get('output_data', {})
+        entities = output_data.get('entities', {})
+        user_assets = output_data.get('user_assets', [])
+        recommended_product = output_data.get('recommended_product')
+        recommended_logo = output_data.get('recommended_logo')
+        has_assets = output_data.get('has_assets', False)
+        product_mentioned = output_data.get('product_mentioned', False)
+    else:
+        # Fallback if no Phase 0 output (backward compatibility)
+        entities = {}
+        user_assets = []
+        recommended_product = None
+        recommended_logo = None
+        has_assets = False
+        product_mentioned = False
     
     # Use config default if creativity_level not specified
     if creativity_level is None:
@@ -68,6 +91,13 @@ def plan_video_intelligent(
     logger.info(f"🚀 Phase 1 (Intelligent Planning) starting for video {video_id}")
     logger.info(f"   Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
     logger.info(f"   Creativity level: {creativity_level}")
+    logger.info(f"   User has assets: {has_assets}")
+    if has_assets:
+        logger.info(f"   Assets available: {len(user_assets)}")
+        if recommended_product:
+            logger.info(f"   Recommended product: {recommended_product.get('name', 'N/A')}")
+        if recommended_logo:
+            logger.info(f"   Recommended logo: {recommended_logo.get('name', 'N/A')}")
     
     # Determine which model to use
     if force_model:
@@ -77,12 +107,22 @@ def plan_video_intelligent(
         use_mini = USE_GPT4O_MINI
         logger.info(f"   Using gpt-4o-mini: {use_mini}")
     
+    # Package reference context for planning functions
+    reference_context = {
+        'has_assets': has_assets,
+        'entities': entities,
+        'user_assets': user_assets,
+        'recommended_product': recommended_product,
+        'recommended_logo': recommended_logo,
+        'product_mentioned': product_mentioned
+    }
+    
     try:
         if use_mini:
             # Try gpt-4o-mini first
             try:
                 logger.info("   Attempting gpt-4o-mini...")
-                result = plan_with_gpt4o_mini(video_id, prompt, creativity_level, start_time)
+                result = plan_with_gpt4o_mini(video_id, prompt, creativity_level, start_time, reference_context, phase0_output)
                 logger.info("✅ gpt-4o-mini succeeded")
                 return result
             
@@ -91,7 +131,7 @@ def plan_video_intelligent(
                 
                 if GPT4O_MINI_FALLBACK:
                     logger.info("🔄 Falling back to gpt-4-turbo-preview")
-                    result = plan_with_gpt4_turbo(video_id, prompt, creativity_level, start_time)
+                    result = plan_with_gpt4_turbo(video_id, prompt, creativity_level, start_time, reference_context, phase0_output)
                     logger.info("✅ gpt-4-turbo-preview fallback succeeded")
                     return result
                 else:
@@ -99,7 +139,7 @@ def plan_video_intelligent(
         else:
             # Use gpt-4-turbo-preview directly
             logger.info("   Using gpt-4-turbo-preview (direct)")
-            result = plan_with_gpt4_turbo(video_id, prompt, creativity_level, start_time)
+            result = plan_with_gpt4_turbo(video_id, prompt, creativity_level, start_time, reference_context, phase0_output)
             logger.info("✅ gpt-4-turbo-preview succeeded")
             return result
         
@@ -128,7 +168,9 @@ def plan_with_gpt4o_mini(
     video_id: str,
     prompt: str,
     creativity_level: float,
-    start_time: float
+    start_time: float,
+    reference_context: dict = None,
+    phase0_output: dict = None
 ) -> dict:
     """
     Plan video using gpt-4o-mini with Structured Outputs.
@@ -137,7 +179,7 @@ def plan_with_gpt4o_mini(
     """
     
     # Build prompts (gpt-4o-mini supports system messages)
-    system_prompt = build_gpt4_system_prompt()
+    system_prompt = build_gpt4_system_prompt(reference_context)
     user_message = f"Create a video advertisement: {prompt}"
     
     logger.info(f"   Calling gpt-4o-mini with structured outputs...")
@@ -176,6 +218,15 @@ def plan_with_gpt4o_mini(
     logger.info(f"   LLM selected archetype: {llm_output.selected_archetype}")
     logger.info(f"   LLM composed {len(llm_output.beat_sequence)} beats")
     
+    # Extract reference_mapping if present
+    reference_mapping = llm_output_dict.get('reference_mapping', {})
+    if reference_mapping:
+        logger.info(f"   LLM generated reference_mapping for {len(reference_mapping)} beats")
+    
+    # Validate reference asset usage if user has assets
+    if reference_context and reference_context.get('has_assets'):
+        validate_reference_asset_usage(reference_mapping, reference_context)
+    
     # Validate and fix beat durations (ensures 5/10/15s only)
     llm_output_dict = validate_llm_beat_durations(llm_output_dict)
     
@@ -212,7 +263,9 @@ def plan_with_gpt4o_mini(
         status="success",
         output_data={
             "spec": spec,
-            "model_used": "gpt-4o-mini"
+            "reference_mapping": reference_mapping,
+            "model_used": "gpt-4o-mini",
+            "phase0_output": phase0_output  # Pass Phase 0 output for Phase 2
         },
         cost_usd=cost,
         duration_seconds=duration_seconds,
@@ -224,7 +277,9 @@ def plan_with_gpt4_turbo(
     video_id: str,
     prompt: str,
     creativity_level: float,
-    start_time: float
+    start_time: float,
+    reference_context: dict = None,
+    phase0_output: dict = None
 ) -> dict:
     """
     Plan video using gpt-4-turbo-preview with JSON mode (fallback or direct use).
@@ -233,7 +288,7 @@ def plan_with_gpt4_turbo(
     """
     
     # Build separate system and user prompts
-    system_prompt = build_gpt4_system_prompt()
+    system_prompt = build_gpt4_system_prompt(reference_context)
     user_message = f"Create a video advertisement: {prompt}"
     
     # Calculate temperature
@@ -262,6 +317,15 @@ def plan_with_gpt4_turbo(
     # Log planning results
     logger.info(f"   LLM selected archetype: {llm_output_dict.get('selected_archetype')}")
     logger.info(f"   LLM composed {len(llm_output_dict.get('beat_sequence', []))} beats")
+    
+    # Extract reference_mapping if present
+    reference_mapping = llm_output_dict.get('reference_mapping', {})
+    if reference_mapping:
+        logger.info(f"   LLM generated reference_mapping for {len(reference_mapping)} beats")
+    
+    # Validate reference asset usage if user has assets
+    if reference_context and reference_context.get('has_assets'):
+        validate_reference_asset_usage(reference_mapping, reference_context)
     
     # Validate and fix beat durations
     llm_output_dict = validate_llm_beat_durations(llm_output_dict)
@@ -299,7 +363,9 @@ def plan_with_gpt4_turbo(
         status="success",
         output_data={
             "spec": spec,
-            "model_used": "gpt-4-turbo-preview"
+            "reference_mapping": reference_mapping,
+            "model_used": "gpt-4-turbo-preview",
+            "phase0_output": phase0_output  # Pass Phase 0 output for Phase 2
         },
         cost_usd=cost,
         duration_seconds=duration_seconds,
@@ -309,12 +375,127 @@ def plan_with_gpt4_turbo(
 
 # ===== Prompt Builders =====
 
-def build_gpt4_system_prompt() -> str:
+def validate_reference_asset_usage(reference_mapping: dict, reference_context: dict):
+    """
+    Validate that LLM used reference assets appropriately.
+    
+    Checks:
+    - If user has products → at least one product beat should have product reference
+    - If user has logo → closing beat should have logo reference
+    - Asset IDs in mapping exist in user's library
+    
+    Logs warnings if validation fails but doesn't raise exceptions
+    (LLM may have good reasons for decisions).
+    """
+    user_assets = reference_context.get('user_assets', [])
+    recommended_product = reference_context.get('recommended_product')
+    recommended_logo = reference_context.get('recommended_logo')
+    
+    # Build asset ID lookup
+    valid_asset_ids = {asset['asset_id'] for asset in user_assets}
+    
+    # Check if referenced assets exist
+    for beat_id, mapping in reference_mapping.items():
+        asset_ids = mapping.get('asset_ids', [])
+        for asset_id in asset_ids:
+            if asset_id not in valid_asset_ids:
+                logger.warning(f"   ⚠️  Beat '{beat_id}' references unknown asset '{asset_id}'")
+    
+    # Check if product was used (if available)
+    if recommended_product:
+        product_id = recommended_product['asset_id']
+        product_used = any(
+            product_id in mapping.get('asset_ids', [])
+            for mapping in reference_mapping.values()
+        )
+        if not product_used:
+            logger.warning(f"   ⚠️  Recommended product '{recommended_product.get('name')}' was NOT used in any beat")
+            logger.warning(f"       This is an advertising app - products should be featured!")
+        else:
+            logger.info(f"   ✓ Recommended product is used in reference_mapping")
+    
+    # Check if logo was used in closing (if available)
+    if recommended_logo:
+        logo_id = recommended_logo['asset_id']
+        logo_used = any(
+            logo_id in mapping.get('asset_ids', [])
+            for mapping in reference_mapping.values()
+        )
+        if not logo_used:
+            logger.warning(f"   ⚠️  Recommended logo '{recommended_logo.get('name')}' was NOT used in any beat")
+            logger.warning(f"       Logos should ALWAYS appear in closing beats for brand reinforcement!")
+        else:
+            logger.info(f"   ✓ Recommended logo is used in reference_mapping")
+    
+    logger.info(f"   Reference asset validation complete")
+
+
+def build_reference_asset_guidelines(reference_context: dict) -> str:
+    """
+    Build reference asset usage guidelines section for system prompt.
+    
+    This section is ONLY included if user has reference assets available.
+    Kept minimal - Phase 0 already did the selection work, Phase 1 just decides placement.
+    """
+    recommended_product = reference_context.get('recommended_product')
+    recommended_logo = reference_context.get('recommended_logo')
+    
+    if not recommended_product and not recommended_logo:
+        logger.info("📋 No reference assets to include in prompt")
+        return ""
+    
+    product_id = recommended_product.get('asset_id') if recommended_product else None
+    product_name = recommended_product.get('name', 'Product') if recommended_product else None
+    logo_id = recommended_logo.get('asset_id') if recommended_logo else None
+    logo_name = recommended_logo.get('name', 'Logo') if recommended_logo else None
+    
+    # Build example mapping parts
+    product_example = f'    "hero_shot": {{\n      "asset_ids": ["{product_id}"],\n      "usage_type": "product",\n      "rationale": "Hero shot showcases the product"\n    }}' if recommended_product else ''
+    logo_example = f'    "call_to_action": {{\n      "asset_ids": ["{logo_id}"],\n      "usage_type": "logo",\n      "rationale": "Closing beat includes brand logo"\n    }}' if recommended_logo else ''
+    comma = ',' if (recommended_product and recommended_logo) else ''
+    
+    section = f"""
+===== REFERENCE ASSETS =====
+
+{'' if not recommended_product else f"User has uploaded product '{product_name}' (ID: {product_id}) - decide when/if to include in beats using reference_mapping."}
+{'' if not recommended_logo else f"User has uploaded logo '{logo_name}' (ID: {logo_id}) - always include in closing beats using reference_mapping."}
+
+**CRITICAL: reference_mapping Structure**
+Keys MUST be beat_ids from your beat_sequence (e.g., 'hero_shot', 'dynamic_intro'), NOT asset IDs.
+
+**Example reference_mapping:**
+```json
+{{
+  "reference_mapping": {{
+{product_example}{comma}
+{logo_example}
+  }}
+}}
+```
+"""
+    
+    logger.info("📋 Built reference asset guidelines section:")
+    logger.info(section)
+    
+    return section
+
+
+def build_gpt4_system_prompt(reference_context: dict = None) -> str:
     """
     Build system prompt for GPT-4 Turbo (kept separate from user message).
+    
+    Args:
+        reference_context: Optional dict containing Phase 0 reference asset information
     """
     
+    # Build reference asset section if available
+    reference_section = ""
+    if reference_context and reference_context.get('has_assets'):
+        reference_section = build_reference_asset_guidelines(reference_context)
+    
     return f"""You are a professional video director and creative strategist. Your job is to plan a complete video advertisement based on the user's request.
+
+{reference_section}
 
 ===== AVAILABLE TEMPLATE ARCHETYPES =====
 

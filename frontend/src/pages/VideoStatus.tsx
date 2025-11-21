@@ -77,7 +77,6 @@ export function VideoStatus() {
   // Reset notification flags and state when videoId changes
   useEffect(() => {
     if (videoId) {
-      console.log('[VideoStatus] Video ID set:', videoId);
       hasShownStoryboardNotificationRef.current = false;
       hasShownStitchedNotificationRef.current = false;
       // Reset state when starting a new video
@@ -94,37 +93,15 @@ export function VideoStatus() {
 
   // Handle status updates from SSE stream
   useEffect(() => {
-    console.log('[VideoStatus] Status update effect triggered:', {
-      has_streamStatus: !!streamStatus,
-      isProcessing,
-      streamStatus_video_id: streamStatus?.video_id,
-      videoId
-    });
-
     if (!streamStatus) {
-      console.log('[VideoStatus] No streamStatus, skipping update');
       return;
     }
 
     if (!isProcessing) {
-      console.log('[VideoStatus] isProcessing is false, skipping update');
       return;
     }
 
     const status = streamStatus;
-    
-    console.log('[VideoStatus] Processing status update:', {
-      video_id: status.video_id,
-      status: status.status,
-      progress: status.progress,
-      current_phase: status.current_phase,
-      has_storyboard_urls: !!status.storyboard_urls?.length,
-      has_video_url: !!(status.final_video_url || status.stitched_video_url),
-      chunk_progress: status.current_chunk_index !== undefined 
-        ? `${status.current_chunk_index + 1}/${status.total_chunks}` 
-        : null,
-      timestamp: new Date().toISOString()
-    });
     
     const currentStep = getProcessingStepFromPhase(status.current_phase, status.progress);
     setProcessingProgress(currentStep);
@@ -190,7 +167,6 @@ export function VideoStatus() {
     }
     
     if (status.status === 'complete') {
-      console.log('[VideoStatus] Video generation complete, navigating to preview');
       setIsProcessing(false);
       if (videoId) {
         navigate(`/preview/${videoId}`);
