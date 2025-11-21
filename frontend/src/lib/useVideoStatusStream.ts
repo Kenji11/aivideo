@@ -27,6 +27,7 @@ export function useVideoStatusStream(
   const eventSourceRef = useRef<EventSource | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+  const usePollingRef = useRef(false); // Track polling state to prevent infinite loops
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -47,17 +48,18 @@ export function useVideoStatusStream(
         pollingIntervalRef.current = null;
       }
       setIsConnected(false);
+      usePollingRef.current = false;
       return;
     }
 
     // Try SSE first (unless we've already determined polling is needed)
-    if (!usePolling) {
+    if (!usePollingRef.current && !usePolling) {
       const connectSSE = async () => {
         try {
           // Get auth token for SSE connection
           const token = await getIdToken();
           if (!token) {
-            console.warn('[SSE] No auth token, falling back to polling');
+            usePollingRef.current = true;
             setUsePolling(true);
             return;
           }
@@ -71,7 +73,6 @@ export function useVideoStatusStream(
           eventSourceRef.current = eventSource;
 
           eventSource.onopen = () => {
-            console.log('[SSE] Connection opened');
             setIsConnected(true);
             setError(null);
           };
@@ -79,9 +80,7 @@ export function useVideoStatusStream(
           eventSource.onmessage = (event) => {
             try {
               const data = JSON.parse(event.data) as StatusResponse;
-              console.log('[SSE] Status update received:', {
-                data
-            });
+              // Removed excessive console.log for performance
               if (isMountedRef.current) {
                 setStatus(data);
                 setError(null);
@@ -93,7 +92,6 @@ export function useVideoStatusStream(
           };
 
           eventSource.addEventListener('close', () => {
-            console.log('[SSE] Stream closed by server');
             if (eventSourceRef.current) {
               eventSourceRef.current.close();
               eventSourceRef.current = null;
@@ -110,22 +108,22 @@ export function useVideoStatusStream(
             // Fallback to polling on any error
             eventSource.close();
             setIsConnected(false);
+            usePollingRef.current = true;
             setUsePolling(true);
           });
 
-          eventSource.onerror = (event) => {
-            console.error('[SSE] Connection error:', event);
+          eventSource.onerror = () => {
             // If SSE fails (connection error, auth failure, etc.), fallback to polling
             if (eventSource.readyState === EventSource.CLOSED) {
-              console.log('[SSE] Connection closed, falling back to polling');
               setIsConnected(false);
+              usePollingRef.current = true;
               setUsePolling(true);
             } else if (eventSource.readyState === EventSource.CONNECTING) {
               // Still connecting, wait a bit
               setTimeout(() => {
                 if (eventSource.readyState === EventSource.CLOSED) {
-                  console.log('[SSE] Connection failed, falling back to polling');
                   setIsConnected(false);
+                  usePollingRef.current = true;
                   setUsePolling(true);
                 }
               }, 2000);
@@ -134,6 +132,7 @@ export function useVideoStatusStream(
         } catch (err) {
           console.error('[SSE] Failed to create EventSource:', err);
           setError(err instanceof Error ? err : new Error('Failed to create SSE connection'));
+          usePollingRef.current = true;
           setUsePolling(true);
         }
       };
@@ -142,17 +141,16 @@ export function useVideoStatusStream(
     }
 
     // Fallback to polling if SSE failed or is disabled
-    if (usePolling) {
+    if (usePollingRef.current || usePolling) {
+      // Prevent duplicate polling connections
+      if (pollingIntervalRef.current) {
+        return;
+      }
+      
       const pollStatus = async () => {
         try {
           const statusData = await getVideoStatus(videoId);
-          console.log('[Polling] Status update received:', {
-            video_id: statusData.video_id,
-            status: statusData.status,
-            progress: statusData.progress,
-            current_phase: statusData.current_phase,
-            timestamp: new Date().toISOString()
-          });
+          // Removed excessive console.log for performance
           if (isMountedRef.current) {
             setStatus(statusData);
             setError(null);

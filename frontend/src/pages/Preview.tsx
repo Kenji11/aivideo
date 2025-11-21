@@ -43,13 +43,12 @@ export function Preview() {
           
           if (videoData.final_video_url) {
             setVideoUrl(videoData.final_video_url);
-            setTitle(videoData.video_id); // VideoResponse doesn't have title, use video_id as fallback
+            setTitle(videoData.title);
             return;
           }
         } catch (err) {
           if (abortController.signal.aborted) return;
           // If getVideo fails, try status endpoint
-          console.log('[Preview] getVideo failed, trying status endpoint:', err);
         }
 
         // Fallback to status endpoint (works for both in-progress and completed videos)
@@ -62,6 +61,18 @@ export function Preview() {
           setVideoUrl(url);
         } else {
           setError('Video is not ready yet. Please wait for generation to complete.');
+        }
+        
+        // Try to get title from video list if status endpoint doesn't have it
+        try {
+          const { listVideos } = await import('../lib/api');
+          const videoList = await listVideos();
+          const matchingVideo = videoList.videos.find(v => v.video_id === videoId);
+          if (matchingVideo) {
+            setTitle(matchingVideo.title);
+          }
+        } catch (err) {
+          // Failed to fetch title from video list
         }
       } catch (err: any) {
         if (err.name === 'AbortError' || abortController.signal.aborted) {

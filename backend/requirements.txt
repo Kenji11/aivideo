@@ -31,3 +31,13 @@ langchain-core>=0.1.0
 
 # Firebase Admin SDK for token verification
 firebase-admin>=6.0.0
+
+# CLIP Embeddings (for reference asset analysis)
+# Note: torch and torchvision are installed separately in Dockerfile from PyTorch CPU index
+# Using open_clip instead of clip-by-openai (supports modern PyTorch versions)
+open-clip-torch>=2.20.0
+
+# Image Processing & Analysis
+opencv-python>=4.8.0
+scikit-learn>=1.3.0
+numpy>=1.24.0  # For vector similarity calculations

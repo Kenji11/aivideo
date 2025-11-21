@@ -1,5 +1,6 @@
 # Phase 4: Refinement Task
 import time
+import logging
 from datetime import datetime, timezone
 from app.orchestrator.celery_app import celery_app
 from app.common.schemas import PhaseOutput
@@ -9,6 +10,9 @@ from app.orchestrator.progress import update_progress, update_cost
 from app.database import SessionLocal
 from app.common.models import VideoGeneration, VideoStatus
 from sqlalchemy.orm.attributes import flag_modified
+from app.services.asset_usage_tracker import asset_usage_tracker
+
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task(bind=True, name="app.phases.phase4_refine.task.refine_video")
@@ -154,6 +158,14 @@ def refine_video(self, phase3_output: dict, user_id: str = None) -> dict:
                     video.completed_at = datetime.now(timezone.utc)
                 flag_modified(video, 'phase_outputs')
                 db.commit()
+                
+                # Track asset usage now that video is complete
+                try:
+                    logger.info(f"Tracking asset usage for video {video_id}")
+                    asset_usage_tracker.increment_usage_for_video(video_id, db=db)
+                except Exception as e:
+                    # Don't fail the video generation if usage tracking fails
+                    logger.error(f"Failed to track asset usage for video {video_id}: {str(e)}", exc_info=True)
         finally:
             db.close()
         

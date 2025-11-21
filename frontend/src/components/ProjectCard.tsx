@@ -1,4 +1,5 @@
 import { Play, Trash2, Calendar, Video as VideoIcon, Loader2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { VideoListItem } from '../lib/api';
 import { formatDistanceToNow } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
@@ -53,56 +54,121 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
     }, 50);
   };
 
+  // Determine navigation route based on status
+  const getVideoRoute = () => {
+    if (project.status === 'complete' && project.final_video_url) {
+      return `/preview/${project.video_id}`;
+    } else if (project.status !== 'complete' && project.status !== 'failed') {
+      return `/processing/${project.video_id}`;
+    }
+    return '#'; // No link for failed videos
+  };
+
+  const videoRoute = getVideoRoute();
+
   return (
-    <Card className="overflow-hidden hover:shadow-lg group cursor-pointer animate-fade-in">
-      <div 
-        className="aspect-video bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center relative overflow-hidden"
-        onClick={handleClick}
+    <Card className="overflow-hidden hover:shadow-lg group animate-fade-in">
+      <Link
+        to={videoRoute}
+        className="block"
+        onClick={(e) => {
+          // Clean up video before navigation to prevent abort errors
+          if (videoRef.current) {
+            videoRef.current.pause();
+            videoRef.current.src = '';
+          }
+          // Still call onSelect if provided (for backwards compatibility)
+          if (onSelect) {
+            onSelect(project);
+          }
+        }}
       >
+        <div 
+          className="aspect-video bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center relative overflow-hidden cursor-pointer"
+        >
         {hasVideo && project.final_video_url ? (
-          <video
-            ref={videoRef}
-            src={project.final_video_url}
-            className="w-full h-full object-cover"
-            muted
-            preload="none"
-            onMouseEnter={(e) => {
-              if (videoRef.current && !videoRef.current.paused) return;
-              e.currentTarget.play().catch(() => {
-                // Ignore play errors (e.g., if video is being cleaned up)
-              });
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.pause();
-              e.currentTarget.currentTime = 0;
-            }}
-            onError={(e) => {
-              // Silently handle video errors
-              console.debug('ProjectCard video error (expected when navigating):', e);
-            }}
-            onAbort={(e) => {
-              // Silently handle abort (expected when navigating)
-              console.debug('ProjectCard video aborted (expected when navigating)');
-            }}
-          />
+          <>
+            {/* Show thumbnail if available, otherwise show video directly */}
+            {project.thumbnail_url ? (
+              <>
+                <img
+                  src={project.thumbnail_url}
+                  alt={project.title}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback to video if thumbnail fails to load
+                    const target = e.currentTarget;
+                    target.style.display = 'none';
+                    const video = target.nextElementSibling as HTMLVideoElement;
+                    if (video) {
+                      video.style.display = 'block';
+                    }
+                  }}
+                />
+                <video
+                  ref={videoRef}
+                  src={project.final_video_url}
+                  className="w-full h-full object-cover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                  muted
+                  preload="none"
+                  onMouseEnter={(e) => {
+                    if (videoRef.current && !videoRef.current.paused) return;
+                    e.currentTarget.play().catch(() => {
+                      // Ignore play errors (e.g., if video is being cleaned up)
+                    });
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.pause();
+                    e.currentTarget.currentTime = 0;
+                  }}
+                  onError={(e) => {
+                    // Silently handle video errors
+                    console.debug('ProjectCard video error (expected when navigating):', e);
+                  }}
+                  onAbort={(e) => {
+                    // Silently handle abort (expected when navigating)
+                    console.debug('ProjectCard video aborted (expected when navigating)');
+                  }}
+                />
+              </>
+            ) : (
+              <video
+                ref={videoRef}
+                src={project.final_video_url}
+                className="w-full h-full object-cover"
+                muted
+                preload="none"
+                onMouseEnter={(e) => {
+                  if (videoRef.current && !videoRef.current.paused) return;
+                  e.currentTarget.play().catch(() => {
+                    // Ignore play errors (e.g., if video is being cleaned up)
+                  });
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.pause();
+                  e.currentTarget.currentTime = 0;
+                }}
+                onError={(e) => {
+                  // Silently handle video errors
+                  console.debug('ProjectCard video error (expected when navigating):', e);
+                }}
+                onAbort={(e) => {
+                  // Silently handle abort (expected when navigating)
+                  console.debug('ProjectCard video aborted (expected when navigating)');
+                }}
+              />
+            )}
+          </>
         ) : (
           <>
             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/30 flex items-center justify-center">
-              <Button
-                variant="secondary"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelect?.(project);
-                }}
-                className="rounded-full transform scale-0 group-hover:scale-100 transition-transform duration-300"
-              >
+              <div className="rounded-full bg-secondary p-3 transform scale-0 group-hover:scale-100 transition-transform duration-300">
                 {isProcessing ? (
                   <Loader2 className="w-6 h-6 text-primary animate-spin" />
                 ) : (
                   <Play className="w-6 h-6 text-primary fill-current" />
                 )}
-              </Button>
+              </div>
             </div>
             {isProcessing ? (
               <Loader2 className="w-12 h-12 text-primary animate-spin" />
@@ -117,16 +183,25 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
           </div>
         )}
       </div>
+      </Link>
 
       <CardContent className="p-4 space-y-3">
-        <div>
-          <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+        <Link
+          to={videoRoute}
+          className="block hover:text-primary transition-colors"
+          onClick={(e) => {
+            if (onSelect) {
+              onSelect(project);
+            }
+          }}
+        >
+          <h3 className="font-semibold text-foreground line-clamp-2">
             {project.title}
           </h3>
           <p className="text-xs text-muted-foreground mt-1">
             {project.current_phase ? `Phase: ${project.current_phase.replace('phase', '').replace('_', ' ')}` : ''}
           </p>
-        </div>
+        </Link>
 
         <div className="flex items-center justify-between">
           <Badge variant={status.variant}>
