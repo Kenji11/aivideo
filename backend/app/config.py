@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, AliasChoices
 from functools import lru_cache
 import logging
 import os
@@ -42,23 +42,23 @@ class Settings(BaseSettings):
     # Option 1: JSON file path (with private_key from env var)
     firebase_credentials_path: str = Field(
         default="/app/firebase-credentials.json",
-        env="FIREBASE_CREDENTIALS_PATH",
+        validation_alias=AliasChoices('firebase_credentials_path', 'FIREBASE_CREDENTIALS_PATH'),
         description="Path to service account JSON file (without private_key, defaults to Docker mount path)"
     )
     firebase_private_key: str = Field(
         default="",
-        env="FIREBASE_PRIVATE_KEY",
+        validation_alias=AliasChoices('firebase_private_key', 'FIREBASE_PRIVATE_KEY'),
         description="Service account private key (from FIREBASE_PRIVATE_KEY env var, replaces private_key in JSON)"
     )
     # Option 2: Individual environment variables (alternative)
     firebase_project_id: str = Field(
         default="",
-        env="FIREBASE_PROJECT_ID",
+        validation_alias=AliasChoices('firebase_project_id', 'FIREBASE_PROJECT_ID'),
         description="Firebase project ID (from FIREBASE_PROJECT_ID env var)"
     )
     firebase_client_email: str = Field(
         default="",
-        env="FIREBASE_CLIENT_EMAIL",
+        validation_alias=AliasChoices('firebase_client_email', 'FIREBASE_CLIENT_EMAIL'),
         description="Firebase service account client email (from FIREBASE_CLIENT_EMAIL env var)"
     )
     
