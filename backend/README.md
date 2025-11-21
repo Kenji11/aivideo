@@ -2,6 +2,8 @@
 
 ## Recent Changes
 
+**January 2025**: Added Reference Assets feature (PR #1) - Users can now upload, manage, and use reference images in video generation. See `REFERENCE_ASSETS.md` for details.
+
 **November 17, 2025**: Migrated from Alembic to raw SQL migrations for better control and to eliminate race conditions in multi-container setups. All migrations are now in `migrations/*.sql` and run via `python migrate.py`.
 
 ## Environment Variables

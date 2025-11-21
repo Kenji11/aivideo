@@ -9,35 +9,69 @@
 **Status**: ✅ All critical bugs fixed, architecture documented
 
 ## What Just Happened
-1. ✅ **PR #11 Complete**: Phase cleanup and renaming - removed unused phases and created sequential structure
-2. ✅ **Removed Unused Phases**: Deleted phase6_export, phase2_animatic, phase3_references, and old phase4_chunks
-3. ✅ **Renamed Phases**: phase4_chunks_storyboard → phase3_chunks, phase5_refine → phase4_refine
-4. ✅ **Sequential Structure**: Pipeline now uses phase1 → phase2 → phase3 → phase4 (clean numbering)
-5. ✅ **Code Cleanup**: Removed ~50% of unused phase code, updated all references
-6. ✅ **Pipeline Updated**: Chain now goes directly from phase2 to phase3 (removed phase3_references)
-7. ✅ **All References Updated**: Imports, Celery tasks, progress tracking, status builder, API endpoints
-8. ✅ **Memory Bank Updated**: All documentation reflects PR #11 completion
+1. ✅ **PR #5 (ControlNet Implementation) Complete**: ControlNet integration for product consistency in storyboard generation
+   - Created `backend/app/services/controlnet.py` with Canny edge detection preprocessing
+   - Implemented `generate_with_controlnet()` using `xlabs-ai/flux-dev-controlnet` model
+   - Updated Phase 2 storyboard generation to use ControlNet when product references exist
+   - Added cost constant: `COST_FLUX_DEV_CONTROLNET_IMAGE = 0.058` (vs $0.025 for regular flux-dev)
+   - Fixed Phase 1 reference_mapping structure bug (beat_ids as keys, not asset IDs)
+   - ControlNet path: Downloads product image, preprocesses edges, generates with ControlNet
+   - Fallback path: Uses regular flux-dev when no product reference exists
+   - Cost tracking works for both paths with `used_controlnet` debug flag
+2. ✅ **PR #3 (Semantic Search System) Complete**: Vector similarity search for reference assets
+   - Backend: `asset_search.py` service with CLIP embeddings and pgvector similarity search
+   - API: `/api/assets/search` (text-to-image), `/api/assets/{id}/similar` (image-to-image), `/api/assets/recommend` (style consistency)
+   - Frontend: Search bar with debounce, "Find Similar" button in asset detail modal
+   - Similarity thresholds: 0.25 (25%) for text search, 0.7 (70%) for image similarity
+   - Fixed enum mismatch: Use `AssetSource.USER_UPLOAD.name` for database compatibility
+   - Auto-scroll: Similar assets section scrolls into view when results load
+3. ✅ **PR #1 (Reference Assets) Complete**: Reference asset library foundation implemented
+   - Database: Extended `assets` table with reference asset fields (name, description, thumbnail_url, AI analysis fields, embedding)
+   - Migration: `004_add_reference_asset_fields.sql` adds all new columns (requires pgvector extension)
+   - S3: New flat structure `{user_id}/assets/{filename}` with auto-generated thumbnails
+   - API: Updated upload endpoint, added GET/PATCH/DELETE `/api/assets/{asset_id}` endpoints
+   - Frontend: New Assets page (`/assets`) with grid view, upload modal, detail modal, filters, pagination
+4. ✅ **PR #11 Complete**: Phase cleanup and renaming - removed unused phases and created sequential structure
+5. ✅ **Removed Unused Phases**: Deleted phase6_export, phase2_animatic, phase3_references, and old phase4_chunks
+6. ✅ **Renamed Phases**: phase4_chunks_storyboard → phase3_chunks, phase5_refine → phase4_refine
+7. ✅ **Sequential Structure**: Pipeline now uses phase1 → phase2 → phase3 → phase4 (clean numbering)
+8. ✅ **Code Cleanup**: Removed ~50% of unused phase code, updated all references
+9. ✅ **Pipeline Updated**: Chain now goes directly from phase2 to phase3 (removed phase3_references)
+10. ✅ **All References Updated**: Imports, Celery tasks, progress tracking, status builder, API endpoints
+11. ✅ **Memory Bank Updated**: All documentation reflects PR #5 and PR #11 completion
 
 ## Current Focus
-**System Stabilization & Infrastructure Improvements**
+**ControlNet Integration & Reference Asset Workflow**
 
 ### Recent Achievements
-1. ✅ **PR #11**: Phase cleanup and renaming - sequential phase structure (phase1 → phase2 → phase3 → phase4)
-2. ✅ **Code Cleanup**: Removed 4 unused phases (phase6_export, phase2_animatic, phase3_references, old phase4_chunks)
-3. ✅ **Sequential Naming**: Phases now numbered 1-4 sequentially for clarity
-4. ✅ **Simplified Pipeline**: Removed phase3_references from chain (phase2 → phase3 directly)
-5. ✅ **All References Updated**: Imports, Celery tasks, progress tracking, status builder, API endpoints
-6. ✅ **PR #10**: Redis-based progress tracking with Server-Sent Events (SSE)
-7. ✅ **Performance**: 90%+ reduction in database writes during pipeline execution
+1. ✅ **PR #5**: ControlNet integration for product consistency
+   - ControlNet preprocessing service with Canny edge detection (OpenCV)
+   - ControlNet generation using flux-dev-controlnet model ($0.058/image)
+   - Phase 2 storyboard generation with product reference support
+   - Fixed reference_mapping structure (beat_ids as keys)
+   - Dual-path generation: ControlNet when references exist, regular flux-dev fallback
+2. ✅ **PR #3**: Semantic search system with CLIP embeddings and pgvector
+   - Text-to-image search with 25% minimum similarity threshold
+   - Image-to-image similarity with 70% minimum threshold
+   - Style-consistent recommendations using centroid embeddings
+   - Fixed enum compatibility issues (AssetSource)
+3. ✅ **PR #11**: Phase cleanup and renaming - sequential phase structure (phase1 → phase2 → phase3 → phase4)
+4. ✅ **Code Cleanup**: Removed 4 unused phases (phase6_export, phase2_animatic, phase3_references, old phase4_chunks)
+5. ✅ **Sequential Naming**: Phases now numbered 1-4 sequentially for clarity
+6. ✅ **Simplified Pipeline**: Removed phase3_references from chain (phase2 → phase3 directly)
+7. ✅ **All References Updated**: Imports, Celery tasks, progress tracking, status builder, API endpoints
+8. ✅ **PR #10**: Redis-based progress tracking with Server-Sent Events (SSE)
+9. ✅ **Performance**: 90%+ reduction in database writes during pipeline execution
 
 ### System Status
 - ✅ **Pipeline**: Fully functional end-to-end (phase1 → phase2 → phase3 → phase4)
-- ✅ **Phase 1**: Working (GPT-4 validation and spec extraction)
-- ✅ **Phase 2**: Working (Storyboard generation)
+- ✅ **Phase 1**: Working (GPT-4 validation and spec extraction with reference_mapping)
+- ✅ **Phase 2**: Working (Storyboard generation with ControlNet support for product references)
 - ✅ **Phase 3**: Working (Chunk generation and stitching) - renamed from phase4_chunks_storyboard
 - ✅ **Phase 4**: Working (Audio integration and refinement) - renamed from phase5_refine
 - ✅ **Progress Tracking**: Real-time updates working (Redis + SSE)
-- ✅ **Cost Tracking**: Per-phase cost monitoring working
+- ✅ **Cost Tracking**: Per-phase cost monitoring working (includes ControlNet cost tracking)
+- ✅ **ControlNet Service**: Canny edge detection preprocessing and flux-dev-controlnet generation
 
 ## Recent Decisions
 
@@ -224,6 +258,13 @@
 - [ ] Performance optimization (parallel after chunk 0) - Future enhancement
 
 ## Notes
+- ✅ **PR #5 Complete**: ControlNet integration for product consistency in storyboard generation
+- ✅ **ControlNet Service**: Canny edge detection preprocessing and flux-dev-controlnet generation ($0.058/image)
+- ✅ **Reference Mapping Fix**: Phase 1 now correctly uses beat_ids as keys (not asset IDs)
+- ✅ **Dual-Path Generation**: ControlNet path when product references exist, regular flux-dev fallback
+- ✅ **PR #3 Complete**: Semantic search system with CLIP embeddings and similarity thresholds
+- ✅ **Enum Fixes**: Resolved AssetSource enum mismatch (use .name for database compatibility)
+- ✅ **Similarity Thresholds**: 0.25 for text search, 0.7 for image similarity (CLIP performs better on image-to-image)
 - ✅ **PR #11 Complete**: Phase cleanup and renaming - sequential structure (phase1 → phase2 → phase3 → phase4)
 - ✅ **Removed Unused Phases**: phase6_export, phase2_animatic, phase3_references, old phase4_chunks
 - ✅ **Renamed Phases**: phase4_chunks_storyboard → phase3_chunks, phase5_refine → phase4_refine

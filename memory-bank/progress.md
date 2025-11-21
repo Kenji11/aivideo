@@ -34,10 +34,14 @@
 - [x] **Today**: Respect user-specified durations (override ad optimization)
 - [x] **Today**: Enhanced logging (duration optimization + chunk calculation)
 
-### Phase 2: Animatic Generation
+### Phase 2: Storyboard Generation
 - [x] Initial implementation complete
-- [x] **Temporarily disabled for MVP** (simpler workflow)
-- [x] May re-enable post-MVP for multi-image consistency
+- [x] **PR #5**: ControlNet integration for product consistency ✅
+- [x] ControlNet preprocessing service (Canny edge detection with OpenCV)
+- [x] ControlNet generation using flux-dev-controlnet ($0.058/image)
+- [x] Dual-path generation: ControlNet when product references exist, regular flux-dev fallback
+- [x] Reference mapping integration (beat_ids as keys)
+- [x] Cost tracking for both paths (ControlNet vs regular flux-dev)
 
 ### Phase 3: Reference Assets (REMOVED in PR #11)
 - [x] **PR #11**: Removed phase3_references from pipeline ✅
@@ -71,6 +75,22 @@
 - [x] Presigned URL caching in Redis
 - [x] StatusResponse schema with current_chunk_index and total_chunks
 
+### Reference Assets & Semantic Search
+- [x] **PR #1**: Reference asset library foundation ✅
+- [x] Database schema with embedding column (pgvector)
+- [x] S3 storage with thumbnails
+- [x] Upload, edit, delete API endpoints
+- [x] Frontend asset library UI
+- [x] **PR #3**: Semantic search system ✅
+- [x] CLIP embedding generation (text and image)
+- [x] pgvector similarity search (cosine distance)
+- [x] Text-to-image search endpoint (25% threshold)
+- [x] Image-to-image similarity endpoint (70% threshold)
+- [x] Style-consistent recommendations
+- [x] Frontend search bar with debounce
+- [x] "Find Similar" feature in asset detail modal
+- [x] Auto-scroll to similar assets section
+
 ### Phase 4: Refinement (renamed from Phase 5)
 - [x] Basic implementation complete
 - [x] **PR #11**: Renamed from phase5_refine to phase4_refine ✅
@@ -100,6 +120,9 @@
 9. ✅ **PR #9**: Parallel chunk generation with LangChain RunnableParallel
 10. ✅ **PR #10**: Redis-based progress tracking with Server-Sent Events (SSE)
 11. ✅ **PR #11**: Phase cleanup and renaming - sequential structure (phase1 → phase2 → phase3 → phase4)
+12. ✅ **PR #1 (Reference Assets)**: Database schema, S3 structure, API endpoints, frontend UI ✅
+13. ✅ **PR #3 (Semantic Search)**: CLIP embeddings, pgvector similarity search, search API endpoints, frontend search UI ✅
+14. ✅ **PR #5 (ControlNet)**: ControlNet preprocessing and generation service, Phase 2 integration, reference mapping fix ✅
 
 ---
 
@@ -140,7 +163,7 @@
 - [ ] Real-time progress updates
 - [ ] Video preview before final generation
 - [ ] Template gallery with previews
-- [ ] Asset upload UI
+- [x] **PR #1 (Reference Assets)**: Asset upload UI ✅
 - [ ] Cost estimation before generation
 - [ ] Video history and management
 

@@ -130,7 +130,7 @@ Reference Asset Library → AI Analysis → Semantic Search → Auto-Matching �
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
 | **Asset Analysis** | GPT-4 Vision | Categorize and analyze uploads |
-| **Embedding Generation** | CLIP (ViT-L/14) | Semantic vector representations |
+| **Embedding Generation** | CLIP (ViT-B/32) | Semantic vector representations (512-dim) |
 | **Vector Search** | pgvector | Fast similarity search |
 | **Edge Detection** | OpenCV Canny | ControlNet preprocessing |
 | **Logo Detection** | CV2 + Heuristics | Identify logo assets |
@@ -201,7 +201,7 @@ class ReferenceAsset(Base):
     logo_position_preference = Column(String)  # "bottom-right", "top-left", etc.
     
     # Semantic Search
-    embedding = Column(Vector(768))  # CLIP ViT-L/14 produces 768-dim vectors
+    embedding = Column(Vector(512))  # CLIP ViT-B/32 produces 512-dim vectors
     
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -307,9 +307,9 @@ async def analyze_reference_asset(
     
     Be specific and detailed in descriptions."""
     
-    # Call GPT-4 Vision
+    # Call GPT-4o Vision
     response = client.chat.completions.create(
-        model="gpt-4-vision-preview",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": system_prompt},
             {
@@ -450,16 +450,30 @@ import torch
 import clip
 from PIL import Image
 
-# Load CLIP model once at startup
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model, preprocess = clip.load("ViT-L/14", device=device)
+# Load CLIP model once at startup (with volume caching)
+import os
+from functools import lru_cache
+
+MODEL_CACHE_DIR = os.getenv('CLIP_MODEL_CACHE', '/mnt/models')
+CLIP_MODEL = os.getenv('CLIP_MODEL', 'ViT-B/32')
+
+@lru_cache(maxsize=1)
+def load_clip_model():
+    """Load CLIP model, downloads to volume on first run"""
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model, preprocess = clip.load(
+        CLIP_MODEL,
+        device=device,
+        download_root=MODEL_CACHE_DIR
+    )
+    return model, preprocess, device
 
 def generate_image_embedding(image_path: str) -> list:
     """
     Generate CLIP embedding for image
     
     Returns:
-        768-dimensional vector (list of floats)
+        512-dimensional vector (list of floats) - ViT-B/32 output
     """
     image = Image.open(image_path)
     image_input = preprocess(image).unsqueeze(0).to(device)
@@ -476,7 +490,7 @@ def generate_text_embedding(text: str) -> list:
     Generate CLIP embedding for text query
     
     Returns:
-        768-dimensional vector (list of floats)
+        512-dimensional vector (list of floats) - ViT-B/32 output
     """
     text_input = clip.tokenize([text]).to(device)
     
@@ -1752,7 +1766,7 @@ CREATE TABLE reference_assets (
     logo_position_preference VARCHAR,
     
     -- Semantic Search
-    embedding vector(768),
+    embedding vector(512),  -- ViT-B/32 produces 512-dim embeddings
     
     -- Metadata
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -1829,7 +1843,7 @@ def test_upload_and_analysis():
     # Verify analysis returns correct asset_type=product
     # Verify primary_object contains "sneaker" or "shoe"
     # Verify colors extracted
-    # Verify embedding generated (768 dimensions)
+    # Verify embedding generated (512 dimensions - ViT-B/32 output)
 
 def test_logo_detection():
     """Test automatic logo detection"""

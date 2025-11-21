@@ -87,6 +87,7 @@ async def get_video(
     
     return VideoResponse(
         video_id=video.id,
+        title=video.title,
         status=video.status.value,
         final_video_url=final_video_url,
         cost_usd=video.cost_usd,
