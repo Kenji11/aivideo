@@ -3,13 +3,21 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Video } from 'lucide-react';
 import { ProcessingSteps } from '../components/ProcessingSteps';
 import { NotificationCenter, Notification } from '../components/NotificationCenter';
-import { StatusResponse } from '../lib/api';
+import { CheckpointCard } from '../components/CheckpointCard';
+import { CheckpointTree } from '../components/CheckpointTree';
+import { ArtifactEditor } from '../components/ArtifactEditor';
+import { BranchSelector } from '../components/BranchSelector';
+import { StatusResponse, CheckpointInfo, CheckpointTreeNode, BranchInfo } from '../lib/api';
+import { continueVideo } from '../lib/api';
 import { useVideoStatusStream } from '../lib/useVideoStatusStream';
+import { useToast } from '../hooks/use-toast';
 
 export function VideoStatus() {
   const navigate = useNavigate();
   const { videoId } = useParams<{ videoId: string }>();
   
+  const { toast } = useToast();
+
   // State
   const [isProcessing, setIsProcessing] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -22,21 +30,26 @@ export function VideoStatus() {
   const [currentPhase, setCurrentPhase] = useState<string | undefined>(undefined);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
+  // Checkpoint state
+  const [currentCheckpoint, setCurrentCheckpoint] = useState<CheckpointInfo | null>(null);
+  const [checkpointTree, setCheckpointTree] = useState<CheckpointTreeNode[]>([]);
+  const [activeBranches, setActiveBranches] = useState<BranchInfo[]>([]);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [isContinuing, setIsContinuing] = useState(false);
+
   // Use refs to track notification state across renders
   const hasShownStoryboardNotificationRef = useRef(false);
   const hasShownStitchedNotificationRef = useRef(false);
 
-  // Map current_phase to processing step index
-  // Phase 3 (References) is disabled - skipped in pipeline
+  // Map current_phase to processing step index (now supporting 4 phases with checkpoints)
   const getProcessingStepFromPhase = (phase: string | undefined, progress: number): number => {
     if (!phase) return 0;
     if (phase === 'phase1_validate') return 0;
     if (phase === 'phase2_storyboard' || phase === 'phase2_animatic') return 1; // Support both new and legacy phase names
-    // Phase 3 (references) is disabled - skip to Phase 4
-    if (phase === 'phase3_references') return 2; // Should not occur, but handle gracefully
-    if (phase === 'phase3_chunks') return 2; // Moved from 3 to 2 (Phase 3 removed)
-    if (phase === 'phase4_refine') return 2; // Phase 4 is part of chunk generation/refinement, keep at step 2
-    return Math.min(Math.floor(progress / 25), 2); // Cap at 2 (max step index)
+    if (phase === 'phase3_references') return 2; // References (if enabled)
+    if (phase === 'phase3_chunks') return 2; // Video chunks generation
+    if (phase === 'phase4_refine') return 3; // Phase 4 refinement with music
+    return Math.min(Math.floor(progress / 25), 3); // Cap at 3 (max step index for 4 phases)
   };
 
   const getStepStatus = (stepIndex: number): 'completed' | 'processing' | 'pending' => {
@@ -48,9 +61,8 @@ export function VideoStatus() {
   const processingSteps = [
     { name: 'Content planning with AI', status: getStepStatus(0) },
     { name: 'Generating storyboard images', status: getStepStatus(1) },
-    // Phase 3 (Creating reference images) is disabled - commented out
-    // { name: 'Creating reference images', status: getStepStatus(2) },
-    { name: 'Generating & stitching video chunks', status: getStepStatus(2) }, // Moved from 3 to 2
+    { name: 'Generating video chunks', status: getStepStatus(2) },
+    { name: 'Adding music and finalizing', status: getStepStatus(3) }, // Phase 4 refinement
   ];
 
   const addNotification = (type: Notification['type'], title: string, message: string) => {
@@ -65,6 +77,51 @@ export function VideoStatus() {
     };
     setNotifications((prev) => [notification, ...prev]);
     setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 5000);
+  };
+
+  // Checkpoint handlers
+  const handleContinue = async () => {
+    if (!currentCheckpoint || !videoId || isContinuing) return;
+
+    setIsContinuing(true);
+    try {
+      const response = await continueVideo(videoId, currentCheckpoint.checkpoint_id);
+
+      if (response.created_new_branch) {
+        toast({
+          title: 'New Branch Created',
+          description: `Created branch: ${response.branch_name}`,
+        });
+      }
+
+      toast({
+        title: 'Pipeline Continued',
+        description: `Starting Phase ${response.next_phase}`,
+      });
+
+      // Resume processing
+      setIsProcessing(true);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Continue Failed',
+        description: error.message,
+      });
+    } finally {
+      setIsContinuing(false);
+    }
+  };
+
+  const handleEdit = () => {
+    setEditDialogOpen(true);
+  };
+
+  const handleArtifactUpdated = (artifact: any) => {
+    toast({
+      title: 'Artifact Updated',
+      description: `Version ${artifact.version} created`,
+    });
+    // The status stream will pick up the new artifact version automatically
   };
 
   // Use SSE stream for real-time status updates (with automatic fallback to polling)
@@ -157,7 +214,28 @@ export function VideoStatus() {
       setCurrentChunkIndex(null);
       setTotalChunks(null);
     }
-    
+
+    // Handle checkpoint updates
+    if (status.current_checkpoint) {
+      setCurrentCheckpoint(status.current_checkpoint);
+
+      // Check if status is paused
+      if (status.status.includes('PAUSED_AT_PHASE')) {
+        console.log('[VideoStatus] Pipeline paused at checkpoint:', status.current_checkpoint.checkpoint_id);
+        setIsProcessing(false); // Stop elapsed time counter
+      }
+    }
+
+    // Update checkpoint tree
+    if (status.checkpoint_tree) {
+      setCheckpointTree(status.checkpoint_tree);
+    }
+
+    // Update active branches
+    if (status.active_branches) {
+      setActiveBranches(status.active_branches);
+    }
+
     // Update video URLs - prefer final_video_url, fallback to stitched_video_url
     // For Veo models, Phase 5 is skipped, so final_video_url might not be set
     const videoUrl = status.final_video_url || status.stitched_video_url;
@@ -246,6 +324,48 @@ export function VideoStatus() {
         <div className="max-w-md mx-auto text-left mb-8">
           <ProcessingSteps steps={processingSteps} elapsedTime={elapsedTime} />
         </div>
+
+        {/* Checkpoint UI */}
+        {currentCheckpoint && videoId && (
+          <div className="mt-8 pt-8 border-t border-border max-w-4xl mx-auto space-y-6">
+            {/* Branch Selector */}
+            {activeBranches.length > 0 && (
+              <div className="flex justify-end">
+                <BranchSelector
+                  branches={activeBranches}
+                  currentBranch={currentCheckpoint.branch_name}
+                  disabled={true}
+                />
+              </div>
+            )}
+
+            {/* Current Checkpoint Card */}
+            <CheckpointCard
+              checkpoint={currentCheckpoint}
+              videoId={videoId}
+              onEdit={handleEdit}
+              onContinue={handleContinue}
+              isProcessing={isContinuing}
+            />
+
+            {/* Checkpoint Tree */}
+            {checkpointTree.length > 0 && (
+              <CheckpointTree
+                tree={checkpointTree}
+                currentCheckpointId={currentCheckpoint.checkpoint_id}
+              />
+            )}
+
+            {/* Artifact Editor Modal */}
+            <ArtifactEditor
+              open={editDialogOpen}
+              onOpenChange={setEditDialogOpen}
+              checkpoint={currentCheckpoint}
+              videoId={videoId}
+              onArtifactUpdated={handleArtifactUpdated}
+            />
+          </div>
+        )}
 
         {storyboardUrls && storyboardUrls.length > 0 && (
           <div className="mt-8 pt-8 border-t border-border">

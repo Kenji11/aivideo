@@ -16,11 +16,13 @@ interface UploadVideoProps {
   prompt: string;
   selectedModel: string;
   uploadedAssetIds: string[];
+  autoContinue: boolean;
   onTitleChange: (title: string) => void;
   onDescriptionChange: (description: string) => void;
   onPromptChange: (prompt: string) => void;
   onModelChange: (model: string) => void;
   onAssetsUploaded: (assetIds: string[]) => void;
+  onAutoContinueChange: (autoContinue: boolean) => void;
   onNotification?: (type: 'success' | 'error', title: string, message: string) => void;
 }
 
@@ -30,11 +32,13 @@ export function UploadVideo({
   prompt,
   selectedModel,
   uploadedAssetIds,
+  autoContinue,
   onTitleChange,
   onDescriptionChange,
   onPromptChange,
   onModelChange,
   onAssetsUploaded,
+  onAutoContinueChange,
   onNotification,
 }: UploadVideoProps) {
   const navigate = useNavigate();
@@ -49,7 +53,8 @@ export function UploadVideo({
         description: description || undefined,
         prompt: prompt,
         reference_assets: uploadedAssetIds,
-        model: selectedModel
+        model: selectedModel,
+        auto_continue: autoContinue
       });
       
       console.log('[UploadVideo] Video generation started, navigating to:', `/processing/${response.video_id}`);
@@ -150,6 +155,24 @@ export function UploadVideo({
           <p className="mt-1 text-xs text-muted-foreground">
             Choose the AI model for video generation. Different models have different quality, speed, and cost characteristics.
           </p>
+        </div>
+
+        <div className="flex items-start space-x-3 p-4 rounded-lg border border-border bg-muted/30">
+          <input
+            type="checkbox"
+            id="autoContinue"
+            checked={autoContinue}
+            onChange={(e) => onAutoContinueChange(e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+          />
+          <div className="flex-1">
+            <label htmlFor="autoContinue" className="text-sm font-medium text-foreground cursor-pointer">
+              YOLO Mode (Auto-continue)
+            </label>
+            <p className="text-xs text-muted-foreground mt-1">
+              Skip checkpoints and run the entire pipeline without pausing. Uncheck this to review and edit artifacts at each stage (Planning, Storyboard, Chunks, Refinement).
+            </p>
+          </div>
         </div>
 
         <button
