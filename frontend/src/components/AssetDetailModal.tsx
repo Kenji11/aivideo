@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { api, AssetDetail } from '../lib/api';
-import { X, Edit2, Save, Trash2, Image as ImageIcon, Search, Loader2 } from 'lucide-react';
+import { X, Edit2, Save, Trash2, Search, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -32,9 +32,10 @@ interface AssetDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   assetId: string;
+  onAssetSelect?: (assetId: string) => void;
 }
 
-export function AssetDetailModal({ isOpen, onClose, assetId }: AssetDetailModalProps) {
+export function AssetDetailModal({ isOpen, onClose, assetId, onAssetSelect }: AssetDetailModalProps) {
   const [asset, setAsset] = useState<AssetDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -44,6 +45,7 @@ export function AssetDetailModal({ isOpen, onClose, assetId }: AssetDetailModalP
   const [isLoadingSimilar, setIsLoadingSimilar] = useState(false);
   const [showSimilar, setShowSimilar] = useState(false);
   const similarAssetsRef = useRef<HTMLDivElement>(null);
+  const modalContentRef = useRef<HTMLDivElement>(null);
   
   // Editable fields
   const [name, setName] = useState('');
@@ -51,13 +53,7 @@ export function AssetDetailModal({ isOpen, onClose, assetId }: AssetDetailModalP
   const [referenceAssetType, setReferenceAssetType] = useState('');
   const [logoPositionPreference, setLogoPositionPreference] = useState('');
 
-  useEffect(() => {
-    if (isOpen && assetId) {
-      fetchAsset();
-    }
-  }, [isOpen, assetId]);
-
-  const fetchAsset = async () => {
+  const fetchAsset = useCallback(async () => {
     setIsLoading(true);
     try {
       const assetData = await api.getAsset(assetId);
@@ -77,7 +73,28 @@ export function AssetDetailModal({ isOpen, onClose, assetId }: AssetDetailModalP
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [assetId, onClose]);
+
+  useEffect(() => {
+    if (isOpen && assetId) {
+      fetchAsset();
+      // Reset similar assets section when assetId changes
+      setShowSimilar(false);
+      setSimilarAssets([]);
+      setIsLoadingSimilar(false);
+      // Scroll to top when navigating to new asset
+      // Use setTimeout to ensure DOM is ready after asset loads
+      const scrollToTop = () => {
+        if (modalContentRef.current) {
+          // The DialogContent element should be scrollable
+          modalContentRef.current.scrollTop = 0;
+        }
+      };
+      // Scroll immediately and also after a brief delay to handle async rendering
+      scrollToTop();
+      setTimeout(scrollToTop, 100);
+    }
+  }, [isOpen, assetId, fetchAsset]);
 
   const handleSave = async () => {
     if (!asset) return;
@@ -114,10 +131,13 @@ export function AssetDetailModal({ isOpen, onClose, assetId }: AssetDetailModalP
     try {
       const response = await api.getSimilarAssets(assetId, { limit: 10 });
       setSimilarAssets(response.assets as AssetDetail[]);
-      // Scroll to similar assets section after results load
-      setTimeout(() => {
-        similarAssetsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      }, 100);
+      // Scroll to similar assets section immediately after results load
+      // Use requestAnimationFrame for immediate scroll after DOM update
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          similarAssetsRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+        });
+      });
     } catch (error) {
       console.error('Failed to find similar assets:', error);
       toast({
@@ -173,8 +193,8 @@ export function AssetDetailModal({ isOpen, onClose, assetId }: AssetDetailModalP
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={onClose} key={assetId}>
+      <DialogContent ref={modalContentRef} className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Asset Details</span>
@@ -515,10 +535,10 @@ export function AssetDetailModal({ isOpen, onClose, assetId }: AssetDetailModalP
                       key={similar.asset_id}
                       className="group relative aspect-square bg-muted rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                       onClick={() => {
-                        // Close current modal and open new one (parent should handle this)
-                        onClose();
-                        // Note: This would need to be handled by parent component
-                        // For now, just show the asset in a new modal would require parent state management
+                        // Navigate to the clicked similar asset
+                        if (onAssetSelect) {
+                          onAssetSelect(similar.asset_id);
+                        }
                       }}
                     >
                       <img
