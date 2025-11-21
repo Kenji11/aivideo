@@ -11,13 +11,20 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
+# Copy requirements.txt first (for better Docker layer caching)
+COPY requirements.txt .
+
 # Install PyTorch CPU version first (smaller image, faster install)
+# Must install from PyTorch's CPU index to get CPU-only version
 RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
     torch>=2.0.0 \
     torchvision>=0.15.0
 
-# Install Python dependencies
-COPY requirements.txt .
+# Verify torch is installed
+RUN python -c "import torch; print(f'PyTorch {torch.__version__} installed successfully')"
+
+# Install remaining Python dependencies
+# torch and torchvision are already installed above, so they're not in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
