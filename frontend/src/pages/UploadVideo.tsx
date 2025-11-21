@@ -43,7 +43,6 @@ export function UploadVideo({
     e.preventDefault();
     
     try {
-      console.log('[UploadVideo] handleSubmit called, generating video...');
       const response = await generateVideo({
         title: title || 'Untitled Video',
         description: description || undefined,
@@ -51,8 +50,6 @@ export function UploadVideo({
         reference_assets: uploadedAssetIds,
         model: selectedModel
       });
-      
-      console.log('[UploadVideo] Video generation started, navigating to:', `/processing/${response.video_id}`);
       // Navigate to processing page with videoId in route
       navigate(`/processing/${response.video_id}`);
       onNotification?.('success', 'Generation Started', 'Your video is being created...');

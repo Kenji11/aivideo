@@ -20,17 +20,12 @@ apiClient.interceptors.request.use(
       const token = await getIdToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
-        console.log(`[API] Added auth token to ${config.method?.toUpperCase()} ${config.url}`);
-      } else {
-        console.warn(`[API] No auth token available for ${config.method?.toUpperCase()} ${config.url}`);
       }
     } catch (error) {
       // If token retrieval fails, log the error
       console.error('[API] Failed to get auth token:', error);
-      console.warn(`[API] Request will proceed without token: ${config.method?.toUpperCase()} ${config.url}`);
     }
     
-    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
     return config;
   },
   (error) => {

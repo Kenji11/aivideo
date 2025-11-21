@@ -36,7 +36,6 @@ export function Preview() {
           }
         } catch (err) {
           // If getVideo fails, try status endpoint
-          console.log('[Preview] getVideo failed, trying status endpoint:', err);
         }
 
         // Fallback to status endpoint (works for both in-progress and completed videos)
@@ -58,7 +57,7 @@ export function Preview() {
             setTitle(matchingVideo.title);
           }
         } catch (err) {
-          console.log('[Preview] Failed to fetch title from video list:', err);
+          // Failed to fetch title from video list
         }
       } catch (err) {
         console.error('[Preview] Failed to fetch video data:', err);
