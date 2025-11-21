@@ -22,24 +22,11 @@ app = FastAPI(
 )
 
 # CORS middleware
-# In development, allow localhost origins; in production, only allow specific domains
-if settings.environment == "development":
-    allow_origins = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-    ]
-else:
-    allow_origins = [
-        "https://aivideo.gauntlet3.com",
-        "https://videoai.gauntlet3.com",
-    ]
-
+# Allow all origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allow_origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # Must be False when allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
