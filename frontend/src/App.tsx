@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Sparkles, Video, Film, Download } from 'lucide-react';
 // Commented out - may use later
@@ -94,14 +94,14 @@ function AppContent() {
     { id: 4, name: 'Download', icon: Download },
   ];
 
-  const addNotification = (type: Notification['type'], title: string, message: string) => {
+  const addNotification = useCallback((type: Notification['type'], title: string, message: string) => {
     const variant = type === 'error' ? 'destructive' : 'default';
     toast({
       variant,
       title,
       description: message,
     });
-  };
+  }, []);
 
 
   const handleProjectSelect = (project: VideoListItem) => {
@@ -167,7 +167,7 @@ function AppContent() {
     };
 
     fetchProjects();
-  }, [location.pathname]);
+  }, [location.pathname, addNotification]);
 
   const getCurrentStep = () => {
     if (location.pathname.startsWith('/processing')) return 2;
