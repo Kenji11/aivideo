@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api, AssetListItem } from '../lib/api';
 import { UploadAssetModal } from '../components/UploadAssetModal';
 import { AssetDetailModal } from '../components/AssetDetailModal';
 import { UploadZone } from '../components/UploadZone';
-import { Image, Trash2, Filter, X } from 'lucide-react';
+import { Image, Trash2, Filter, X, Search, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -39,6 +39,10 @@ export function AssetLibrary() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [assetToDelete, setAssetToDelete] = useState<{ id: string; name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchAssets, setSearchAssets] = useState<AssetListItem[]>([]);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchAssets = useCallback(async () => {
     setIsLoading(true);
@@ -62,6 +66,51 @@ export function AssetLibrary() {
       setIsLoading(false);
     }
   }, [filterType, filterLogo, page, limit]);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      // Clear search results but keep showing library
+      setSearchAssets([]);
+      setIsSearching(false);
+      return;
+    }
+
+    // Debounce search
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const response = await api.searchAssets({
+          q: searchQuery.trim(),
+          asset_type: filterType || undefined,
+          limit: 50,
+        });
+        setSearchAssets(response.assets);
+      } catch (error) {
+        console.error('Search failed:', error);
+        // Only show error for actual failures, not empty results
+        if (error instanceof Error && !error.message.includes('404')) {
+          toast({
+            variant: 'destructive',
+            title: 'Search failed',
+            description: error.message,
+          });
+        }
+        setSearchAssets([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery, filterType]);
 
   useEffect(() => {
     fetchAssets();
@@ -141,6 +190,40 @@ export function AssetLibrary() {
         </p>
       </div>
 
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search assets by description (e.g., 'red Nike sneaker', 'minimalist logo')..."
+            className="w-full pl-10 pr-10 py-2 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          {isSearching && (
+            <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
+          )}
+          {searchQuery && !isSearching && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+        {searchQuery.trim() && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {isSearching
+              ? 'Searching...'
+              : searchAssets.length > 0
+              ? `Found ${searchAssets.length} result(s) for "${searchQuery}"`
+              : null}
+          </p>
+        )}
+      </div>
+
       {/* Upload Zone */}
       <div className="mb-8">
         <label className="block text-sm font-medium text-foreground mb-2">
@@ -209,8 +292,95 @@ export function AssetLibrary() {
         </div>
       )}
 
-      {/* Asset grid */}
-      {!isLoading && assets.length > 0 && (
+      {/* Search results grid - only show when search is complete and has query */}
+      {!isLoading && !isSearching && searchQuery.trim() && searchAssets.length > 0 && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {searchAssets.map((asset) => (
+              <div
+                key={asset.asset_id}
+                className="group relative aspect-square bg-muted rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                onClick={() => handleAssetClick(asset)}
+              >
+                {/* Thumbnail */}
+                <img
+                  src={asset.thumbnail_url || asset.s3_url}
+                  alt={asset.name || asset.filename}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Asset';
+                  }}
+                />
+                
+                {/* Overlay on hover */}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={(e) => handleDelete(asset.asset_id, asset.name || asset.filename, e)}
+                    className="flex items-center gap-1"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </Button>
+                </div>
+
+                {/* Asset type badge */}
+                {asset.reference_asset_type && (
+                  <div className="absolute top-2 left-2">
+                    <span className="px-2 py-1 text-xs font-semibold rounded bg-primary/90 text-primary-foreground">
+                      {asset.reference_asset_type}
+                    </span>
+                  </div>
+                )}
+
+                {/* Logo badge */}
+                {asset.is_logo && (
+                  <div className="absolute top-2 right-2">
+                    <span className="px-2 py-1 text-xs font-semibold rounded bg-blue-600 text-white">
+                      Logo
+                    </span>
+                  </div>
+                )}
+
+                {/* AI Analyzed indicator */}
+                {asset.analysis && (
+                  <div className="absolute top-2 right-2" style={{ top: asset.is_logo ? '2.5rem' : '0.5rem' }}>
+                    <span className="px-2 py-1 text-xs font-semibold rounded bg-green-600 text-white">
+                      ✓ AI
+                    </span>
+                  </div>
+                )}
+
+                {/* Primary object on hover */}
+                {asset.primary_object && (
+                  <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4 pointer-events-none">
+                    <p className="text-sm text-white text-center line-clamp-3">
+                      {asset.primary_object}
+                    </p>
+                  </div>
+                )}
+
+                {/* Asset name */}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+                  <p className="text-sm font-medium text-white truncate">
+                    {asset.name || asset.filename}
+                  </p>
+                  {asset.similarity_score !== undefined && (
+                    <p className="text-xs text-white/80 mt-1">
+                      Match: {(asset.similarity_score * 100).toFixed(0)}%
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          </>
+      )}
+
+      {/* Regular asset grid - always show when not showing search results */}
+      {!isLoading && (!searchQuery.trim() || isSearching || (searchQuery.trim() && searchAssets.length === 0)) && assets.length > 0 && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {assets.map((asset) => (
@@ -288,8 +458,8 @@ export function AssetLibrary() {
             ))}
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
+          {/* Pagination - only show when not searching */}
+          {!searchQuery.trim() && totalPages > 1 && (
             <div className="mt-8 flex items-center justify-center gap-2">
               <Button
                 variant="outline"
@@ -313,23 +483,51 @@ export function AssetLibrary() {
         </>
       )}
 
-      {/* Empty state */}
-      {!isLoading && assets.length === 0 && (
-        <div className="text-center py-16">
-          <Image className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-          <p className="text-lg font-semibold text-foreground mb-2">
-            No assets yet
-          </p>
-          <p className="text-muted-foreground mb-6">
-            {filterType || filterLogo !== null
-              ? 'No assets match your filters. Try adjusting your filters.'
-              : 'Upload your first reference asset to get started'}
-          </p>
-          {(!filterType && filterLogo === null) && (
-            <p className="text-sm text-muted-foreground">
-              Use the upload zone above to add your first reference asset
+      {/* Empty state for no assets at all */}
+      {!isLoading && !isSearching && assets.length === 0 && !searchQuery.trim() && (
+        <div className="text-center py-16 px-4">
+          <div className="max-w-md mx-auto">
+            <div className="mb-6">
+              <Image className="w-24 h-24 mx-auto text-muted-foreground opacity-50" />
+            </div>
+            <p className="text-xl font-semibold text-foreground mb-2">
+              No assets yet
             </p>
-          )}
+            <p className="text-muted-foreground mb-6">
+              {filterType || filterLogo !== null
+                ? 'No assets match your filters. Try adjusting your filters.'
+                : 'Upload your first reference asset to get started'}
+            </p>
+            {(!filterType && filterLogo === null) && (
+              <p className="text-sm text-muted-foreground">
+                Use the upload zone above to add your first reference asset
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Empty state for search with no results */}
+      {!isLoading && !isSearching && searchQuery.trim() && searchAssets.length === 0 && (
+        <div className="text-center py-16 px-4">
+          <div className="max-w-md mx-auto">
+            <div className="mb-6">
+              <Image className="w-24 h-24 mx-auto text-muted-foreground opacity-50" />
+            </div>
+            <p className="text-xl font-semibold text-foreground mb-2">
+              No assets found
+            </p>
+            <p className="text-muted-foreground mb-6">
+              We couldn't find any assets matching "{searchQuery}". Try a different search term or browse all assets.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => setSearchQuery('')}
+              className="mt-4"
+            >
+              Clear search
+            </Button>
+          </div>
         </div>
       )}
 

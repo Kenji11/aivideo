@@ -31,7 +31,18 @@ class ReferenceAssetType(str, enum.Enum):
     PROP = "prop"
 
 class AssetSource(str, enum.Enum):
-    """Asset source"""
+    """
+    Asset source enum.
+    
+    NOTE: There's a mismatch between Python enum values (lowercase) and PostgreSQL enum labels (uppercase).
+    - Python: USER_UPLOAD = "user_upload"
+    - PostgreSQL: 'USER_UPLOAD' (enum label)
+    
+    For raw SQL queries, use .name (e.g., AssetSource.USER_UPLOAD.name) to get "USER_UPLOAD".
+    For SQLAlchemy ORM, use the enum directly (e.g., AssetSource.USER_UPLOAD) - it handles conversion.
+    
+    TODO: Migrate to align values or change to VARCHAR for consistency.
+    """
     USER_UPLOAD = "user_upload"
     SYSTEM_GENERATED = "system_generated"
 
@@ -47,7 +58,7 @@ class Asset(Base):
     s3_key = Column(String, nullable=False)  # S3 key/path
     s3_url = Column(String, nullable=True)  # Full S3 URL or presigned URL
     asset_type = Column(SQLEnum(AssetType), nullable=False)  # Legacy: IMAGE/VIDEO/AUDIO
-    source = Column(SQLEnum(AssetSource), nullable=False)
+    source = Column(String(20), nullable=False)  # user_upload/system_generated - stored as string to avoid enum name issues
     
     # Metadata
     file_name = Column(String, nullable=True)
