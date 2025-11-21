@@ -139,6 +139,7 @@ class VideoGeneration(Base):
     refined_url = Column(String, nullable=True)
     final_video_url = Column(String, nullable=True)
     final_music_url = Column(String, nullable=True)  # Music URL from Phase 5 (saved even if combining fails)
+    thumbnail_url = Column(String, nullable=True)  # Thumbnail image URL (640x360) for My Projects page
     phase_outputs = Column(JSON, default=dict)  # Store outputs from each phase
     
     # Note: creativity_level, selected_archetype, num_beats, num_chunks stored in spec JSON

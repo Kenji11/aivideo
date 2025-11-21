@@ -56,6 +56,7 @@ class VideoResponse(BaseModel):
     title: str
     status: str
     final_video_url: Optional[str]
+    thumbnail_url: Optional[str] = None
     cost_usd: float
     generation_time_seconds: Optional[float]
     created_at: datetime
@@ -70,6 +71,7 @@ class VideoListItem(BaseModel):
     progress: float
     current_phase: Optional[str] = None
     final_video_url: Optional[str]
+    thumbnail_url: Optional[str] = None
     cost_usd: float
     created_at: datetime
     completed_at: Optional[datetime]

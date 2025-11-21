@@ -173,6 +173,7 @@ export interface VideoListItem {
   progress: number;
   current_phase?: string;
   final_video_url?: string;
+  thumbnail_url?: string;
   cost_usd: number;
   created_at: string;
   completed_at?: string;
