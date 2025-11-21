@@ -30,6 +30,12 @@
   - Veo 3.1 Fast: Video generation (native audio) - $0.50/5s chunk
   - MusicGen: Background music generation (Phase 5) - $0.15/video
   - Other models: wan, zeroscope, animatediff, kling, pixverse, sora
+- **CLIP (Local)**: Semantic embeddings for reference asset search (PR #3)
+  - Model: ViT-B/32 (512-dim embeddings)
+  - Text encoder: Converts queries to embeddings
+  - Vision encoder: Converts images to embeddings
+  - Cost: $0.00 (local inference)
+  - Performance: Better at image-to-image (0.7-0.95) than text-to-image (0.2-0.5)
 
 ### Infrastructure (AWS - us-east-2)
 - **Compute**: Elastic Beanstalk (Web + Worker tiers)
@@ -160,6 +166,11 @@ replicate==0.15.4              # Replicate API client
 openai==1.3.5                  # OpenAI API client
 pydantic==2.5.0                # Data validation
 python-multipart==0.0.6        # File uploads
+torch>=2.0.0                   # PyTorch (for CLIP)
+transformers>=4.30.0           # Hugging Face (for CLIP)
+pillow>=10.0.0                 # Image processing
+numpy>=1.24.0                  # Numerical operations (for embeddings)
+pgvector                       # PostgreSQL vector extension (via migration)
 ```
 
 ### Frontend (JavaScript/TypeScript)
@@ -224,6 +235,17 @@ python-multipart==0.0.6        # File uploads
 - queued, validating, generating_animatic
 - generating_references, generating_chunks
 - refining, complete, failed
+
+- assets: Reference asset library (PR #1, #3)
+  - id (UUID), user_id, s3_key, s3_url
+  - name, description, reference_asset_type
+  - embedding (vector(512)) - CLIP embeddings for semantic search
+  - analysis (JSON) - GPT-4V analysis results
+  - primary_object, colors, style_tags, etc.
+  - source (enum: USER_UPLOAD, SYSTEM_GENERATED)
+  
+# Extensions
+- pgvector: Vector similarity search (cosine distance)
 ```
 
 ## Deployment Considerations

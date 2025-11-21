@@ -9,32 +9,44 @@
 **Status**: ✅ All critical bugs fixed, architecture documented
 
 ## What Just Happened
-1. ✅ **PR #1 (Reference Assets) Complete**: Reference asset library foundation implemented
+1. ✅ **PR #3 (Semantic Search System) Complete**: Vector similarity search for reference assets
+   - Backend: `asset_search.py` service with CLIP embeddings and pgvector similarity search
+   - API: `/api/assets/search` (text-to-image), `/api/assets/{id}/similar` (image-to-image), `/api/assets/recommend` (style consistency)
+   - Frontend: Search bar with debounce, "Find Similar" button in asset detail modal
+   - Similarity thresholds: 0.25 (25%) for text search, 0.7 (70%) for image similarity
+   - Fixed enum mismatch: Use `AssetSource.USER_UPLOAD.name` for database compatibility
+   - Auto-scroll: Similar assets section scrolls into view when results load
+2. ✅ **PR #1 (Reference Assets) Complete**: Reference asset library foundation implemented
    - Database: Extended `assets` table with reference asset fields (name, description, thumbnail_url, AI analysis fields, embedding)
    - Migration: `004_add_reference_asset_fields.sql` adds all new columns (requires pgvector extension)
    - S3: New flat structure `{user_id}/assets/{filename}` with auto-generated thumbnails
    - API: Updated upload endpoint, added GET/PATCH/DELETE `/api/assets/{asset_id}` endpoints
    - Frontend: New Assets page (`/assets`) with grid view, upload modal, detail modal, filters, pagination
-2. ✅ **PR #11 Complete**: Phase cleanup and renaming - removed unused phases and created sequential structure
-3. ✅ **Removed Unused Phases**: Deleted phase6_export, phase2_animatic, phase3_references, and old phase4_chunks
-4. ✅ **Renamed Phases**: phase4_chunks_storyboard → phase3_chunks, phase5_refine → phase4_refine
-5. ✅ **Sequential Structure**: Pipeline now uses phase1 → phase2 → phase3 → phase4 (clean numbering)
-6. ✅ **Code Cleanup**: Removed ~50% of unused phase code, updated all references
-7. ✅ **Pipeline Updated**: Chain now goes directly from phase2 to phase3 (removed phase3_references)
-8. ✅ **All References Updated**: Imports, Celery tasks, progress tracking, status builder, API endpoints
-9. ✅ **Memory Bank Updated**: All documentation reflects PR #11 completion
+3. ✅ **PR #11 Complete**: Phase cleanup and renaming - removed unused phases and created sequential structure
+4. ✅ **Removed Unused Phases**: Deleted phase6_export, phase2_animatic, phase3_references, and old phase4_chunks
+5. ✅ **Renamed Phases**: phase4_chunks_storyboard → phase3_chunks, phase5_refine → phase4_refine
+6. ✅ **Sequential Structure**: Pipeline now uses phase1 → phase2 → phase3 → phase4 (clean numbering)
+7. ✅ **Code Cleanup**: Removed ~50% of unused phase code, updated all references
+8. ✅ **Pipeline Updated**: Chain now goes directly from phase2 to phase3 (removed phase3_references)
+9. ✅ **All References Updated**: Imports, Celery tasks, progress tracking, status builder, API endpoints
+10. ✅ **Memory Bank Updated**: All documentation reflects PR #11 completion
 
 ## Current Focus
-**System Stabilization & Infrastructure Improvements**
+**Reference Asset Library & Semantic Search**
 
 ### Recent Achievements
-1. ✅ **PR #11**: Phase cleanup and renaming - sequential phase structure (phase1 → phase2 → phase3 → phase4)
-2. ✅ **Code Cleanup**: Removed 4 unused phases (phase6_export, phase2_animatic, phase3_references, old phase4_chunks)
-3. ✅ **Sequential Naming**: Phases now numbered 1-4 sequentially for clarity
-4. ✅ **Simplified Pipeline**: Removed phase3_references from chain (phase2 → phase3 directly)
-5. ✅ **All References Updated**: Imports, Celery tasks, progress tracking, status builder, API endpoints
-6. ✅ **PR #10**: Redis-based progress tracking with Server-Sent Events (SSE)
-7. ✅ **Performance**: 90%+ reduction in database writes during pipeline execution
+1. ✅ **PR #3**: Semantic search system with CLIP embeddings and pgvector
+   - Text-to-image search with 25% minimum similarity threshold
+   - Image-to-image similarity with 70% minimum threshold
+   - Style-consistent recommendations using centroid embeddings
+   - Fixed enum compatibility issues (AssetSource)
+2. ✅ **PR #11**: Phase cleanup and renaming - sequential phase structure (phase1 → phase2 → phase3 → phase4)
+3. ✅ **Code Cleanup**: Removed 4 unused phases (phase6_export, phase2_animatic, phase3_references, old phase4_chunks)
+4. ✅ **Sequential Naming**: Phases now numbered 1-4 sequentially for clarity
+5. ✅ **Simplified Pipeline**: Removed phase3_references from chain (phase2 → phase3 directly)
+6. ✅ **All References Updated**: Imports, Celery tasks, progress tracking, status builder, API endpoints
+7. ✅ **PR #10**: Redis-based progress tracking with Server-Sent Events (SSE)
+8. ✅ **Performance**: 90%+ reduction in database writes during pipeline execution
 
 ### System Status
 - ✅ **Pipeline**: Fully functional end-to-end (phase1 → phase2 → phase3 → phase4)
@@ -230,6 +242,9 @@
 - [ ] Performance optimization (parallel after chunk 0) - Future enhancement
 
 ## Notes
+- ✅ **PR #3 Complete**: Semantic search system with CLIP embeddings and similarity thresholds
+- ✅ **Enum Fixes**: Resolved AssetSource enum mismatch (use .name for database compatibility)
+- ✅ **Similarity Thresholds**: 0.25 for text search, 0.7 for image similarity (CLIP performs better on image-to-image)
 - ✅ **PR #11 Complete**: Phase cleanup and renaming - sequential structure (phase1 → phase2 → phase3 → phase4)
 - ✅ **Removed Unused Phases**: phase6_export, phase2_animatic, phase3_references, old phase4_chunks
 - ✅ **Renamed Phases**: phase4_chunks_storyboard → phase3_chunks, phase5_refine → phase4_refine
