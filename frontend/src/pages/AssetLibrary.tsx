@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { api, AssetListItem } from '../lib/api';
 import { UploadAssetModal } from '../components/UploadAssetModal';
 import { AssetDetailModal } from '../components/AssetDetailModal';
@@ -179,6 +179,109 @@ export function AssetLibrary() {
 
   const totalPages = Math.ceil(total / limit);
 
+  // Group assets by type for display
+  const groupedAssets = useMemo(() => {
+    const grouped: Record<string, AssetListItem[]> = {};
+    
+    assets.forEach((asset) => {
+      // Determine the section key - products take precedence over logos
+      let sectionKey: string;
+      if (asset.reference_asset_type === 'product') {
+        sectionKey = 'product';
+      } else if (asset.is_logo) {
+        sectionKey = 'logo';
+      } else if (asset.reference_asset_type) {
+        sectionKey = asset.reference_asset_type;
+      } else {
+        sectionKey = 'other';
+      }
+      
+      if (!grouped[sectionKey]) {
+        grouped[sectionKey] = [];
+      }
+      grouped[sectionKey].push(asset);
+    });
+
+    return grouped;
+  }, [assets]);
+
+  // Define section order and labels
+  const sectionOrder = [
+    { key: 'product', label: 'Products' },
+    { key: 'logo', label: 'Logo' },
+    { key: 'person', label: 'Person' },
+    { key: 'environment', label: 'Environment' },
+    { key: 'prop', label: 'Prop' },
+    { key: 'texture', label: 'Texture' },
+    { key: 'other', label: 'Other' },
+  ];
+
+  // Render asset card component
+  const renderAssetCard = (asset: AssetListItem) => (
+    <div
+      key={asset.asset_id}
+      className="group relative aspect-square bg-muted rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+      onClick={() => handleAssetClick(asset)}
+    >
+      {/* Thumbnail */}
+      <img
+        src={asset.thumbnail_url || asset.s3_url}
+        alt={asset.name || asset.filename}
+        className="w-full h-full object-cover"
+        onError={(e) => {
+          e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Asset';
+        }}
+      />
+      
+      {/* Overlay on hover */}
+      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={(e) => handleDelete(asset.asset_id, asset.name || asset.filename, e)}
+          className="flex items-center gap-1"
+        >
+          <Trash2 className="w-4 h-4" />
+          Delete
+        </Button>
+      </div>
+
+      {/* Logo badge */}
+      {asset.is_logo && (
+        <div className="absolute top-2 right-2">
+          <span className="px-2 py-1 text-xs font-semibold rounded bg-blue-600 text-white">
+            Logo
+          </span>
+        </div>
+      )}
+
+      {/* AI Analyzed indicator */}
+      {asset.analysis && (
+        <div className="absolute top-2 right-2" style={{ top: asset.is_logo ? '2.5rem' : '0.5rem' }}>
+          <span className="px-2 py-1 text-xs font-semibold rounded bg-green-600 text-white">
+            ✓ AI
+          </span>
+        </div>
+      )}
+
+      {/* Primary object on hover */}
+      {asset.primary_object && (
+        <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4 pointer-events-none">
+          <p className="text-sm text-white text-center line-clamp-3">
+            {asset.primary_object}
+          </p>
+        </div>
+      )}
+
+      {/* Asset name */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+        <p className="text-sm font-medium text-white truncate">
+          {asset.name || asset.filename}
+        </p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="animate-fade-in">
       <div className="mb-8">
@@ -325,15 +428,6 @@ export function AssetLibrary() {
                   </Button>
                 </div>
 
-                {/* Asset type badge */}
-                {asset.reference_asset_type && (
-                  <div className="absolute top-2 left-2">
-                    <span className="px-2 py-1 text-xs font-semibold rounded bg-primary/90 text-primary-foreground">
-                      {asset.reference_asset_type}
-                    </span>
-                  </div>
-                )}
-
                 {/* Logo badge */}
                 {asset.is_logo && (
                   <div className="absolute top-2 right-2">
@@ -379,84 +473,26 @@ export function AssetLibrary() {
           </>
       )}
 
-      {/* Regular asset grid - always show when not showing search results */}
+      {/* Regular asset grid - grouped by type with sections */}
       {!isLoading && (!searchQuery.trim() || isSearching || (searchQuery.trim() && searchAssets.length === 0)) && assets.length > 0 && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {assets.map((asset) => (
-              <div
-                key={asset.asset_id}
-                className="group relative aspect-square bg-muted rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
-                onClick={() => handleAssetClick(asset)}
-              >
-                {/* Thumbnail */}
-                <img
-                  src={asset.thumbnail_url || asset.s3_url}
-                  alt={asset.name || asset.filename}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Asset';
-                  }}
-                />
-                
-                {/* Overlay on hover */}
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={(e) => handleDelete(asset.asset_id, asset.name || asset.filename, e)}
-                    className="flex items-center gap-1"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete
-                  </Button>
-                </div>
+          {sectionOrder.map((section) => {
+            const sectionAssets = groupedAssets[section.key];
+            if (!sectionAssets || sectionAssets.length === 0) {
+              return null;
+            }
 
-                {/* Asset type badge */}
-                {asset.reference_asset_type && (
-                  <div className="absolute top-2 left-2">
-                    <span className="px-2 py-1 text-xs font-semibold rounded bg-primary/90 text-primary-foreground">
-                      {asset.reference_asset_type}
-                    </span>
-                  </div>
-                )}
-
-                {/* Logo badge */}
-                {asset.is_logo && (
-                  <div className="absolute top-2 right-2">
-                    <span className="px-2 py-1 text-xs font-semibold rounded bg-blue-600 text-white">
-                      Logo
-                    </span>
-                  </div>
-                )}
-
-                {/* AI Analyzed indicator */}
-                {asset.analysis && (
-                  <div className="absolute top-2 right-2" style={{ top: asset.is_logo ? '2.5rem' : '0.5rem' }}>
-                    <span className="px-2 py-1 text-xs font-semibold rounded bg-green-600 text-white">
-                      ✓ AI
-                    </span>
-                  </div>
-                )}
-
-                {/* Primary object on hover */}
-                {asset.primary_object && (
-                  <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4 pointer-events-none">
-                    <p className="text-sm text-white text-center line-clamp-3">
-                      {asset.primary_object}
-                    </p>
-                  </div>
-                )}
-
-                {/* Asset name */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-                  <p className="text-sm font-medium text-white truncate">
-                    {asset.name || asset.filename}
-                  </p>
+            return (
+              <div key={section.key} className="mb-8">
+                <h3 className="text-xl font-semibold text-foreground mb-4">
+                  {section.label}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {sectionAssets.map(renderAssetCard)}
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
 
           {/* Pagination - only show when not searching */}
           {!searchQuery.trim() && totalPages > 1 && (
