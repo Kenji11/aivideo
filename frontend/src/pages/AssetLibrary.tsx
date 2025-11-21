@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api, AssetListItem } from '../lib/api';
 import { UploadAssetModal } from '../components/UploadAssetModal';
 import { AssetDetailModal } from '../components/AssetDetailModal';
@@ -26,11 +27,11 @@ const REFERENCE_ASSET_TYPES = [
 ];
 
 export function AssetLibrary() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [assets, setAssets] = useState<AssetListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<AssetListItem | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>('');
   const [filterLogo, setFilterLogo] = useState<boolean | null>(null);
   const [page, setPage] = useState(0);
@@ -43,6 +44,12 @@ export function AssetLibrary() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchAssets, setSearchAssets] = useState<AssetListItem[]>([]);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get assetId from URL query params
+  const assetIdFromUrl = searchParams.get('assetId');
+  
+  // Determine if modal should be open based on URL
+  const isDetailModalOpen = !!assetIdFromUrl;
 
   const fetchAssets = useCallback(async () => {
     setIsLoading(true);
@@ -166,15 +173,43 @@ export function AssetLibrary() {
     setAssetToDelete(null);
   };
 
+  // Sync selectedAsset with URL assetId
+  useEffect(() => {
+    if (assetIdFromUrl) {
+      // Find the asset in current assets list
+      const asset = assets.find(a => a.asset_id === assetIdFromUrl) ||
+                    searchAssets.find(a => a.asset_id === assetIdFromUrl);
+      if (asset) {
+        setSelectedAsset(asset);
+      } else {
+        // Asset not in current list, create a minimal object for the modal
+        setSelectedAsset({ asset_id: assetIdFromUrl } as AssetListItem);
+      }
+    } else {
+      setSelectedAsset(null);
+    }
+  }, [assetIdFromUrl, assets, searchAssets]);
+
   const handleAssetClick = (asset: AssetListItem) => {
-    setSelectedAsset(asset);
-    setIsDetailModalOpen(true);
+    // Update URL with assetId query param, preserving other params
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('assetId', asset.asset_id);
+    setSearchParams(newParams);
   };
 
   const handleCloseDetailModal = () => {
-    setIsDetailModalOpen(false);
-    setSelectedAsset(null);
+    // Remove assetId from URL, preserving other params
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('assetId');
+    setSearchParams(newParams);
     fetchAssets(); // Refresh in case asset was updated
+  };
+
+  const handleAssetSelect = (assetId: string) => {
+    // Update URL to navigate to new asset, preserving other params
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('assetId', assetId);
+    setSearchParams(newParams);
   };
 
   const totalPages = Math.ceil(total / limit);
@@ -575,11 +610,12 @@ export function AssetLibrary() {
       />
 
       {/* Detail Modal */}
-      {selectedAsset && (
+      {selectedAsset && assetIdFromUrl && (
         <AssetDetailModal
           isOpen={isDetailModalOpen}
           onClose={handleCloseDetailModal}
-          assetId={selectedAsset.asset_id}
+          assetId={assetIdFromUrl}
+          onAssetSelect={handleAssetSelect}
         />
       )}
 
