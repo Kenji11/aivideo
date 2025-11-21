@@ -23,7 +23,9 @@ def generate_beat_image(
     beat: Dict,
     style: Dict,
     product: Dict,
-    user_id: str
+    user_id: str,
+    reference_mapping: Dict = None,
+    user_assets: list = None
 ) -> Dict:
     """
     Generate a storyboard image for a single beat.
@@ -38,6 +40,8 @@ def generate_beat_image(
         style: Style specification with color_palette, lighting, aesthetic, etc.
         product: Product specification with name, category, etc.
         user_id: User ID for organizing outputs in S3
+        reference_mapping: Optional dict mapping beat_id to reference assets (from Phase 1)
+        user_assets: Optional list of user asset dicts (from Phase 0) for metadata lookup
         
     Returns:
         Dictionary with:
@@ -48,6 +52,7 @@ def generate_beat_image(
             - image_url: S3 URL of generated image
             - shot_type: Shot type from beat
             - prompt_used: Full prompt that was used for generation
+            - referenced_asset_ids: List of asset IDs used (for usage tracking)
     """
     
     # Extract base prompt from beat template
@@ -60,17 +65,82 @@ def generate_beat_image(
     aesthetic = style.get('aesthetic', 'cinematic')
     shot_type = beat.get('shot_type', 'medium')
     
-    # Compose full prompt
-    full_prompt = (
-        f"{base_prompt}, "
-        f"{colors_str} color palette, "
-        f"{lighting} lighting, "
-        f"{aesthetic} aesthetic, "
-        f"cinematic composition, "
-        f"high quality professional photography, "
-        f"1280x720 aspect ratio, "
-        f"{shot_type} shot framing"
-    )
+    # Track which assets are referenced for this beat
+    referenced_asset_ids = []
+    
+    # Check if this beat has reference assets in the mapping
+    beat_id = beat.get('beat_id')
+    reference_info = None
+    if reference_mapping and beat_id and beat_id in reference_mapping:
+        reference_info = reference_mapping[beat_id]
+        logger.info(f"Beat {beat_id} has reference mapping: {reference_info}")
+    
+    # Enhance prompt with reference asset information
+    reference_prompt_parts = []
+    if reference_info and user_assets:
+        asset_ids = reference_info.get('asset_ids', [])
+        usage_type = reference_info.get('usage_type', 'product')
+        
+        # Look up asset details from user_assets list
+        for asset_id in asset_ids:
+            asset = next((a for a in user_assets if a.get('asset_id') == asset_id), None)
+            if asset:
+                referenced_asset_ids.append(asset_id)
+                
+                # Extract asset metadata
+                primary_object = asset.get('primary_object', '')
+                asset_name = asset.get('name', '')
+                asset_colors = asset.get('colors', [])
+                asset_style_tags = asset.get('style_tags', [])
+                
+                # Build reference description based on usage type
+                if usage_type == 'product':
+                    if primary_object:
+                        reference_prompt_parts.append(f"featuring {primary_object}")
+                    elif asset_name:
+                        reference_prompt_parts.append(f"featuring {asset_name}")
+                    
+                    # Add style tags if available
+                    if asset_style_tags:
+                        style_str = ', '.join(asset_style_tags[:3])  # Limit to 3 tags
+                        reference_prompt_parts.append(f"{style_str} style")
+                    
+                elif usage_type == 'logo':
+                    if asset_name:
+                        reference_prompt_parts.append(f"with {asset_name} logo visible")
+                    else:
+                        reference_prompt_parts.append("with brand logo prominent")
+                    reference_prompt_parts.append("brand identity clear")
+                
+                # Merge asset colors into palette if available
+                if asset_colors:
+                    # Prepend asset colors to existing palette (give them priority)
+                    color_palette = asset_colors[:2] + color_palette  # Take top 2 colors from asset
+                    colors_str = ', '.join(color_palette[:5])  # Limit to 5 total colors
+                    logger.info(f"Enhanced color palette with asset colors: {colors_str}")
+                
+                logger.info(
+                    f"Enhanced prompt with {usage_type} reference: {asset_name or primary_object} "
+                    f"(asset_id: {asset_id})"
+                )
+    
+    # Compose full prompt with reference enhancements
+    prompt_parts = [base_prompt]
+    
+    # Add reference descriptions
+    if reference_prompt_parts:
+        prompt_parts.extend(reference_prompt_parts)
+    
+    # Add style information
+    prompt_parts.append(f"{colors_str} color palette")
+    prompt_parts.append(f"{lighting} lighting")
+    prompt_parts.append(f"{aesthetic} aesthetic")
+    prompt_parts.append("cinematic composition")
+    prompt_parts.append("high quality professional photography")
+    prompt_parts.append("1280x720 aspect ratio")
+    prompt_parts.append(f"{shot_type} shot framing")
+    
+    full_prompt = ', '.join(prompt_parts)
     
     # Create negative prompt
     negative_prompt = (
@@ -139,7 +209,8 @@ def generate_beat_image(
             "duration": beat.get('duration', 5),
             "image_url": s3_url,
             "shot_type": shot_type,
-            "prompt_used": full_prompt
+            "prompt_used": full_prompt,
+            "referenced_asset_ids": referenced_asset_ids  # Track which assets were used
         }
         
     except Exception as e:

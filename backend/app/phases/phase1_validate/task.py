@@ -263,7 +263,8 @@ def plan_with_gpt4o_mini(
         output_data={
             "spec": spec,
             "reference_mapping": reference_mapping,
-            "model_used": "gpt-4o-mini"
+            "model_used": "gpt-4o-mini",
+            "phase0_output": phase0_output  # Pass Phase 0 output for Phase 2
         },
         cost_usd=cost,
         duration_seconds=duration_seconds,
@@ -361,7 +362,8 @@ def plan_with_gpt4_turbo(
         output_data={
             "spec": spec,
             "reference_mapping": reference_mapping,
-            "model_used": "gpt-4-turbo-preview"
+            "model_used": "gpt-4-turbo-preview",
+            "phase0_output": phase0_output  # Pass Phase 0 output for Phase 2
         },
         cost_usd=cost,
         duration_seconds=duration_seconds,
