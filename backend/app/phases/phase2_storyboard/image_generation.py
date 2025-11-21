@@ -172,9 +172,11 @@ def generate_beat_image(
         f"{full_prompt[:100]}..."
     )
     
-    # Determine if we should use ControlNet (if product reference exists)
+    # Determine if we should use ControlNet (only if scene contains product or logo asset)
     use_controlnet = False
     product_asset_id = None
+    has_logo = False
+    image_to_image_strength = 0.3  # Default for product-only scenes
     
     logger.info(f"🔍 ControlNet Decision - reference_info exists: {reference_info is not None}")
     logger.info(f"🔍 ControlNet Decision - user_assets exists: {user_assets is not None}")
@@ -185,13 +187,46 @@ def generate_beat_image(
         
         logger.info(f"🔍 ControlNet Decision - asset_ids: {asset_ids}, usage_type: {usage_type}")
         
-        # Use ControlNet if we have a product reference
+        # Check if scene contains product or logo assets
+        # First check usage_type from reference_info, then check actual asset types
+        has_product = False
+        has_logo = False
+        
         if usage_type == 'product' and asset_ids:
-            product_asset_id = asset_ids[0]  # Use first product asset
+            has_product = True
+        elif usage_type == 'logo' and asset_ids:
+            has_logo = True
+        
+        # Also check all assets to see their actual types (in case usage_type doesn't match)
+        if asset_ids:
+            for asset_id in asset_ids:
+                asset = next((a for a in user_assets if a.get('asset_id') == asset_id), None)
+                if asset:
+                    asset_type = asset.get('reference_asset_type', '')
+                    if asset_type == 'logo':
+                        has_logo = True
+                    elif asset_type == 'product':
+                        has_product = True
+        
+        # Use ControlNet only if scene contains product OR logo
+        if has_product or has_logo:
+            # Use first product asset if available, otherwise first logo asset
+            if has_product:
+                product_asset_id = asset_ids[0]  # Use first product asset
+            else:
+                product_asset_id = asset_ids[0]  # Use first logo asset
+            
             use_controlnet = True
-            logger.info(f"   ✅ Using ControlNet with product asset: {product_asset_id}")
+            
+            # Set image_to_image_strength: 1.0 for logo scenes, 0.3 for product-only scenes
+            if has_logo:
+                image_to_image_strength = 1.0
+                logger.info(f"   ✅ Using ControlNet with logo asset: {product_asset_id} (image_to_image_strength: 1.0)")
+            else:
+                image_to_image_strength = 0.3
+                logger.info(f"   ✅ Using ControlNet with product asset: {product_asset_id} (image_to_image_strength: 0.3)")
         else:
-            logger.info(f"   ⚠️ Not using ControlNet - usage_type='{usage_type}' (needs 'product'), asset_ids={asset_ids}")
+            logger.info(f"   ⚠️ Not using ControlNet - scene does not contain product or logo (usage_type='{usage_type}')")
     else:
         logger.info(f"   ⚠️ Not using ControlNet - reference_info={reference_info is not None}, user_assets={user_assets is not None}")
     
@@ -225,11 +260,13 @@ def generate_beat_image(
                                 generated_image_url = controlnet_service.generate_with_controlnet(
                                     prompt=full_prompt,
                                     control_image_path=control_image_path,
-                                    control_strength=0.5,  # Canny works best with 0.5
+                                    control_strength=0.5,  # ControlNet strength for edge structure (default for Canny)
                                     aspect_ratio="16:9",
                                     negative_prompt=negative_prompt,
                                     steps=40,  # Higher steps for better quality
-                                    guidance_scale=4.0  # Higher guidance for better prompt adherence
+                                    guidance_scale=4.0,  # Higher guidance for better prompt adherence
+                                    reference_image_path=product_image_path,  # Original product/image asset for image-to-image
+                                    image_to_image_strength=image_to_image_strength  # 0.25 for logo scenes, 0.15 for product-only
                                 )
                                 
                                 # Download generated image
