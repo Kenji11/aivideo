@@ -20,11 +20,18 @@ from sqlalchemy.orm.attributes import flag_modified
 logger = logging.getLogger(__name__)
 
 
-def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
+def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None, reference_mapping: dict = None, user_assets: list = None):
     """
     Core implementation of storyboard generation (without Celery wrapper).
     
     This function contains the actual logic and can be called directly for testing.
+    
+    Args:
+        video_id: Video generation ID
+        spec: Video specification from Phase 1
+        user_id: User ID for S3 uploads
+        reference_mapping: Optional dict mapping beat_id to reference assets (from Phase 1)
+        user_assets: Optional list of user asset dicts (from Phase 0) for metadata lookup
     """
     start_time = time.time()
     
@@ -57,9 +64,16 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
             f"{len(beats)} beats to generate"
         )
         
+        # Log reference mapping if present
+        if reference_mapping:
+            logger.info(f"Reference mapping available for {len(reference_mapping)} beats")
+            for beat_id, ref_info in reference_mapping.items():
+                logger.info(f"  {beat_id}: {ref_info.get('usage_type')} - {ref_info.get('asset_ids')}")
+        
         # Initialize tracking
         storyboard_images = []
         total_cost = 0.0
+        all_referenced_asset_ids = set()  # Track all assets used across beats
         
         # Generate one image per beat
         for beat_index, beat in enumerate(beats):
@@ -75,7 +89,9 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
                 beat=beat,
                 style=style,
                 product=product,
-                user_id=user_id
+                user_id=user_id,
+                reference_mapping=reference_mapping,
+                user_assets=user_assets
             )
             
             # Add image URL to the beat in spec
@@ -83,6 +99,12 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
             
             # Track storyboard image info
             storyboard_images.append(beat_image_info)
+            
+            # Track referenced assets
+            referenced_assets = beat_image_info.get('referenced_asset_ids', [])
+            if referenced_assets:
+                all_referenced_asset_ids.update(referenced_assets)
+                logger.info(f"  Referenced assets: {referenced_assets}")
             
             # Track cost (FLUX Dev: $0.025 per image)
             total_cost += COST_FLUX_DEV_IMAGE
@@ -112,6 +134,11 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
             f"cost=${total_cost:.4f}, duration={duration_seconds:.2f}s"
         )
         
+        # Log asset usage summary
+        if all_referenced_asset_ids:
+            logger.info(f"Total unique assets referenced: {len(all_referenced_asset_ids)}")
+            logger.info(f"Asset IDs: {list(all_referenced_asset_ids)}")
+        
         # Extract storyboard URLs from beats and persist to Redis
         storyboard_urls = []
         for beat in beats:
@@ -138,7 +165,8 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
                     "status": "success",
                     "output_data": {
                         "storyboard_images": storyboard_images,
-                        "spec": spec
+                        "spec": spec,
+                        "referenced_asset_ids": list(all_referenced_asset_ids)  # Track for usage counting
                     },
                     "cost_usd": total_cost,
                     "duration_seconds": duration_seconds,
@@ -158,7 +186,8 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
             status="success",
             output_data={
                 "storyboard_images": storyboard_images,
-                "spec": spec  # Return updated spec with image_urls in beats
+                "spec": spec,  # Return updated spec with image_urls in beats
+                "referenced_asset_ids": list(all_referenced_asset_ids)  # Track for usage counting
             },
             cost_usd=total_cost,
             duration_seconds=duration_seconds,
@@ -255,7 +284,19 @@ def generate_storyboard(self, phase1_output: dict, user_id: str = None):
     
     # Extract spec and video_id from Phase 1 output
     video_id = phase1_output['video_id']
-    spec = phase1_output['output_data']['spec']
+    output_data = phase1_output['output_data']
+    spec = output_data['spec']
+    
+    # Extract reference mapping if present (from Phase 1)
+    reference_mapping = output_data.get('reference_mapping')
+    
+    # Extract user_assets from Phase 0 output if present
+    # Phase 1 stores phase0_output in its output_data
+    user_assets = None
+    if 'phase0_output' in output_data:
+        phase0_data = output_data['phase0_output']
+        if phase0_data and phase0_data.get('status') == 'success':
+            user_assets = phase0_data.get('output_data', {}).get('user_assets')
     
     # Call core implementation
-    return _generate_storyboard_impl(video_id, spec, user_id)
+    return _generate_storyboard_impl(video_id, spec, user_id, reference_mapping, user_assets)

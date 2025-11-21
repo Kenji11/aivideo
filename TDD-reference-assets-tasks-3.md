@@ -293,35 +293,35 @@
 
 ---
 
-### Task 4.7: Update Phase 2 to Use Reference Mapping
+### Task 4.7: Update Phase 2 to Use Reference Mapping ✅
 
 **File:** `backend/app/phases/phase2_storyboard/image_generation.py`
 
-- [ ] Update `generate_beat_image()` signature:
-  - [ ] Add parameter: `reference_mapping: dict = None`
-  - [ ] Add parameter: `user_assets: list[dict] = None`
-- [ ] Check if current beat has references in mapping:
-  - [ ] Look up `reference_mapping.get(beat['beat_id'])`
-  - [ ] If exists, extract asset_ids and usage_type
-- [ ] Fetch asset details from user_assets list
-  - [ ] Get primary_object, style_tags, colors for referenced assets
-- [ ] Enhance image generation prompt with reference info:
-  - [ ] If product reference: Add "featuring [product_name], [primary_object description]"
-  - [ ] If logo reference: Add "with [brand] logo visible, brand identity prominent"
-  - [ ] Include asset's dominant colors in color palette
-  - [ ] Include asset's style_tags in aesthetic description
-- [ ] Log reference usage:
-  - [ ] Log which assets were used for each beat
-  - [ ] Track for usage_count increment later
+- [x] Update `generate_beat_image()` signature:
+  - [x] Add parameter: `reference_mapping: dict = None`
+  - [x] Add parameter: `user_assets: list[dict] = None`
+- [x] Check if current beat has references in mapping:
+  - [x] Look up `reference_mapping.get(beat['beat_id'])`
+  - [x] If exists, extract asset_ids and usage_type
+- [x] Fetch asset details from user_assets list
+  - [x] Get primary_object, style_tags, colors for referenced assets
+- [x] Enhance image generation prompt with reference info:
+  - [x] If product reference: Add "featuring [product_name], [primary_object description]"
+  - [x] If logo reference: Add "with [brand] logo visible, brand identity prominent"
+  - [x] Include asset's dominant colors in color palette
+  - [x] Include asset's style_tags in aesthetic description
+- [x] Log reference usage:
+  - [x] Log which assets were used for each beat
+  - [x] Track for usage_count increment later
 
 ---
 
-### Task 4.8: Update Pipeline to Include Phase 0
+### Task 4.8: Update Pipeline to Include Phase 0 ✅
 
 **File:** `backend/app/orchestrator/pipeline.py`
 
-- [ ] Import Phase 0 task: `from app.phases.phase0_reference_prep.task import prepare_references`
-- [ ] Update `run_pipeline()` chain:
+- [x] Import Phase 0 task: `from app.phases.phase0_reference_prep.task import prepare_references`
+- [x] Update `run_pipeline()` chain:
   ```python
   workflow = chain(
       # NEW: Phase 0 - Reference preparation
@@ -340,105 +340,39 @@
       refine_video.s(user_id)
   )
   ```
-- [ ] Update progress tracking to include Phase 0
-- [ ] Update cost tracking to include Phase 0 entity extraction cost
+- [x] Update progress tracking to include Phase 0
+- [x] Update cost tracking to include Phase 0 entity extraction cost
 
 ---
 
-### Task 4.9: Update Phase 2 Task to Accept Reference Mapping
+### Task 4.9: Update Phase 2 Task to Accept Reference Mapping ✅
 
 **File:** `backend/app/phases/phase2_storyboard/task.py`
 
-- [ ] Update `generate_storyboard()` signature:
-  - [ ] Accept phase1_output (already does this)
-  - [ ] Extract reference_mapping from phase1_output['output_data']['reference_mapping']
-  - [ ] Extract user_assets from Phase 0 output (stored in phase1_output or fetch from Redis)
-- [ ] Pass reference_mapping + user_assets to `generate_beat_image()` for each beat
-- [ ] Track which assets were used:
-  - [ ] Build list of asset_ids that were actually used
-  - [ ] Return in Phase 2 output for usage_count increment
+- [x] Update `generate_storyboard()` signature:
+  - [x] Accept phase1_output (already does this)
+  - [x] Extract reference_mapping from phase1_output['output_data']['reference_mapping']
+  - [x] Extract user_assets from Phase 0 output (stored in phase1_output)
+- [x] Pass reference_mapping + user_assets to `generate_beat_image()` for each beat
+- [x] Track which assets were used:
+  - [x] Build list of asset_ids that were actually used
+  - [x] Return in Phase 2 output for usage_count increment
 
 ---
 
-### Task 4.10: Track Asset Usage
+### Task 4.10: Track Asset Usage ✅
 
 **File:** `backend/app/services/asset_usage_tracker.py` (NEW)
 
-- [ ] Create `AssetUsageTracker` class
-- [ ] Implement `increment_usage(asset_ids: list[str]) -> None`
-  - [ ] For each asset_id in list
-  - [ ] Increment `usage_count` in database
-  - [ ] Update `last_used_at` timestamp
-- [ ] Call from Phase 4 (final phase) when video completes successfully
-
----
-
-### Task 4.11: Manual Override API
-
----
-
-### Task 4.12: Manual Override API
-
-**File:** `backend/app/api/videos.py`
-
-- [ ] Implement `POST /api/videos/{video_id}/reference-mapping` endpoint
-- [ ] Accept request body:
-  ```json
-  {
-    "beat_id": "hero_shot",
-    "asset_ids": ["asset_id_1", "asset_id_2"],
-    "usage_type": "product"
-  }
-  ```
-- [ ] Verify video ownership
-- [ ] Verify assets belong to user
-- [ ] Update video record:
-  - [ ] Add/update `custom_reference_mapping` field
-  - [ ] Store beat_id → asset_ids mapping
-  - [ ] Mark as manually selected
-- [ ] Return success response
-- [ ] Implement `GET /api/videos/{video_id}/reference-mapping` endpoint
-  - [ ] Return current reference mapping (auto + manual overrides)
-  - [ ] Merge auto-matched and custom mappings
-  - [ ] Indicate which are manual vs auto
-
----
-
-### Task 4.13: Frontend: Reference Selection UI
-
-**File:** `frontend/src/components/VideoGenerator.tsx`
-
-- [ ] After entering prompt, show "Select References" step (optional)
-- [ ] Display auto-matched references for each beat
-  - [ ] Group by beat
-  - [ ] Show thumbnails of matched assets
-  - [ ] Show usage_type badge ("Product", "Logo", etc.)
-  - [ ] Badge: "Auto-selected by AI"
-- [ ] Allow manual override
-  - [ ] "Change" button next to each beat
-  - [ ] Open asset picker modal
-  - [ ] Allow selecting different assets
-  - [ ] Update reference mapping
-- [ ] Add "Skip" option
-  - [ ] User can proceed without references
-  - [ ] System uses auto-selected references automatically
-- [ ] Show preview of selected references
-  - [ ] Thumbnails with labels
-  - [ ] Remove button for each
-- [ ] Persist selection when user proceeds to generation
-- [ ] Style with Tailwind CSS
-
-**File:** `frontend/src/components/AssetPickerModal.tsx`
-
-- [ ] Create modal for manually selecting assets
-- [ ] Display user's asset library in grid
-- [ ] Filter by asset type (product/logo/etc)
-- [ ] Search assets (integrate with semantic search)
-- [ ] Multi-select capability
-  - [ ] Checkboxes on thumbnails
-  - [ ] "Select" button to confirm
-- [ ] Show selected count
-- [ ] Close and return selected assets to parent component
+- [x] Create `AssetUsageTracker` class
+- [x] Implement `increment_usage(asset_ids: list[str]) -> None`
+  - [x] For each asset_id in list
+  - [x] Increment `usage_count` in database
+  - [x] Update `updated_at` timestamp
+- [x] Implement `increment_usage_for_video(video_id: str) -> None`
+  - [x] Fetch referenced_asset_ids from Phase 2 output
+  - [x] Call increment_usage for all referenced assets
+- [x] Call from Phase 4 (final phase) when video completes successfully
 
 ---
 
