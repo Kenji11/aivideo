@@ -56,7 +56,8 @@ class EntityExtractionService:
                 "entities": {},
                 "user_assets": [],
                 "has_assets": False,
-                "product_mentioned": False
+                "product_mentioned": False,
+                "brand_mentioned": False
             }
         
         logger.info(f"User {user_id} has {len(user_assets)} assets - proceeding with extraction")
@@ -70,11 +71,18 @@ class EntityExtractionService:
             entities["product"].lower() not in ["product", "item", "object"]
         )
         
+        # Step 4: Determine if brand was mentioned
+        brand_mentioned = bool(
+            entities.get("brand") and 
+            entities["brand"].lower() not in ["brand", "company", "manufacturer"]
+        )
+        
         return {
             "entities": entities,
             "user_assets": user_assets,
             "has_assets": True,
-            "product_mentioned": product_mentioned
+            "product_mentioned": product_mentioned,
+            "brand_mentioned": brand_mentioned
         }
     
     def _get_user_assets(self, user_id: str) -> list[dict]:
