@@ -33,6 +33,7 @@ celery_app.conf.update(
         "app.phases.phase2_storyboard.task",
         "app.phases.phase3_chunks.task",
         "app.phases.phase4_refine.task",
+        "app.phases.phase6_editing.task",
     ],
 )
 
@@ -72,6 +73,13 @@ try:
     logger.info("✓ Imported app.phases.phase4_refine.task")
 except Exception as e:
     logger.error(f"✗ Failed to import app.phases.phase4_refine.task: {e}", exc_info=True)
+    raise
+
+try:
+    from app.phases.phase6_editing import task as phase6_task  # noqa: F401
+    logger.info("✓ Imported app.phases.phase6_editing.task")
+except Exception as e:
+    logger.error(f"✗ Failed to import app.phases.phase6_editing.task: {e}", exc_info=True)
     raise
 
 logger.info("All task modules imported successfully")
