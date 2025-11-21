@@ -1,4 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
+import { EditingPage } from './features/editing/EditingPage';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Sparkles, Video, Film, Download } from 'lucide-react';
 // Commented out - may use later
@@ -402,6 +403,8 @@ function AppContent() {
           <Route path="/processing/:videoId" element={<VideoStatus />} />
 
           <Route path="/preview/:videoId" element={<Preview />} />
+
+          <Route path="/video/:videoId/edit" element={<EditingPage />} />
 
           <Route path="/download" element={
             <div className="space-y-6 animate-fade-in">
