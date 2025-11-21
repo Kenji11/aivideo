@@ -270,6 +270,29 @@ class EditingService:
                 if not chunk_metadata:
                     continue
                 
+                # IMPORTANT: Track the original chunk as 'original' version BEFORE replacing
+                # This ensures users can switch back to the original version
+                original_url = chunk_urls[chunk_idx]
+                original_prompt_for_tracking = chunk_metadata['prompt']
+                original_model_for_tracking = chunk_metadata.get('model', spec.get('model', 'hailuo'))
+                
+                # Check if original version is already tracked
+                existing_versions = self.chunk_manager.get_chunk_versions(video_id, chunk_idx)
+                has_original_version = any(v.version_id == 'original' for v in existing_versions)
+                
+                # Track original version if not already tracked
+                if not has_original_version and original_url:
+                    self.chunk_manager.track_chunk_version(
+                        video_id=video_id,
+                        chunk_index=chunk_idx,
+                        version_type='original',
+                        version_url=original_url,
+                        prompt=original_prompt_for_tracking,
+                        model=original_model_for_tracking,
+                        cost=chunk_metadata.get('cost', 0.0)
+                    )
+                    logger.info(f"Tracked original version for chunk {chunk_idx} before replacement")
+                
                 original_prompt = new_prompt or chunk_metadata['prompt']
                 original_model = model
                 
@@ -354,6 +377,9 @@ class EditingService:
                     model=original_model,
                     cost=chunk_cost
                 )
+                
+                # Set the new replacement as the currently selected version (default)
+                self.chunk_manager.set_selected_version(video_id, chunk_idx, version_id)
                 
                 new_chunk_urls.append(new_chunk_url)
                 total_cost += chunk_cost

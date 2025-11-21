@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { useRef, useEffect } from 'react';
 
 interface ProjectCardProps {
   project: VideoListItem;
@@ -27,23 +28,61 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
   const status = statusConfig[project.status] || statusConfig.queued;
   const isProcessing = project.status !== 'complete' && project.status !== 'failed';
   const hasVideo = project.final_video_url || project.status === 'complete';
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Cleanup video on unmount
+  useEffect(() => {
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.src = '';
+        videoRef.current.load();
+      }
+    };
+  }, []);
+
+  const handleClick = () => {
+    // Clean up video before navigation to prevent abort errors
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.src = '';
+    }
+    // Small delay to allow cleanup
+    setTimeout(() => {
+      onSelect?.(project);
+    }, 50);
+  };
 
   return (
     <Card className="overflow-hidden hover:shadow-lg group cursor-pointer animate-fade-in">
       <div 
         className="aspect-video bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center relative overflow-hidden"
-        onClick={() => onSelect?.(project)}
+        onClick={handleClick}
       >
         {hasVideo && project.final_video_url ? (
           <video
+            ref={videoRef}
             src={project.final_video_url}
             className="w-full h-full object-cover"
             muted
             preload="none"
-            onMouseEnter={(e) => e.currentTarget.play()}
+            onMouseEnter={(e) => {
+              if (videoRef.current && !videoRef.current.paused) return;
+              e.currentTarget.play().catch(() => {
+                // Ignore play errors (e.g., if video is being cleaned up)
+              });
+            }}
             onMouseLeave={(e) => {
               e.currentTarget.pause();
               e.currentTarget.currentTime = 0;
+            }}
+            onError={(e) => {
+              // Silently handle video errors
+              console.debug('ProjectCard video error (expected when navigating):', e);
+            }}
+            onAbort={(e) => {
+              // Silently handle abort (expected when navigating)
+              console.debug('ProjectCard video aborted (expected when navigating)');
             }}
           />
         ) : (
