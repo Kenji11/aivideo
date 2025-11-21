@@ -71,6 +71,22 @@
 - [x] Presigned URL caching in Redis
 - [x] StatusResponse schema with current_chunk_index and total_chunks
 
+### Reference Assets & Semantic Search
+- [x] **PR #1**: Reference asset library foundation ✅
+- [x] Database schema with embedding column (pgvector)
+- [x] S3 storage with thumbnails
+- [x] Upload, edit, delete API endpoints
+- [x] Frontend asset library UI
+- [x] **PR #3**: Semantic search system ✅
+- [x] CLIP embedding generation (text and image)
+- [x] pgvector similarity search (cosine distance)
+- [x] Text-to-image search endpoint (25% threshold)
+- [x] Image-to-image similarity endpoint (70% threshold)
+- [x] Style-consistent recommendations
+- [x] Frontend search bar with debounce
+- [x] "Find Similar" feature in asset detail modal
+- [x] Auto-scroll to similar assets section
+
 ### Phase 4: Refinement (renamed from Phase 5)
 - [x] Basic implementation complete
 - [x] **PR #11**: Renamed from phase5_refine to phase4_refine ✅
@@ -101,6 +117,7 @@
 10. ✅ **PR #10**: Redis-based progress tracking with Server-Sent Events (SSE)
 11. ✅ **PR #11**: Phase cleanup and renaming - sequential structure (phase1 → phase2 → phase3 → phase4)
 12. ✅ **PR #1 (Reference Assets)**: Database schema, S3 structure, API endpoints, frontend UI ✅
+13. ✅ **PR #3 (Semantic Search)**: CLIP embeddings, pgvector similarity search, search API endpoints, frontend search UI ✅
 
 ---
 
