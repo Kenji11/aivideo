@@ -387,6 +387,11 @@ def build_status_response_from_db(video: VideoGeneration) -> StatusResponse:
                     video.id, "refined_video_url", refined_url
                 )
     
+    # Build checkpoint information
+    current_checkpoint = _build_checkpoint_info(video.id)
+    checkpoint_tree = _build_checkpoint_tree_nodes(video.id)
+    active_branches = _build_active_branches(video.id)
+    
     return StatusResponse(
         video_id=video.id,
         status=video.status.value,

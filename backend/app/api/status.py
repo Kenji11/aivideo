@@ -81,9 +81,11 @@ async def get_status(
     if redis_client._client:
         try:
             redis_data = redis_client.get_video_data(video_id)
-            # Verify user access from Redis
+            # Verify user access from Redis - if user_id doesn't match, don't use Redis data
+            # but still check DB (could be stale Redis data)
             if redis_data and redis_data.get("user_id") != user_id:
-                raise HTTPException(status_code=404, detail="Video not found")
+                logger.warning(f"Redis user_id mismatch for video {video_id}: Redis={redis_data.get('user_id')}, Request={user_id}")
+                redis_data = None  # Don't use Redis data, fall through to DB check
         except HTTPException:
             raise
         except Exception as e:
@@ -93,7 +95,7 @@ async def get_status(
         # Build response from Redis data
         return build_status_response_from_redis_video_data(redis_data)
     
-    # Fallback to DB
+    # Fallback to DB (either Redis missing or user_id mismatch)
     video = db.query(VideoGeneration).filter(
         VideoGeneration.id == video_id,
         VideoGeneration.user_id == user_id

@@ -30,6 +30,9 @@ export function Preview() {
   const [retryCount, setRetryCount] = useState(0);
   const [phaseArtifacts, setPhaseArtifacts] = useState<PhaseArtifacts>({});
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
+  const [videoTitle, setVideoTitle] = useState<string>('');
+  const [videoDescription, setVideoDescription] = useState<string>('');
+  const [processTime, setProcessTime] = useState<string>('');
 
   const fetchVideoData = useCallback(async (isRetry: boolean = false) => {
     if (!videoId) {
@@ -57,7 +60,12 @@ export function Preview() {
       try {
         statusData = await getVideoStatus(videoId);
       } catch (err) {
-        console.error('[Preview] getVideoStatus failed:', err);
+        // Status endpoint may return 404 for completed videos (Redis expiration or DB lookup issues)
+        // This is expected and handled gracefully - we use videoData instead
+        // Only log if it's not a 404 error
+        if (err instanceof Error && !err.message.includes('Video not found') && !err.message.includes('404')) {
+          console.warn('[Preview] getVideoStatus failed:', err);
+        }
       }
 
       // Extract video URL
@@ -68,6 +76,28 @@ export function Preview() {
         setError('Video is not ready yet. Please wait for generation to complete.');
       }
 
+      // Extract title and description
+      if (videoData) {
+        setVideoTitle(videoData.title || 'Untitled Video');
+        setVideoDescription(videoData.description || '');
+        
+        // Calculate process time
+        if (videoData.completed_at && videoData.created_at) {
+          const created = new Date(videoData.created_at);
+          const completed = new Date(videoData.completed_at);
+          const diffMs = completed.getTime() - created.getTime();
+          const diffMins = Math.floor(diffMs / 60000);
+          const diffSecs = Math.floor((diffMs % 60000) / 1000);
+          setProcessTime(`${diffMins}:${diffSecs.toString().padStart(2, '0')}`);
+        } else if (videoData.generation_time_seconds) {
+          const mins = Math.floor(videoData.generation_time_seconds / 60);
+          const secs = Math.floor(videoData.generation_time_seconds % 60);
+          setProcessTime(`${mins}:${secs.toString().padStart(2, '0')}`);
+        } else {
+          setProcessTime('N/A');
+        }
+      }
+
       // Extract phase artifacts
       const artifacts: PhaseArtifacts = {};
 
@@ -76,15 +106,32 @@ export function Preview() {
         artifacts.phase1 = { spec: videoData.spec };
       }
 
-      // Phase 2: Storyboard images (from statusData)
+      // Phase 2: Storyboard images (from statusData, videoData, or extract from spec)
       if (statusData?.storyboard_urls && statusData.storyboard_urls.length > 0) {
         artifacts.phase2 = { storyboardUrls: statusData.storyboard_urls };
+      } else if (videoData?.storyboard_urls && videoData.storyboard_urls.length > 0) {
+        artifacts.phase2 = { storyboardUrls: videoData.storyboard_urls };
+      } else if (videoData?.spec?.beats) {
+        // Fallback: Extract storyboard URLs from spec beats
+        const storyboardUrls: string[] = [];
+        videoData.spec.beats.forEach((beat: any) => {
+          if (beat.image_url) {
+            storyboardUrls.push(beat.image_url);
+          }
+        });
+        if (storyboardUrls.length > 0) {
+          artifacts.phase2 = { storyboardUrls };
+        }
       }
 
-      // Phase 3: Individual chunk videos (from statusData)
+      // Phase 3: Individual chunk videos (from statusData or videoData)
       if (statusData?.chunk_urls && statusData.chunk_urls.length > 0) {
         artifacts.phase3 = {
           chunkUrls: statusData.chunk_urls,
+        };
+      } else if (videoData?.chunk_urls && videoData.chunk_urls.length > 0) {
+        artifacts.phase3 = {
+          chunkUrls: videoData.chunk_urls,
         };
       }
 
@@ -245,19 +292,19 @@ export function Preview() {
       <div className="p-8 space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-foreground mb-2">
-            Video Preview
+            {videoTitle || 'Video Preview'}
           </h2>
-          {videoId && (
-            <p className="text-sm text-muted-foreground font-mono">
-              {videoId}
+          {videoDescription && (
+            <p className="text-sm text-muted-foreground">
+              {videoDescription}
             </p>
           )}
         </div>
 
         <div className="grid grid-cols-2 gap-4 p-4 bg-card rounded-lg">
           <div>
-            <p className="text-xs text-muted-foreground">Duration</p>
-            <p className="text-lg font-semibold text-foreground">2:45</p>
+            <p className="text-xs text-muted-foreground">Process time</p>
+            <p className="text-lg font-semibold text-foreground">{processTime || 'N/A'}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Resolution</p>

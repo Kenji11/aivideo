@@ -46,8 +46,16 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response) {
       // Server responded with error status
-      console.error('[API] Error response:', error.response.data);
-      throw new Error(error.response.data?.detail || error.response.data?.message || 'An error occurred');
+      const status = error.response.status;
+      const detail = error.response.data?.detail || error.response.data?.message || 'An error occurred';
+      
+      // Don't log 404 errors for status endpoint - these are expected for completed videos
+      const isStatusEndpoint404 = status === 404 && error.config?.url?.includes('/api/status/');
+      if (!isStatusEndpoint404) {
+        console.error('[API] Error response:', error.response.data);
+      }
+      
+      throw new Error(detail);
     } else if (error.request) {
       // Request was made but no response received
       console.error('[API] No response received:', error.request);
@@ -110,6 +118,8 @@ export interface StatusResponse {
 
 export interface VideoResponse {
   video_id: string;
+  title: string;
+  description?: string;
   status: string;
   final_video_url?: string;
   cost_usd: number;
@@ -118,6 +128,8 @@ export interface VideoResponse {
   completed_at?: string;
   spec?: any;
   animatic_urls?: string[];
+  storyboard_urls?: string[];
+  chunk_urls?: string[];
 }
 
 export interface UploadedAsset {

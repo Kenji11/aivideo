@@ -13,7 +13,7 @@ interface CheckpointCardProps {
 
 export function CheckpointCard({
   checkpoint,
-  videoId,
+  videoId: _videoId, // eslint-disable-line @typescript-eslint/no-unused-vars
   onEdit,
   onContinue,
   isProcessing = false,

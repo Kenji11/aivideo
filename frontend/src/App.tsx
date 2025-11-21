@@ -83,7 +83,6 @@ function AppContent() {
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('veo_fast');
-  const [autoContinue, setAutoContinue] = useState<boolean>(true); // Default to YOLO mode
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [videoToDelete, setVideoToDelete] = useState<{ id: string; title: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -110,8 +109,8 @@ function AppContent() {
     if (project.status === 'complete' && project.final_video_url) {
       setTitle(project.title);
       navigate(`/preview/${project.video_id}`);
-    } else if (project.status !== 'complete') {
-      // Navigate to processing page for videos that are still processing or failed
+    } else if (project.status !== 'complete' && project.status !== 'failed') {
+      // Navigate to processing page for videos that are still processing
       navigate(`/processing/${project.video_id}`);
     }
   };
@@ -229,7 +228,6 @@ function AppContent() {
   }
 
   const showStepIndicator = location.pathname.startsWith('/processing') || 
-                           location.pathname.startsWith('/preview') || 
                            location.pathname === '/download';
 
   // Get user display name or email
@@ -346,7 +344,6 @@ function AppContent() {
               prompt={prompt}
               selectedModel={selectedModel}
               uploadedAssetIds={uploadedAssetIds}
-              autoContinue={autoContinue}
               onTitleChange={setTitle}
               onDescriptionChange={setDescription}
               onPromptChange={setPrompt}
@@ -355,7 +352,6 @@ function AppContent() {
                 setUploadedAssetIds(assetIds);
                 addNotification('success', 'Files Uploaded', `${assetIds.length} file(s) uploaded successfully!`);
               }}
-              onAutoContinueChange={setAutoContinue}
               onNotification={addNotification}
             />
           } />

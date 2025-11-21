@@ -26,12 +26,12 @@ export function BranchSelector({
     return null;
   }
 
-  const phaseNames: Record<number, string> = {
-    1: 'Planning',
-    2: 'Storyboard',
-    3: 'Chunks',
-    4: 'Refinement',
-  };
+  // const phaseNames: Record<number, string> = {
+  //   1: 'Planning',
+  //   2: 'Storyboard',
+  //   3: 'Chunks',
+  //   4: 'Refinement',
+  // };
 
   return (
     <div className="flex items-center gap-2">

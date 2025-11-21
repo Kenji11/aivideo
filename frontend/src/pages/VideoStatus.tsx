@@ -25,7 +25,7 @@ export function VideoStatus() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [storyboardUrls, setStoryboardUrls] = useState<string[] | null>(null);
-  const [referenceAssets, setReferenceAssets] = useState<StatusResponse['reference_assets'] | null>(null);
+  const [referenceAssets] = useState<StatusResponse['reference_assets'] | null>(null);
   const [stitchedVideoUrl, setStitchedVideoUrl] = useState<string | null>(null);
   const [currentChunkIndex, setCurrentChunkIndex] = useState<number | null>(null);
   const [totalChunks, setTotalChunks] = useState<number | null>(null);
@@ -131,7 +131,7 @@ export function VideoStatus() {
   };
 
   // Use SSE stream for real-time status updates (with automatic fallback to polling)
-  const { status: streamStatus, error: streamError, isConnected } = useVideoStatusStream(
+  const { status: streamStatus, error: streamError } = useVideoStatusStream(
     videoId || null,
     isProcessing
   );

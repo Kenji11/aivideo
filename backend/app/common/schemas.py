@@ -115,6 +115,8 @@ class StatusResponse(BaseModel):
 class VideoResponse(BaseModel):
     """Response from video endpoint"""
     video_id: str
+    title: str
+    description: Optional[str]
     status: str
     final_video_url: Optional[str]
     cost_usd: float
@@ -122,6 +124,8 @@ class VideoResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime]
     spec: Optional[Dict]
+    storyboard_urls: Optional[List[str]] = None
+    chunk_urls: Optional[List[str]] = None
 
 class VideoListItem(BaseModel):
     """Video item in list response"""

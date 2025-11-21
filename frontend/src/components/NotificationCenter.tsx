@@ -35,7 +35,7 @@ interface NotificationCenterProps {
   onDismiss: (id: string) => void;
 }
 
-export function NotificationCenter({ notifications, onDismiss }: NotificationCenterProps) {
+export function NotificationCenter(_props: NotificationCenterProps) { // eslint-disable-line @typescript-eslint/no-unused-vars
   // This component is kept for backward compatibility but doesn't render anything
   // The Toaster component in App.tsx handles all toast display
   return null;

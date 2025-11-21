@@ -13,7 +13,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Upload, RefreshCw } from 'lucide-react';
-import { editSpec, uploadBeatImage, regenerateBeat, regenerateChunk } from '../lib/api';
+import { uploadBeatImage, regenerateBeat, regenerateChunk } from '../lib/api';
 import { useToast } from '../hooks/use-toast';
 
 interface ArtifactEditorProps {
@@ -41,27 +41,27 @@ export function ArtifactEditor({
     return null;
   }
 
-  const handleEditSpec = async () => {
-    if (checkpoint.phase_number !== 1) return;
-
-    setIsLoading(true);
-    try {
-      // For now, just a placeholder - you'd need a full spec editing UI
-      toast({
-        title: 'Spec Editing',
-        description: 'Full spec editing UI coming soon. Use the continue button to proceed.',
-      });
-      onOpenChange(false);
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Failed to edit spec',
-        description: error.message,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // TODO: Implement spec editing functionality
+  // const handleEditSpec = async () => {
+  //   if (checkpoint.phase_number !== 1) return;
+  //   setIsLoading(true);
+  //   try {
+  //     // For now, just a placeholder - you'd need a full spec editing UI
+  //     toast({
+  //       title: 'Spec Editing',
+  //       description: 'Full spec editing UI coming soon. Use the continue button to proceed.',
+  //     });
+  //     onOpenChange(false);
+  //   } catch (error: any) {
+  //     toast({
+  //       variant: 'destructive',
+  //       title: 'Failed to edit spec',
+  //       description: error.message,
+  //     });
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
 
   const handleUploadImage = async (beatIndex: number, file: File) => {
     if (checkpoint.phase_number !== 2) return;

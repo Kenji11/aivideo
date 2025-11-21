@@ -85,15 +85,84 @@ async def get_video(
         s3_path = final_video_url.replace(f's3://{s3_client.bucket}/', '')
         final_video_url = s3_client.generate_presigned_url(s3_path, expiration=3600 * 24 * 7)  # 7 days
     
+    # Extract storyboard URLs from spec beats or phase_outputs
+    storyboard_urls = None
+    
+    # First try to extract from spec.beats
+    if video.spec and video.spec.get('beats'):
+        from app.services.s3 import s3_client
+        storyboard_urls = []
+        for beat in video.spec['beats']:
+            image_url = beat.get('image_url')
+            if image_url:
+                if image_url.startswith('s3://'):
+                    s3_path = image_url.replace(f's3://{s3_client.bucket}/', '')
+                    presigned_url = s3_client.generate_presigned_url(s3_path, expiration=3600 * 24 * 7)
+                    storyboard_urls.append(presigned_url)
+                else:
+                    storyboard_urls.append(image_url)
+    
+    # If no URLs found in spec.beats, try phase_outputs
+    if not storyboard_urls and video.phase_outputs:
+        phase2_output = video.phase_outputs.get('phase2_storyboard')
+        if phase2_output and phase2_output.get('status') == 'success':
+            phase2_data = phase2_output.get('output_data', {})
+            spec_data = phase2_data.get('spec', {}) or video.spec or {}
+            beats = spec_data.get('beats', [])
+            if beats:
+                from app.services.s3 import s3_client
+                storyboard_urls = []
+                for beat in beats:
+                    image_url = beat.get('image_url')
+                    if image_url:
+                        if image_url.startswith('s3://'):
+                            s3_path = image_url.replace(f's3://{s3_client.bucket}/', '')
+                            presigned_url = s3_client.generate_presigned_url(s3_path, expiration=3600 * 24 * 7)
+                            storyboard_urls.append(presigned_url)
+                        else:
+                            storyboard_urls.append(image_url)
+    
+    # Extract chunk URLs from video.chunk_urls or phase_outputs
+    chunk_urls = None
+    if video.chunk_urls and len(video.chunk_urls) > 0:
+        from app.services.s3 import s3_client
+        chunk_urls = []
+        for url in video.chunk_urls:
+            if url and url.startswith('s3://'):
+                s3_path = url.replace(f's3://{s3_client.bucket}/', '')
+                presigned_url = s3_client.generate_presigned_url(s3_path, expiration=3600 * 24 * 7)
+                chunk_urls.append(presigned_url)
+            else:
+                chunk_urls.append(url)
+    elif video.phase_outputs:
+        phase3_output = video.phase_outputs.get('phase3_chunks')
+        if phase3_output and phase3_output.get('status') == 'success':
+            phase3_data = phase3_output.get('output_data', {})
+            chunk_urls_raw = phase3_data.get('chunk_urls', [])
+            if chunk_urls_raw:
+                from app.services.s3 import s3_client
+                chunk_urls = []
+                for url in chunk_urls_raw:
+                    if url and url.startswith('s3://'):
+                        s3_path = url.replace(f's3://{s3_client.bucket}/', '')
+                        presigned_url = s3_client.generate_presigned_url(s3_path, expiration=3600 * 24 * 7)
+                        chunk_urls.append(presigned_url)
+                    else:
+                        chunk_urls.append(url)
+    
     return VideoResponse(
         video_id=video.id,
+        title=video.title,
+        description=video.description,
         status=video.status.value,
         final_video_url=final_video_url,
         cost_usd=video.cost_usd,
         generation_time_seconds=video.generation_time_seconds,
         created_at=video.created_at,
         completed_at=video.completed_at,
-        spec=video.spec
+        spec=video.spec,
+        storyboard_urls=storyboard_urls,
+        chunk_urls=chunk_urls
     )
 
 @router.delete("/api/video/{video_id}")
