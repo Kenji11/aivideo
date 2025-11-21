@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { GripVertical, Play, Clock } from 'lucide-react';
-import { ChunkMetadata } from '../../lib/api';
+import { ChunkMetadata, getModelDisplayName } from '../../lib/api';
 import { Badge } from '@/components/ui/badge';
 
 interface ChunkTimelineProps {
@@ -44,6 +44,12 @@ export function ChunkTimeline({
   const formatDuration = (seconds: number) => {
     return `${seconds.toFixed(1)}s`;
   };
+
+  // Debug logging
+  console.log('[ChunkTimeline] Rendering with chunks.length:', chunks.length);
+  if (chunks.length > 0) {
+    console.log('[ChunkTimeline] First chunk sample:', chunks[0]);
+  }
 
   return (
     <div className="space-y-2">
@@ -116,7 +122,7 @@ export function ChunkTimeline({
                     <Clock className="w-3 h-3" />
                     {formatDuration(chunk.duration)}
                   </div>
-                  <div>Model: {chunk.model}</div>
+                  <div>Model: {getModelDisplayName(chunk.model)}</div>
                   <div>Cost: ${chunk.cost.toFixed(4)}</div>
                 </div>
               </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { RefreshCw, Trash2, Scissors, ArrowUpDown, DollarSign, Loader2, Undo2 } from 'lucide-react';
-import { api, ChunkMetadata, EditingAction, CostEstimate } from '../../lib/api';
+import { api, ChunkMetadata, EditingAction, CostEstimate, getModelDisplayName } from '../../lib/api';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -773,7 +773,7 @@ export function EditActions({
                 )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Model:</span>
-                  <span className="font-medium">{costEstimate.model}</span>
+                  <span className="font-medium">{getModelDisplayName(costEstimate.model)}</span>
                 </div>
               </div>
               {Object.keys(costEstimate.cost_per_chunk).length > 0 && (

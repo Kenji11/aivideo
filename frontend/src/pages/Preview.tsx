@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Film, Download, BarChart3, Edit } from 'lucide-react';
 import { getVideoStatus, getVideo, StatusResponse, VideoResponse } from '../lib/api';
@@ -13,6 +13,8 @@ export function Preview() {
   const [description, setDescription] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const loadingAbortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!videoId) {
@@ -20,6 +22,14 @@ export function Preview() {
       setIsLoading(false);
       return;
     }
+
+    // Abort any previous request
+    if (loadingAbortControllerRef.current) {
+      loadingAbortControllerRef.current.abort();
+    }
+
+    const abortController = new AbortController();
+    loadingAbortControllerRef.current = abortController;
 
     const fetchVideoData = async () => {
       setIsLoading(true);
@@ -29,18 +39,23 @@ export function Preview() {
         // Try to get video details first (for completed videos)
         try {
           const videoData: VideoResponse = await getVideo(videoId);
+          if (abortController.signal.aborted) return;
+          
           if (videoData.final_video_url) {
             setVideoUrl(videoData.final_video_url);
             setTitle(videoData.video_id); // VideoResponse doesn't have title, use video_id as fallback
             return;
           }
         } catch (err) {
+          if (abortController.signal.aborted) return;
           // If getVideo fails, try status endpoint
           console.log('[Preview] getVideo failed, trying status endpoint:', err);
         }
 
         // Fallback to status endpoint (works for both in-progress and completed videos)
         const statusData: StatusResponse = await getVideoStatus(videoId);
+        if (abortController.signal.aborted) return;
+        
         const url = statusData.final_video_url || statusData.stitched_video_url;
         
         if (url) {
@@ -48,15 +63,30 @@ export function Preview() {
         } else {
           setError('Video is not ready yet. Please wait for generation to complete.');
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err.name === 'AbortError' || abortController.signal.aborted) {
+          return;
+        }
         console.error('[Preview] Failed to fetch video data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load video');
       } finally {
-        setIsLoading(false);
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchVideoData();
+
+    // Cleanup on unmount
+    return () => {
+      abortController.abort();
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.src = '';
+        videoRef.current.load();
+      }
+    };
   }, [videoId]);
 
   const handleDownload = () => {
@@ -118,12 +148,17 @@ export function Preview() {
       <div className="aspect-video bg-gradient-to-br from-card to-muted flex items-center justify-center">
         {videoUrl ? (
           <video
+            ref={videoRef}
             src={videoUrl}
             controls
             className="w-full h-full object-contain"
             onError={(e) => {
               console.error('Video load error:', e);
               setError('Failed to load video');
+            }}
+            onAbort={(e) => {
+              // Silently handle abort (expected when navigating away)
+              console.debug('Preview video aborted (expected when navigating)');
             }}
           >
             Your browser does not support the video tag.
