@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Film, Download, BarChart3, ChevronDown, ChevronUp, Image as ImageIcon, Video, FileText, Sparkles } from 'lucide-react';
+import { Film, Download, BarChart3, ChevronDown, ChevronUp, Image as ImageIcon, Video, FileText, Sparkles, Play } from 'lucide-react';
 import { getVideoStatus, getVideo, StatusResponse, VideoResponse } from '../lib/api';
 import { toast } from '@/hooks/use-toast';
+import { ChunkEditModal } from '../components/ChunkEditModal';
 
 interface PhaseArtifacts {
   phase1?: {
@@ -33,6 +34,8 @@ export function Preview() {
   const [videoTitle, setVideoTitle] = useState<string>('');
   const [videoDescription, setVideoDescription] = useState<string>('');
   const [processTime, setProcessTime] = useState<string>('');
+  const [selectedChunkIndex, setSelectedChunkIndex] = useState<number | null>(null);
+  const [chunkEditModalOpen, setChunkEditModalOpen] = useState(false);
 
   const fetchVideoData = useCallback(async (isRetry: boolean = false) => {
     if (!videoId) {
@@ -415,22 +418,47 @@ export function Preview() {
                 </button>
                 {expandedPhases.has('phase3') && (
                   <div className="p-4 border-t border-border bg-muted/30">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {phaseArtifacts.phase3.chunkUrls.map((url, index) => (
-                        <div key={index} className="space-y-1">
-                          <div className="text-xs text-muted-foreground mb-1">Chunk {index + 1}</div>
-                          <video
-                            src={url}
-                            controls
-                            className="w-full rounded-lg border border-border"
-                            onError={(e) => {
-                              console.error(`Failed to load chunk ${index + 1}:`, e);
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                      {phaseArtifacts.phase3.chunkUrls.map((url, index) => {
+                        // Get associated beat image from spec
+                        const beatImageUrl = phaseArtifacts.phase1?.spec?.beats?.[index]?.image_url || 
+                                          phaseArtifacts.phase2?.storyboardUrls?.[index];
+                        
+                        return (
+                          <div 
+                            key={index} 
+                            className="relative aspect-video rounded-lg overflow-hidden border border-border bg-card cursor-pointer hover:border-primary transition-colors group"
+                            onClick={() => {
+                              setSelectedChunkIndex(index);
+                              setChunkEditModalOpen(true);
                             }}
                           >
-                            Your browser does not support the video tag.
-                          </video>
-                        </div>
-                      ))}
+                            {beatImageUrl ? (
+                              <img
+                                src={beatImageUrl}
+                                alt={`Chunk ${index + 1} keyframe`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const img = e.currentTarget;
+                                  img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23ddd" width="400" height="300"/%3E%3Ctext fill="%23999" font-family="sans-serif" font-size="18" dy="10.5" font-weight="bold" x="50%25" y="50%25" text-anchor="middle"%3EImage not available%3C/text%3E%3C/svg%3E';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-muted flex items-center justify-center">
+                                <Video className="w-8 h-8 text-muted-foreground" />
+                              </div>
+                            )}
+                            {/* Play overlay on hover */}
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                              <Play className="w-12 h-12 text-white opacity-0 group-hover:opacity-100 transition-opacity fill-current" />
+                            </div>
+                            {/* Chunk label */}
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-2 py-1 text-center">
+                              Chunk {index + 1}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -501,6 +529,26 @@ export function Preview() {
           </button>
         </div>
       </div>
+
+      {/* Chunk Edit Modal */}
+      {selectedChunkIndex !== null && phaseArtifacts.phase3?.chunkUrls && (
+        <ChunkEditModal
+          open={chunkEditModalOpen}
+          onOpenChange={setChunkEditModalOpen}
+          chunkIndex={selectedChunkIndex}
+          chunkUrl={phaseArtifacts.phase3.chunkUrls[selectedChunkIndex]}
+          beatImageUrl={
+            phaseArtifacts.phase1?.spec?.beats?.[selectedChunkIndex]?.image_url ||
+            phaseArtifacts.phase2?.storyboardUrls?.[selectedChunkIndex]
+          }
+          onUpdate={() => {
+            toast({
+              title: 'Chunk Updated',
+              description: `Chunk ${selectedChunkIndex + 1} has been updated`,
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
