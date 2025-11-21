@@ -24,18 +24,41 @@ EMBEDDING_DIM = 512
 class CLIPEmbeddingService:
     """Service for generating CLIP embeddings for images and text"""
     
-    def __init__(self):
+    def __init__(self, lazy_load: bool = False):
+        """
+        Initialize CLIP service.
+        
+        Args:
+            lazy_load: If True, don't load model immediately. Call load_model() explicitly later.
+                      If False, load model immediately (blocking).
+        """
         self.model = None
         self.preprocess = None
         self.device = None
         self._model_loaded = False
-        self._load_model()
+        self._loading = False
+        
+        if not lazy_load:
+            self._load_model()
+    
+    def load_model(self):
+        """
+        Load CLIP model with volume caching.
+        Can be called explicitly after app startup for background loading.
+        """
+        return self._load_model()
     
     def _load_model(self):
-        """Load CLIP model with volume caching"""
+        """Internal method to load CLIP model with volume caching"""
         if self._model_loaded:
+            logger.info("CLIP model already loaded, skipping")
             return
         
+        if self._loading:
+            logger.warning("CLIP model is already being loaded by another thread")
+            return
+        
+        self._loading = True
         start_time = time.time()
         model_name = settings.clip_model  # Default: "ViT-B/32"
         cache_dir = settings.clip_model_cache  # Default: "/mnt/models"
@@ -69,6 +92,7 @@ class CLIPEmbeddingService:
             
             load_time = time.time() - start_time
             self._model_loaded = True
+            self._loading = False
             
             # Check if this was a cold start (download) or warm start (cached)
             # open_clip stores models in HF_HOME or TORCH_HOME
@@ -85,6 +109,7 @@ class CLIPEmbeddingService:
                 )
                 
         except Exception as e:
+            self._loading = False
             logger.error(f"Failed to load CLIP model: {str(e)}", exc_info=True)
             raise RuntimeError(f"CLIP model loading failed: {str(e)}")
     
@@ -184,22 +209,13 @@ def get_clip_service() -> CLIPEmbeddingService:
     Get singleton CLIP embedding service instance
     
     Returns:
-        CLIPEmbeddingService instance (cached)
+        CLIPEmbeddingService instance (cached, lazy loaded)
     """
-    return CLIPEmbeddingService()
+    return CLIPEmbeddingService(lazy_load=True)
 
 
-# Initialize service with error handling - don't crash on import
-try:
-    clip_service = get_clip_service()
-    logger.debug("CLIP embedding service initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize CLIP embedding service: {e}", exc_info=True)
-    # Create a placeholder that will fail on use, but allow import to succeed
-    class FailedCLIPService:
-        def generate_image_embedding(self, image: Image.Image) -> List[float]:
-            raise RuntimeError(f"CLIP service initialization failed: {e}")
-        def generate_text_embedding(self, text: str) -> List[float]:
-            raise RuntimeError(f"CLIP service initialization failed: {e}")
-    clip_service = FailedCLIPService()
+# Initialize service instance (but don't load model yet)
+# Model will be loaded in background after app startup via startup event
+clip_service = get_clip_service()
+logger.info("CLIP embedding service instance created (model not loaded yet)")
 

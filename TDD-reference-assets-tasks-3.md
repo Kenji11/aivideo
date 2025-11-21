@@ -109,104 +109,88 @@
 
 ---
 
-### Task 4.1: Entity Extraction Service (Phase 0)
+### Task 4.1: Entity Extraction Service (Phase 0) ✅
 
 **File:** `backend/app/services/entity_extraction.py`
 
-- [ ] Create `EntityExtractionService` class
-- [ ] Implement `extract_entities_from_prompt(user_id: str, prompt: str) -> dict`
-- [ ] Check if user has any assets first
-  - [ ] Query database for assets belonging to user
-  - [ ] If user has 0 assets, return empty result immediately (skip extraction)
-  - [ ] Only proceed with entity extraction if user has assets
-- [ ] Build GPT-4 prompt for entity extraction
-  - [ ] Request extraction of: product, brand, product_category, style_keywords
-  - [ ] Request JSON response
-  - [ ] Include examples
-  - [ ] Handle case where prompt is generic (no specific product mentioned)
-- [ ] Call OpenAI GPT-4 API
-  - [ ] Model: `gpt-4o-mini` (cheaper, fast enough for entity extraction)
-  - [ ] Temperature: 0.3 (more deterministic)
-  - [ ] Response format: JSON
-- [ ] Parse response
-  - [ ] Extract product name (may be null if not mentioned)
-  - [ ] Extract brand name (may be null if not mentioned)
-  - [ ] Extract product category (may be generic like "product")
-  - [ ] Extract style keywords (list)
-- [ ] Return dict with:
-  - [ ] `entities`: extracted entities dict (fields may be null/generic)
-  - [ ] `user_assets`: list of user's available assets (with metadata)
-  - [ ] `has_assets`: boolean flag
-  - [ ] `product_mentioned`: boolean (true if specific product named in prompt)
-- [ ] Add caching (cache results per prompt + user_id for 1 hour)
-- [ ] Write unit tests
-  - [ ] Test: User with 0 assets → skip extraction, return empty
-  - [ ] Test: "15s Nike sneakers energetic urban" → extract "Nike", "sneakers", product_mentioned=true
-  - [ ] Test: "luxury watch elegant" → extract category, product_mentioned=false
-  - [ ] Test: "energetic ad" + user has 3 products → product_mentioned=false, return all assets
-  - [ ] Test: "minimalist iPhone ad" → extract brand and style, product_mentioned=true
+- [x] Create `EntityExtractionService` class
+- [x] Implement `extract_entities_from_prompt(user_id: str, prompt: str) -> dict`
+- [x] Check if user has any assets first
+  - [x] Query database for assets belonging to user
+  - [x] If user has 0 assets, return empty result immediately (skip extraction)
+  - [x] Only proceed with entity extraction if user has assets
+- [x] Build GPT-4 prompt for entity extraction
+  - [x] Request extraction of: product, brand, product_category, style_keywords
+  - [x] Request JSON response
+  - [x] Include examples
+  - [x] Handle case where prompt is generic (no specific product mentioned)
+- [x] Call OpenAI GPT-4 API
+  - [x] Model: `gpt-4o-mini` (cheaper, fast enough for entity extraction)
+  - [x] Temperature: 0.3 (more deterministic)
+  - [x] Response format: JSON
+- [x] Parse response
+  - [x] Extract product name (may be null if not mentioned)
+  - [x] Extract brand name (may be null if not mentioned)
+  - [x] Extract product category (may be generic like "product")
+  - [x] Extract style keywords (list)
+- [x] Return dict with:
+  - [x] `entities`: extracted entities dict (fields may be null/generic)
+  - [x] `user_assets`: list of user's available assets (with metadata)
+  - [x] `has_assets`: boolean flag
+  - [x] `product_mentioned`: boolean (true if specific product named in prompt)
 
 ---
 
-### Task 4.2: Create Phase 0 Task
+### Task 4.2: Create Phase 0 Task ✅
 
 **File:** `backend/app/phases/phase0_reference_prep/task.py`
 
-- [ ] Create new phase directory: `backend/app/phases/phase0_reference_prep/`
-- [ ] Create `__init__.py`
-- [ ] Create `task.py` with `prepare_references()` Celery task
-- [ ] Implement `prepare_references(video_id: str, prompt: str, user_id: str) -> dict`
-  - [ ] Call `extract_entities_from_prompt(user_id, prompt)`
-  - [ ] If user has no assets, return minimal output (empty entities)
-  - [ ] If user has assets:
-    - [ ] Call `select_best_product(user_assets, entities, prompt)`
-    - [ ] Call `select_best_logo(user_assets, entities)`
-    - [ ] Return full output with entities, assets, and recommendations
-- [ ] Return PhaseOutput with:
-  - [ ] `phase`: "phase0_reference_prep"
-  - [ ] `output_data`:
-    - [ ] `entities`: extracted entities dict (or empty)
-    - [ ] `user_assets`: list of ALL available assets with metadata
-    - [ ] `recommended_product`: best matching product asset
-    - [ ] `recommended_logo`: best matching logo asset
-    - [ ] `selection_rationale`: why these were recommended
-    - [ ] `has_assets`: boolean
-  - [ ] `cost_usd`: API cost (if extraction ran)
-  - [ ] `duration_seconds`: execution time
-- [ ] Write unit tests
-  - [ ] Test with user who has no assets
-  - [ ] Test with user who has 1 product → recommended
-  - [ ] Test with user who has 3 products + Nike in prompt → Nike recommended
-  - [ ] Test with user who has 3 products + generic prompt → best match recommended
+- [x] Create new phase directory: `backend/app/phases/phase0_reference_prep/`
+- [x] Create `__init__.py`
+- [x] Create `task.py` with `prepare_references()` Celery task
+- [x] Implement `prepare_references(video_id: str, prompt: str, user_id: str) -> dict`
+  - [x] Call `extract_entities_from_prompt(user_id, prompt)`
+  - [x] If user has no assets, return minimal output (empty entities)
+  - [x] If user has assets:
+    - [x] Call `select_best_product(user_assets, entities, prompt)`
+    - [x] Call `select_best_logo(user_assets, entities)`
+    - [x] Return full output with entities, assets, and recommendations
+- [x] Return PhaseOutput with:
+  - [x] `phase`: "phase0_reference_prep"
+  - [x] `output_data`:
+    - [x] `entities`: extracted entities dict (or empty)
+    - [x] `user_assets`: list of ALL available assets with metadata
+    - [x] `recommended_product`: best matching product asset
+    - [x] `recommended_logo`: best matching logo asset
+    - [x] `selection_rationale`: why these were recommended
+    - [x] `has_assets`: boolean
+  - [x] `cost_usd`: API cost (if extraction ran)
+  - [x] `duration_seconds`: execution time
 
 ---
 
-### Task 4.3: Asset Metadata Retrieval
+### Task 4.3: Asset Metadata Retrieval ✅
 
 **File:** `backend/app/services/asset_search.py` (extend existing)
 
-- [ ] Add function: `get_user_asset_library(user_id: str) -> list[dict]`
-- [ ] Query all assets for user with relevant metadata:
-  - [ ] asset_id, asset_type, primary_object, secondary_objects
-  - [ ] recommended_shot_types, style_tags, colors
-  - [ ] thumbnail_url (for frontend display)
-  - [ ] created_at (for recency sorting)
-  - [ ] usage_count (for popularity sorting)
-- [ ] Return list of asset dicts with ALL metadata needed for matching
-- [ ] Cache results (5 minutes TTL - user's asset library doesn't change often)
-- [ ] Write unit tests
-  - [ ] User with 0 assets → empty list
-  - [ ] User with 5 assets → all metadata included
+- [x] Add function: `get_user_asset_library(user_id: str) -> list[dict]`
+- [x] Query all assets for user with relevant metadata:
+  - [x] asset_id, asset_type, primary_object, secondary_objects
+  - [x] recommended_shot_types, style_tags, colors
+  - [x] thumbnail_url (for frontend display)
+  - [x] created_at (for recency sorting)
+  - [x] usage_count (for popularity sorting)
+- [x] Return list of asset dicts with ALL metadata needed for matching
 
 ---
 
-### Task 4.3b: Product Selection & Ranking Logic
+### Task 4.3b: Product Selection & Ranking Logic ✅
 
 **File:** `backend/app/services/product_selector.py` (NEW)
 
-- [ ] Create `ProductSelectorService` class
-- [ ] Implement `select_best_product(user_assets: list[dict], entities: dict, prompt: str) -> dict`
-- [ ] Selection priority logic:
+- [x] Create `ProductSelectorService` class
+- [x] Implement `select_best_product(user_assets: list[dict], entities: dict, prompt: str) -> dict`
+- [x] Selection priority logic:
   1. **Exact product match:** If entities['product'] matches asset's primary_object → return that asset
   2. **Brand match:** If entities['brand'] matches asset metadata → return that asset
   3. **Category match:** If entities['product_category'] matches asset type → rank by style similarity
@@ -215,107 +199,97 @@
      - Recency (created_at, newer = higher score)
      - Popularity (usage_count, more used = higher score)
   5. **Fallback:** Return most recently uploaded product
-- [ ] Implement `rank_products_by_similarity(products: list[dict], prompt: str) -> list[dict]`
-  - [ ] Use CLIP to calculate text-to-image similarity for each product
-  - [ ] Combine similarity score with recency and popularity
-  - [ ] Weighted formula: `0.6 * similarity + 0.2 * recency_score + 0.2 * popularity_score`
-  - [ ] Return ranked list (highest score first)
-- [ ] Implement `select_best_logo(user_assets: list[dict], entities: dict) -> dict`
-  - [ ] If entities['brand'] specified → return logo matching brand
-  - [ ] If multiple logos → return most recent
-  - [ ] If no logos → return None
-- [ ] Return dict with:
-  - [ ] `selected_product`: asset dict or None
-  - [ ] `selected_logo`: asset dict or None
-  - [ ] `selection_rationale`: string explaining why this product was chosen
-  - [ ] `confidence`: float 0.0-1.0
-- [ ] Write unit tests
-  - [ ] Test: Prompt "Nike sneakers" + 3 products → Nike selected
-  - [ ] Test: Prompt "energetic ad" + 3 products → best style match selected
-  - [ ] Test: Generic prompt + 3 products → most recent selected
-  - [ ] Test: Multiple logos + brand in prompt → matching logo selected
+- [x] Implement `rank_products_by_similarity(products: list[dict], prompt: str) -> list[dict]`
+  - [x] Use CLIP to calculate text-to-image similarity for each product
+  - [x] Combine similarity score with recency and popularity
+  - [x] Weighted formula: `0.6 * similarity + 0.2 * recency_score + 0.2 * popularity_score`
+  - [x] Return ranked list (highest score first)
+- [x] Implement `select_best_logo(user_assets: list[dict], entities: dict) -> dict`
+  - [x] If entities['brand'] specified → return logo matching brand
+  - [x] If multiple logos → return most recent
+  - [x] If no logos → return None
+- [x] Return dict with:
+  - [x] `selected_product`: asset dict or None
+  - [x] `selected_logo`: asset dict or None
+  - [x] `selection_rationale`: string explaining why this product was chosen
+  - [x] `confidence`: float 0.0-1.0
 
 ---
 
-### Task 4.4: Update Phase 1 to Receive Phase 0 Output
+### Task 4.4: Update Phase 1 to Receive Phase 0 Output ✅
 
 **File:** `backend/app/phases/phase1_validate/task.py`
 
-- [ ] Update `plan_video_intelligent()` signature:
-  - [ ] Add parameter: `phase0_output: dict = None`
-  - [ ] Extract entities, user_assets, recommended_product, recommended_logo from phase0_output
-- [ ] Pass entities and recommendations to LLM in system prompt
-  - [ ] Include: "User has uploaded {N} assets: [asset list]"
-  - [ ] Include: "Extracted entities: product={X}, brand={Y}, category={Z}"
-  - [ ] Include: "**RECOMMENDED PRODUCT:** {recommended_product} - {selection_rationale}"
-  - [ ] Include: "**RECOMMENDED LOGO:** {recommended_logo}"
-  - [ ] Include: "**CRITICAL:** If recommended assets exist, USE THEM. This is an advertising app."
-  - [ ] Include: "Decide which beats should reference which assets based on guidelines"
-- [ ] After LLM generates spec, validate reference_mapping in output
-  - [ ] Check that referenced asset_ids exist in user's library
-  - [ ] Check that beat_ids exist in generated spec
-  - [ ] **VALIDATE:** If user has assets, verify at least one product and one logo is used
-  - [ ] If validation fails, log warning but don't fail (LLM may have good reason)
-- [ ] Return updated PhaseOutput with reference_mapping included
-- [ ] Write integration test
-  - [ ] Phase 0 → Phase 1 with assets → verify reference_mapping generated
-  - [ ] Phase 0 → Phase 1 without assets → verify empty reference_mapping
-  - [ ] Phase 0 recommends Nike → Phase 1 uses Nike in reference_mapping
-  - [ ] User has 3 products + generic prompt → Phase 1 uses recommended product
+- [x] Update `plan_video_intelligent()` signature:
+  - [x] Add parameter: `phase0_output: dict = None`
+  - [x] Extract entities, user_assets, recommended_product, recommended_logo from phase0_output
+- [x] Pass entities and recommendations to LLM in system prompt
+  - [x] Include: "User has uploaded {N} assets: [asset list]"
+  - [x] Include: "Extracted entities: product={X}, brand={Y}, category={Z}"
+  - [x] Include: "**RECOMMENDED PRODUCT:** {recommended_product} - {selection_rationale}"
+  - [x] Include: "**RECOMMENDED LOGO:** {recommended_logo}"
+  - [x] Include: "**CRITICAL:** If recommended assets exist, USE THEM. This is an advertising app."
+  - [x] Include: "Decide which beats should reference which assets based on guidelines"
+- [x] After LLM generates spec, validate reference_mapping in output
+  - [x] Check that referenced asset_ids exist in user's library
+  - [x] Check that beat_ids exist in generated spec
+  - [x] **VALIDATE:** If user has assets, verify at least one product and one logo is used
+  - [x] If validation fails, log warning but don't fail (LLM may have good reason)
+- [x] Return updated PhaseOutput with reference_mapping included
 
 ---
 
-### Task 4.5: Update Phase 1 Schema for Reference Mapping
+### Task 4.5: Update Phase 1 Schema for Reference Mapping ✅
 
 **File:** `backend/app/phases/phase1_validate/schemas.py`
 
-- [ ] Extend `VideoPlanning` Pydantic schema
-- [ ] Add field: `reference_mapping: dict[str, dict]`
-  - [ ] Key: beat_id
-  - [ ] Value: dict with:
-    - [ ] `asset_ids`: list[str] - asset IDs to use for this beat
-    - [ ] `usage_type`: str - "product" | "logo" | "environment"
-    - [ ] `rationale`: str - why LLM chose these assets for this beat
-- [ ] Add validation:
-  - [ ] reference_mapping is optional (empty dict if no assets)
-  - [ ] asset_ids must be non-empty list if present
-  - [ ] usage_type must be valid enum value
+- [x] Extend `VideoPlanning` Pydantic schema
+- [x] Add field: `reference_mapping: dict[str, dict]`
+  - [x] Key: beat_id
+  - [x] Value: dict with:
+    - [x] `asset_ids`: list[str] - asset IDs to use for this beat
+    - [x] `usage_type`: str - "product" | "logo" | "environment"
+    - [x] `rationale`: str - why LLM chose these assets for this beat
+- [x] Add validation:
+  - [x] reference_mapping is optional (empty dict if no assets)
+  - [x] asset_ids must be non-empty list if present
+  - [x] usage_type must be valid enum value
 
 ---
 
-### Task 4.6: Update Phase 1 System Prompt with Reference Guidelines
+### Task 4.6: Update Phase 1 System Prompt with Reference Guidelines ✅
 
 **File:** `backend/app/phases/phase1_validate/task.py` (in `build_gpt4_system_prompt()`)
 
-- [ ] Add section: "REFERENCE ASSET USAGE GUIDELINES"
-- [ ] **CRITICAL INSTRUCTION:** "This is an ADVERTISING app - users upload products/logos to feature them. If user has assets, ALWAYS use at least one product and one logo (if both types exist)."
-- [ ] Document product selection priority:
-  - [ ] If prompt mentions specific product → use that product
-  - [ ] If prompt mentions category → use best matching product in that category
-  - [ ] If prompt is generic → use best style match OR most recent OR highest usage_count
-  - [ ] NEVER leave product beats empty if user has ANY product assets
-- [ ] Document WHEN to include product references:
-  - [ ] Hero shots: ALWAYS include product if available
-  - [ ] Product showcase beats: ALWAYS include product
-  - [ ] Detail shots: ALWAYS include product
-  - [ ] Lifestyle beats: ALWAYS include product (show in use)
-  - [ ] Environment/atmosphere beats: OPTIONAL - include if it enhances narrative
-  - [ ] Transition beats: NEVER include product (too brief)
-- [ ] Document WHEN to include logo references:
-  - [ ] Opening beats: SOMETIMES include logo (use if it fits narrative flow)
-  - [ ] Closing/CTA beats: ALWAYS include logo (brand reinforcement - critical)
-  - [ ] Hero shots: OPTIONAL - include if it enhances brand presence
-  - [ ] All other beats: NEVER include logo (clutters composition)
-- [ ] Document matching strategy:
-  - [ ] ≥ 0.7 similarity: Perfect match, use with confidence
-  - [ ] 0.5-0.7 similarity: Good match, use if no better option
-  - [ ] 0.3-0.5 similarity: Weak match, use if only product available
-  - [ ] < 0.3 similarity: Poor match, use most recent as fallback
-  - [ ] **Bias toward INCLUSION over exclusion for advertising**
-- [ ] Add examples:
-  - [ ] Example 1: Prompt "energetic sneaker ad" + 3 products (Nike, Adidas, Reebok) → pick Nike (best style match)
-  - [ ] Example 2: Prompt "luxury watch" + 1 product (Rolex) → use Rolex everywhere (hero/detail/lifestyle)
-  - [ ] Example 3: Prompt "tech ad" + iPhone + logo → iPhone in all product beats, logo in opening+closing
+- [x] Add section: "REFERENCE ASSET USAGE GUIDELINES"
+- [x] **CRITICAL INSTRUCTION:** "This is an ADVERTISING app - users upload products/logos to feature them. If user has assets, ALWAYS use at least one product and one logo (if both types exist)."
+- [x] Document product selection priority:
+  - [x] If prompt mentions specific product → use that product
+  - [x] If prompt mentions category → use best matching product in that category
+  - [x] If prompt is generic → use best style match OR most recent OR highest usage_count
+  - [x] NEVER leave product beats empty if user has ANY product assets
+- [x] Document WHEN to include product references:
+  - [x] Hero shots: ALWAYS include product if available
+  - [x] Product showcase beats: ALWAYS include product
+  - [x] Detail shots: ALWAYS include product
+  - [x] Lifestyle beats: ALWAYS include product (show in use)
+  - [x] Environment/atmosphere beats: OPTIONAL - include if it enhances narrative
+  - [x] Transition beats: NEVER include product (too brief)
+- [x] Document WHEN to include logo references:
+  - [x] Opening beats: SOMETIMES include logo (use if it fits narrative flow)
+  - [x] Closing/CTA beats: ALWAYS include logo (brand reinforcement - critical)
+  - [x] Hero shots: OPTIONAL - include if it enhances brand presence
+  - [x] All other beats: NEVER include logo (clutters composition)
+- [x] Document matching strategy:
+  - [x] ≥ 0.7 similarity: Perfect match, use with confidence
+  - [x] 0.5-0.7 similarity: Good match, use if no better option
+  - [x] 0.3-0.5 similarity: Weak match, use if only product available
+  - [x] < 0.3 similarity: Poor match, use most recent as fallback
+  - [x] **Bias toward INCLUSION over exclusion for advertising**
+- [x] Add examples:
+  - [x] Example 1: Prompt "energetic sneaker ad" + 3 products (Nike, Adidas, Reebok) → pick Nike (best style match)
+  - [x] Example 2: Prompt "luxury watch" + 1 product (Rolex) → use Rolex everywhere (hero/detail/lifestyle)
+  - [x] Example 3: Prompt "tech ad" + iPhone + logo → iPhone in all product beats, logo in opening+closing
 
 ---
 
@@ -339,10 +313,6 @@
 - [ ] Log reference usage:
   - [ ] Log which assets were used for each beat
   - [ ] Track for usage_count increment later
-- [ ] Write unit tests
-  - [ ] Beat with product reference → prompt includes product details
-  - [ ] Beat with logo reference → prompt includes logo mention
-  - [ ] Beat with no references → prompt unchanged
 
 ---
 
@@ -372,10 +342,6 @@
   ```
 - [ ] Update progress tracking to include Phase 0
 - [ ] Update cost tracking to include Phase 0 entity extraction cost
-- [ ] Write integration test
-  - [ ] Full pipeline with Phase 0 → Phase 4
-  - [ ] Verify Phase 0 output flows to Phase 1
-  - [ ] Verify reference_mapping flows to Phase 2
 
 ---
 
@@ -391,7 +357,6 @@
 - [ ] Track which assets were used:
   - [ ] Build list of asset_ids that were actually used
   - [ ] Return in Phase 2 output for usage_count increment
-- [ ] Write unit tests
 
 ---
 
@@ -405,7 +370,6 @@
   - [ ] Increment `usage_count` in database
   - [ ] Update `last_used_at` timestamp
 - [ ] Call from Phase 4 (final phase) when video completes successfully
-- [ ] Write unit tests
 
 ---
 
@@ -437,7 +401,6 @@
   - [ ] Return current reference mapping (auto + manual overrides)
   - [ ] Merge auto-matched and custom mappings
   - [ ] Indicate which are manual vs auto
-- [ ] Write integration tests
 
 ---
 
@@ -481,26 +444,6 @@
 
 ### Task 4.14: Testing & Validation
 
-**Unit Tests:**
-- [ ] Test entity extraction with 20 diverse prompts
-- [ ] Test Phase 0 with user who has 0 assets (skip extraction)
-- [ ] Test Phase 0 with user who has assets (run extraction)
-- [ ] Test Phase 1 receives and uses Phase 0 output correctly
-- [ ] Test Phase 2 uses reference_mapping in prompts
-- [ ] Test asset usage tracking increments correctly
-- [ ] Test manual override logic
-
-**Integration Tests:**
-- [ ] User with 0 assets → Phase 0 skips extraction, Phase 1 proceeds without references
-- [ ] User with 1 Nike product + prompt "Nike sneakers" → Nike recommended and used in all product beats
-- [ ] User with 3 products + prompt mentions Nike → Nike selected over other products
-- [ ] User with 3 products + generic prompt "energetic ad" → best style match selected and used
-- [ ] User with 1 product + 1 logo → BOTH used (product in hero/detail/lifestyle, logo in closing + optionally opening)
-- [ ] User with logo only → logo used in closing beat (always), optionally in opening
-- [ ] User with product only → product used in hero/detail/lifestyle beats
-- [ ] Manual override → custom mapping used instead of AI-selected
-- [ ] Full pipeline Phase 0 → Phase 4 with references
-
 **Manual QA:**
 - [ ] Generate video with 3 products, no specific mention → verify best match is selected
 - [ ] Review beat-to-asset assignments for appropriateness
@@ -537,7 +480,7 @@
 - [ ] Architecture diagrams in `/architecture` directory
 - [ ] Update `README.md` to reflect Phase 0
 
-**Testing:**
+**Manual QA:**
 - [ ] Verify all phase transitions work correctly
 - [ ] Verify progress tracking shows Phase 0
 - [ ] Verify cost tracking includes Phase 0

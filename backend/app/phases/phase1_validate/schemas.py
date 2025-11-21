@@ -33,6 +33,13 @@ class StyleSpec(BaseModel):
     lighting: str = Field(description="Lighting style description")
 
 
+class ReferenceAssetMapping(BaseModel):
+    """Reference asset mapping for a specific beat"""
+    asset_ids: List[str] = Field(description="List of asset IDs to use for this beat")
+    usage_type: str = Field(description="Asset usage type: 'product' | 'logo' | 'environment'")
+    rationale: str = Field(description="1-2 sentences explaining why these assets were chosen for this beat")
+
+
 class VideoPlanning(BaseModel):
     """Complete video planning output with reasoning (for structured outputs)"""
     reasoning_process: Optional[str] = Field(
@@ -49,6 +56,10 @@ class VideoPlanning(BaseModel):
         description="Explicit verification that beat durations sum to total duration"
     )
     style: StyleSpec
+    reference_mapping: Optional[Dict[str, ReferenceAssetMapping]] = Field(
+        default=None,
+        description="Optional mapping of beat_id to reference assets (empty if user has no assets)"
+    )
 
 
 # ===== Legacy Schemas (kept for compatibility) =====
