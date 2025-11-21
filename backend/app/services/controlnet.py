@@ -69,7 +69,9 @@ class ControlNetService:
         aspect_ratio: str = "16:9",
         negative_prompt: Optional[str] = None,
         steps: int = 40,
-        guidance_scale: float = 4.0
+        guidance_scale: float = 4.0,
+        reference_image_path: Optional[str] = None,
+        image_to_image_strength: Optional[float] = None
     ) -> str:
         """
         Generate image using flux-dev-controlnet with control image.
@@ -82,6 +84,8 @@ class ControlNetService:
             negative_prompt: Optional negative prompt to avoid unwanted elements
             steps: Number of inference steps (default 40, max 50 for better quality)
             guidance_scale: Guidance scale (default 4.0, max 5.0 for better quality)
+            reference_image_path: Optional path to original reference image for image-to-image
+            image_to_image_strength: Optional strength for image-to-image (0-1, recommended 0-0.25)
             
         Returns:
             URL of generated image
@@ -89,22 +93,35 @@ class ControlNetService:
         from app.services.replicate import replicate_client
         
         try:
-            # Open control image as file handle for Replicate
-            with open(control_image_path, 'rb') as control_file:
-                logger.info(f"Generating image with flux-dev-controlnet: {prompt[:80]}...")
+            logger.info(f"Generating image with flux-dev-controlnet: {prompt[:80]}...")
+            
+            # Open control image and reference image (if provided) as file handles for Replicate
+            # Both files need to stay open during the API call
+            control_file = open(control_image_path, 'rb')
+            ref_file = None
+            
+            try:
+                if reference_image_path and image_to_image_strength is not None:
+                    ref_file = open(reference_image_path, 'rb')
+                    logger.info(f"Using image-to-image with strength: {image_to_image_strength}")
                 
                 # Build input parameters
                 input_params = {
                     "prompt": prompt,
-                    "control_image": control_file,  # Fixed: was "image"
-                    "control_type": "canny",  # Fixed: was "controlnet_type"
-                    "control_strength": control_strength,  # Fixed: was "conditioning_scale", Canny works best with 0.5
+                    "control_image": control_file,
+                    "control_type": "canny",
+                    "control_strength": control_strength,
                     "aspect_ratio": aspect_ratio,
                     "output_format": "png",
-                    "output_quality": 100,  # Maximum quality (was 90)
-                    "steps": steps,  # Fixed: was "num_inference_steps"
-                    "guidance_scale": guidance_scale  # Added for better quality control
+                    "output_quality": 100,
+                    "steps": steps,
+                    "guidance_scale": guidance_scale
                 }
+                
+                # Add reference image for image-to-image if provided
+                if ref_file:
+                    input_params["image"] = ref_file
+                    input_params["image_to_image_strength"] = image_to_image_strength
                 
                 # Add negative prompt if provided
                 if negative_prompt:
@@ -115,17 +132,22 @@ class ControlNetService:
                     input=input_params,
                     timeout=120  # ControlNet takes longer
                 )
-                
-                # Extract image URL from output
-                if isinstance(output, str):
-                    image_url = output
-                elif isinstance(output, list) and len(output) > 0:
-                    image_url = output[0]
-                else:
-                    image_url = list(output)[0] if hasattr(output, '__iter__') else str(output)
-                
-                logger.info(f"✅ Generated image with ControlNet: {image_url[:80]}...")
-                return image_url
+            finally:
+                # Close files after API call
+                control_file.close()
+                if ref_file:
+                    ref_file.close()
+            
+            # Extract image URL from output
+            if isinstance(output, str):
+                image_url = output
+            elif isinstance(output, list) and len(output) > 0:
+                image_url = output[0]
+            else:
+                image_url = list(output)[0] if hasattr(output, '__iter__') else str(output)
+            
+            logger.info(f"✅ Generated image with ControlNet: {image_url[:80]}...")
+            return image_url
                 
         except Exception as e:
             logger.error(f"Error generating image with ControlNet: {str(e)}", exc_info=True)
