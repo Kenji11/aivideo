@@ -28,12 +28,12 @@ def get_db():
 
 def init_db():
     """Initialize database tables
-    
+
     Note: This uses SQLAlchemy's create_all() which only creates missing tables.
     For schema changes, use the migration system: python migrate.py up
     """
     from app.common.models import VideoGeneration, Asset
-    
+
     # Create tables if they don't exist (for initial setup)
     # This is safe to run multiple times - it only creates missing tables
     Base.metadata.create_all(bind=engine)

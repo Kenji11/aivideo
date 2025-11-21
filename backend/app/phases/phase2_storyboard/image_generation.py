@@ -23,14 +23,15 @@ def generate_beat_image(
     beat: Dict,
     style: Dict,
     product: Dict,
-    user_id: str
+    user_id: str,
+    version: int = 1
 ) -> Dict:
     """
     Generate a storyboard image for a single beat.
-    
+
     Uses FLUX Dev model (same as Phase 3) to generate high-quality storyboard images.
     Image is uploaded to S3 and URL is returned.
-    
+
     Args:
         video_id: Unique video generation ID
         beat_index: Index of beat in sequence (0-based)
@@ -38,7 +39,8 @@ def generate_beat_image(
         style: Style specification with color_palette, lighting, aesthetic, etc.
         product: Product specification with name, category, etc.
         user_id: User ID for organizing outputs in S3
-        
+        version: Version number for artifact versioning (default: 1)
+
     Returns:
         Dictionary with:
             - beat_id: Beat identifier
@@ -46,6 +48,7 @@ def generate_beat_image(
             - start: Start time in seconds
             - duration: Duration in seconds
             - image_url: S3 URL of generated image
+            - s3_key: S3 key for the uploaded image
             - shot_type: Shot type from beat
             - prompt_used: Full prompt that was used for generation
     """
@@ -118,19 +121,20 @@ def generate_beat_image(
         with open(temp_path, 'wb') as f:
             f.write(response.content)
         
-        # Upload to S3 using user-scoped structure
+        # Upload to S3 using user-scoped structure with versioning
         if not user_id:
             raise PhaseException("user_id is required for S3 uploads")
-        
-        s3_key = get_video_s3_key(user_id, video_id, f"beat_{beat_index:02d}.png")
+
+        # Include version in S3 key: beat_00_v1.png, beat_00_v2.png, etc.
+        s3_key = get_video_s3_key(user_id, video_id, f"beat_{beat_index:02d}_v{version}.png")
         s3_url = s3_client.upload_file(temp_path, s3_key)
-        
+
         logger.info(f"✅ Uploaded storyboard image to S3: {s3_url[:80]}...")
-        
+
         # Cleanup temp file
         if os.path.exists(temp_path):
             os.remove(temp_path)
-        
+
         # Return beat image info
         return {
             "beat_id": beat.get('beat_id'),
@@ -138,6 +142,7 @@ def generate_beat_image(
             "start": beat.get('start', 0),
             "duration": beat.get('duration', 5),
             "image_url": s3_url,
+            "s3_key": s3_key,  # Include S3 key for checkpoint artifact tracking
             "shot_type": shot_type,
             "prompt_used": full_prompt
         }

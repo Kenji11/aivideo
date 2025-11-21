@@ -7,7 +7,7 @@ from app.phases.phase3_chunks.stitcher import VideoStitcher
 from app.common.exceptions import PhaseException
 from app.orchestrator.progress import update_progress, update_cost
 from app.database import SessionLocal
-from app.common.models import VideoGeneration
+from app.common.models import VideoGeneration, VideoStatus
 from sqlalchemy.orm.attributes import flag_modified
 from app.phases.phase3_chunks.schemas import ChunkSpec
 from app.phases.phase3_chunks.chunk_generator import (
@@ -16,6 +16,7 @@ from app.phases.phase3_chunks.chunk_generator import (
     build_chunk_specs_with_storyboard
 )
 from langchain_core.runnables import RunnableParallel
+from app.database.checkpoint_queries import create_checkpoint, create_artifact, approve_checkpoint
 
 
 def generate_chunk_reference_image(chunk_spec: ChunkSpec, beat_to_chunk_map: dict) -> dict:
@@ -340,10 +341,17 @@ def generate_chunks(
         'style_guide_url': phase2_data.get('style_guide_url'),
         'product_reference_url': phase2_data.get('product_reference_url')
     }
-    
+
+    # Extract branch context from Phase 2 output (for checkpoint tree)
+    branch_name = phase2_output.get('_branch_name', 'main')
+    parent_checkpoint_id = phase2_output.get('checkpoint_id')
+    version = phase2_output.get('_version', 1)
+
+    print(f"Phase 3 starting with branch context: branch={branch_name}, version={version}, parent_checkpoint={parent_checkpoint_id}")
+
     if not spec:
         raise PhaseException("Spec not found in Phase 3 output")
-    
+
     # Add model to spec for chunk generation
     spec['model'] = model
     
@@ -421,28 +429,100 @@ def generate_chunks(
             total_cost=total_cost
         )
         
-        # Store Phase 3 output in database
+        # Create checkpoint and artifacts
         db = SessionLocal()
         try:
             video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
-            if video:
-                if video.phase_outputs is None:
-                    video.phase_outputs = {}
-                video.phase_outputs['phase3_chunks'] = output.dict()
-                video.stitched_url = stitched_video_url
-                video.chunk_urls = chunk_urls
-                video.final_video_url = stitched_video_url
-                flag_modified(video, 'phase_outputs')
-                db.commit()
+            if not video:
+                print(f"❌ Video {video_id} not found")
+                raise PhaseException(f"Video {video_id} not found")
+
+            # Create checkpoint record
+            print(f"Creating Phase 3 checkpoint for video {video_id} on branch '{branch_name}'")
+            checkpoint_id = create_checkpoint(
+                video_id=video_id,
+                branch_name=branch_name,
+                phase_number=3,
+                version=version,
+                phase_output=output.dict(),
+                cost_usd=total_cost,
+                user_id=user_id,
+                parent_checkpoint_id=parent_checkpoint_id
+            )
+            print(f"✅ Created checkpoint {checkpoint_id}")
+
+            # Create artifacts for each chunk
+            for i, chunk_url in enumerate(chunk_urls):
+                # Extract S3 key from URL or construct it
+                s3_key = chunk_url.split('.com/')[-1] if '.com/' in chunk_url else f"{user_id}/videos/{video_id}/chunk_{i:02d}_v{version}.mp4"
+                artifact_id = create_artifact(
+                    checkpoint_id=checkpoint_id,
+                    artifact_type='video_chunk',
+                    artifact_key=f"chunk_{i}",
+                    s3_url=chunk_url,
+                    s3_key=s3_key,
+                    version=version,
+                    metadata={'chunk_index': i}
+                )
+            print(f"✅ Created {len(chunk_urls)} chunk artifacts")
+
+            # Create artifact for stitched video
+            stitched_s3_key = stitched_video_url.split('.com/')[-1] if '.com/' in stitched_video_url else f"{user_id}/videos/{video_id}/stitched_v{version}.mp4"
+            stitched_artifact_id = create_artifact(
+                checkpoint_id=checkpoint_id,
+                artifact_type='stitched_video',
+                artifact_key='stitched',
+                s3_url=stitched_video_url,
+                s3_key=stitched_s3_key,
+                version=version,
+                metadata={'num_chunks': len(chunk_urls)}
+            )
+            print(f"✅ Created stitched video artifact")
+
+            # Add checkpoint_id to output
+            output.checkpoint_id = checkpoint_id
+
+            # Update video status to paused
+            video.status = VideoStatus.PAUSED_AT_PHASE3
+            video.current_phase = 'phase3'
+            if video.phase_outputs is None:
+                video.phase_outputs = {}
+            video.phase_outputs['phase3_chunks'] = output.dict()
+            video.stitched_url = stitched_video_url
+            video.chunk_urls = chunk_urls
+            video.final_video_url = stitched_video_url
+            flag_modified(video, 'phase_outputs')
+            db.commit()
+            print(f"✅ Updated video status to PAUSED_AT_PHASE3")
+
+            # Update progress in Redis
+            update_progress(
+                video_id,
+                status='paused_at_phase3',
+                current_phase='phase3',
+                phase_outputs=video.phase_outputs
+            )
+
+            # Check YOLO mode (auto_continue)
+            if hasattr(video, 'auto_continue') and video.auto_continue:
+                print(f"🚀 YOLO mode enabled - auto-continuing to Phase 4")
+                approve_checkpoint(checkpoint_id)
+
+                # Import here to avoid circular dependency
+                from app.orchestrator.pipeline import dispatch_next_phase
+                dispatch_next_phase(video_id, checkpoint_id)
+            else:
+                print(f"⏸️  Pipeline paused at Phase 3 - awaiting user approval")
+
         finally:
             db.close()
-        
+
         print(f"✅ Phase 3 (Chunks) completed successfully for video {video_id}")
         print(f"   - Generated chunks: {len(chunk_urls)}")
         print(f"   - Stitched video: {stitched_video_url}")
         print(f"   - Total cost: ${total_cost:.4f}")
         print(f"   - Duration: {duration_seconds:.2f}s")
-        
+
         return output.dict()
         
     except PhaseException as e:

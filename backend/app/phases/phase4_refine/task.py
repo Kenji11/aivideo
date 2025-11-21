@@ -9,6 +9,7 @@ from app.orchestrator.progress import update_progress, update_cost
 from app.database import SessionLocal
 from app.common.models import VideoGeneration, VideoStatus
 from sqlalchemy.orm.attributes import flag_modified
+from app.database.checkpoint_queries import create_checkpoint, create_artifact, approve_checkpoint
 
 
 @celery_app.task(bind=True, name="app.phases.phase4_refine.task.refine_video")
@@ -59,7 +60,14 @@ def refine_video(self, phase3_output: dict, user_id: str = None) -> dict:
     phase3_data = phase3_output['output_data']
     stitched_video_url = phase3_data.get('stitched_video_url')
     spec = phase3_data.get('spec')  # Spec passed through from Phase 2
-    
+
+    # Extract branch context from Phase 3 output (for checkpoint tree)
+    branch_name = phase3_output.get('_branch_name', 'main')
+    parent_checkpoint_id = phase3_output.get('checkpoint_id')
+    version = phase3_output.get('_version', 1)
+
+    print(f"Phase 4 starting with branch context: branch={branch_name}, version={version}, parent_checkpoint={parent_checkpoint_id}")
+
     if not stitched_video_url:
         # Phase 4 skipped - no stitched video
         # Update final status in database
@@ -120,14 +128,12 @@ def refine_video(self, phase3_output: dict, user_id: str = None) -> dict:
                 for phase_name, phase_output in (video.phase_outputs or {}).items():
                     if isinstance(phase_output, dict) and phase_output.get('status') == 'success':
                         total_cost += phase_output.get('cost_usd', 0.0)
-                
+
                 # Get generation time (calculate from start if available, or use current time)
                 if video.created_at:
                     generation_time = (datetime.now(timezone.utc) - video.created_at).total_seconds()
-                
-                # Store Phase 5 output
-                if video.phase_outputs is None:
-                    video.phase_outputs = {}
+
+                # Build output dictionary
                 output_dict = {
                     "video_id": video_id,
                     "phase": "phase4_refine",
@@ -140,6 +146,58 @@ def refine_video(self, phase3_output: dict, user_id: str = None) -> dict:
                     "duration_seconds": duration_seconds,
                     "error_message": None
                 }
+
+                # Create Phase 4 checkpoint (terminal phase - auto-approved)
+                print(f"Creating Phase 4 checkpoint for video {video_id} on branch '{branch_name}'")
+                checkpoint_id = create_checkpoint(
+                    video_id=video_id,
+                    branch_name=branch_name,
+                    phase_number=4,
+                    version=version,
+                    phase_output=output_dict,
+                    cost_usd=service.total_cost,
+                    user_id=user_id,
+                    parent_checkpoint_id=parent_checkpoint_id
+                )
+                print(f"✅ Created checkpoint {checkpoint_id}")
+
+                # Create artifact for final video
+                final_s3_key = refined_url.split('.com/')[-1] if '.com/' in refined_url else f"{user_id}/videos/{video_id}/final_v{version}.mp4"
+                final_artifact_id = create_artifact(
+                    checkpoint_id=checkpoint_id,
+                    artifact_type='final_video',
+                    artifact_key='final',
+                    s3_url=refined_url,
+                    s3_key=final_s3_key,
+                    version=version,
+                    metadata={'with_audio': True}
+                )
+                print(f"✅ Created final video artifact")
+
+                # Create artifact for music (if present)
+                if music_url:
+                    music_s3_key = music_url.split('.com/')[-1] if '.com/' in music_url else f"{user_id}/videos/{video_id}/music_v{version}.mp3"
+                    music_artifact_id = create_artifact(
+                        checkpoint_id=checkpoint_id,
+                        artifact_type='music',
+                        artifact_key='music',
+                        s3_url=music_url,
+                        s3_key=music_s3_key,
+                        version=version,
+                        metadata={'music_style': spec.get('audio', {}).get('music_style', 'cinematic')}
+                    )
+                    print(f"✅ Created music artifact")
+
+                # Auto-approve Phase 4 checkpoint (terminal phase)
+                approve_checkpoint(checkpoint_id)
+                print(f"✅ Auto-approved Phase 4 checkpoint (terminal phase)")
+
+                # Add checkpoint_id to output
+                output_dict['checkpoint_id'] = checkpoint_id
+
+                # Store Phase 4 output
+                if video.phase_outputs is None:
+                    video.phase_outputs = {}
                 video.phase_outputs['phase4_refine'] = output_dict
                 video.refined_url = refined_url
                 video.final_video_url = refined_url
@@ -177,7 +235,8 @@ def refine_video(self, phase3_output: dict, user_id: str = None) -> dict:
                 "music_url": music_url
             },
             cost_usd=service.total_cost,
-            duration_seconds=duration_seconds
+            duration_seconds=duration_seconds,
+            checkpoint_id=checkpoint_id
         )
         
         print(f"✅ Phase 4 (Refinement) completed successfully for video {video_id}")

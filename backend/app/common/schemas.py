@@ -18,6 +18,7 @@ class PhaseOutput(BaseModel):
     cost_usd: float
     duration_seconds: float
     error_message: Optional[str] = None
+    checkpoint_id: Optional[str] = None  # ID of checkpoint created by this phase
 
 # ============ API Schemas ============
 

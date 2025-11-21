@@ -12,6 +12,7 @@ from app.database import SessionLocal
 from app.common.models import VideoGeneration, VideoStatus
 from app.orchestrator.progress import update_progress
 from app.services.redis import RedisClient
+from app.database.checkpoint_queries import get_checkpoint
 
 logger = logging.getLogger(__name__)
 
@@ -77,33 +78,88 @@ def run_pipeline(self, video_id: str, prompt: str, assets: list = None, model: s
     finally:
         db.close()
     
-    print(f"🔗 Creating chain workflow for video {video_id}...")
-    
-    # Create chain workflow - each phase receives previous phase's PhaseOutput as first arg
-    workflow = chain(
-        # Phase 1: Intelligent video planning (beat-based architecture)
-        plan_video_intelligent.s(video_id, prompt),
-        
-        # Phase 2: Generate storyboard images (receives Phase 1 output)
-        generate_storyboard.s(user_id),
-        
-        # Phase 3: Generate chunks and stitch (receives Phase 2 output)
-        generate_chunks.s(user_id, model),
-        
-        # Phase 4: Refine video with music (receives Phase 3 output)
-        refine_video.s(user_id)
-    )
-    
-    print(f"🔗 Chain created, dispatching with apply_async()...")
-    result = workflow.apply_async()
-    
-    print(f"✅ Pipeline chain dispatched for video {video_id}")
-    print(f"   - Workflow ID: {result.id}")
+    print(f"🚀 Dispatching Phase 1 (checkpoint-enabled pipeline)...")
+
+    # NEW: Dispatch only Phase 1 instead of entire chain
+    # Subsequent phases will be dispatched via continue API or auto-continue
+    result = plan_video_intelligent.delay(video_id, prompt)
+
+    print(f"✅ Phase 1 dispatched for video {video_id}")
+    print(f"   - Task ID: {result.id}")
+    print(f"   - Pipeline will pause at Phase 1 checkpoint")
+    print(f"   - Subsequent phases dispatch via /continue endpoint or auto_continue")
     print(f"   - Worker thread freed - can process more videos concurrently")
-    
+
     # Return immediately - worker thread freed!
     return {
         "video_id": video_id,
-        "workflow_id": result.id,
+        "task_id": result.id,
         "status": "processing"
     }
+
+
+def get_auto_continue_flag(video_id: str) -> bool:
+    """
+    Check if video has auto_continue enabled (YOLO mode).
+
+    Args:
+        video_id: Video generation ID
+
+    Returns:
+        bool: True if auto_continue is enabled, False otherwise
+    """
+    db = SessionLocal()
+    try:
+        video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+        if not video:
+            logger.warning(f"Video {video_id} not found when checking auto_continue flag")
+            return False
+        return video.auto_continue if hasattr(video, 'auto_continue') else False
+    finally:
+        db.close()
+
+
+def dispatch_next_phase(video_id: str, checkpoint_id: str):
+    """
+    Dispatch the next phase based on current checkpoint.
+    Used by both manual continue and YOLO auto-continue.
+
+    Args:
+        video_id: Video generation ID
+        checkpoint_id: Current checkpoint ID
+    """
+    checkpoint = get_checkpoint(checkpoint_id)
+    if not checkpoint:
+        logger.error(f"Checkpoint {checkpoint_id} not found")
+        return
+
+    phase_output = checkpoint['phase_output']
+    phase_number = checkpoint['phase_number']
+    user_id = checkpoint['user_id']
+
+    # Get video model preference from spec or default to hailuo
+    db = SessionLocal()
+    try:
+        video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+        # Model preference might be stored in spec or phase outputs
+        model = 'hailuo'  # Default
+        if video and video.spec:
+            model = video.spec.get('model', 'hailuo')
+    finally:
+        db.close()
+
+    logger.info(f"Dispatching Phase {phase_number + 1} for video {video_id}")
+
+    if phase_number == 1:
+        # Dispatch Phase 2: Storyboard generation
+        generate_storyboard.delay(phase_output, user_id)
+    elif phase_number == 2:
+        # Dispatch Phase 3: Chunk generation
+        generate_chunks.delay(phase_output, user_id, model)
+    elif phase_number == 3:
+        # Dispatch Phase 4: Refinement
+        refine_video.delay(phase_output, user_id)
+    elif phase_number == 4:
+        logger.info(f"Phase 4 is terminal - no next phase to dispatch")
+    else:
+        logger.error(f"Invalid phase number: {phase_number}")

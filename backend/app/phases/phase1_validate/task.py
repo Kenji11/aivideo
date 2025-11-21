@@ -20,6 +20,10 @@ from app.phases.phase1_validate.schemas import VideoPlanning
 from app.common.constants import BEAT_COMPOSITION_CREATIVITY, get_planning_temperature
 from app.common.beat_library import BEAT_LIBRARY
 from app.common.template_archetypes import TEMPLATE_ARCHETYPES
+from app.database import SessionLocal
+from app.common.models import VideoGeneration, VideoStatus
+from app.orchestrator.progress import update_progress
+from app.database.checkpoint_queries import create_checkpoint, create_artifact, approve_checkpoint
 
 logger = logging.getLogger(__name__)
 
@@ -85,10 +89,10 @@ def plan_video_intelligent(
                 result = plan_with_gpt4o_mini(video_id, prompt, creativity_level, start_time)
                 logger.info("✅ gpt-4o-mini succeeded")
                 return result
-            
+
             except Exception as e:
                 logger.error(f"❌ gpt-4o-mini failed: {str(e)}")
-                
+
                 if GPT4O_MINI_FALLBACK:
                     logger.info("🔄 Falling back to gpt-4-turbo-preview")
                     result = plan_with_gpt4_turbo(video_id, prompt, creativity_level, start_time)
@@ -204,9 +208,9 @@ def plan_with_gpt4o_mini(
     logger.info(f"   Duration: {duration_seconds:.2f}s")
     logger.info(f"   Total video duration: {spec['duration']}s")
     logger.info(f"   Beats: {len(spec['beats'])}")
-    
-    # Success - return PhaseOutput
-    return PhaseOutput(
+
+    # Build PhaseOutput
+    output = PhaseOutput(
         video_id=video_id,
         phase="phase1_planning",
         status="success",
@@ -217,7 +221,82 @@ def plan_with_gpt4o_mini(
         cost_usd=cost,
         duration_seconds=duration_seconds,
         error_message=None
-    ).dict()
+    )
+
+    # Get user_id from video record
+    db = SessionLocal()
+    try:
+        video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+        if not video:
+            logger.error(f"Video {video_id} not found")
+            raise Exception(f"Video {video_id} not found")
+
+        user_id = video.user_id
+
+        # Create checkpoint record
+        logger.info(f"Creating Phase 1 checkpoint for video {video_id}")
+        checkpoint_id = create_checkpoint(
+            video_id=video_id,
+            branch_name='main',  # Always start on main branch
+            phase_number=1,
+            version=1,  # First version
+            phase_output=output.model_dump(),
+            cost_usd=cost,
+            user_id=user_id,
+            parent_checkpoint_id=None  # Root checkpoint
+        )
+        logger.info(f"✅ Created checkpoint {checkpoint_id}")
+
+        # Create artifact for spec (stored in DB, not S3)
+        artifact_id = create_artifact(
+            checkpoint_id=checkpoint_id,
+            artifact_type='spec',
+            artifact_key='spec',
+            s3_url='',  # Spec stored in DB, not S3
+            s3_key='',
+            version=1,
+            metadata={'spec': spec}
+        )
+        logger.info(f"✅ Created spec artifact {artifact_id}")
+
+        # Add checkpoint_id to output
+        output.checkpoint_id = checkpoint_id
+
+        # Update video status to paused
+        video.status = VideoStatus.PAUSED_AT_PHASE1
+        video.current_phase = 'phase1'
+        if not video.phase_outputs:
+            video.phase_outputs = {}
+        video.phase_outputs['phase1_planning'] = output.model_dump()
+        video.spec = spec  # Store spec in DB
+        db.commit()
+        logger.info(f"✅ Updated video status to PAUSED_AT_PHASE1")
+
+        # Update progress in Redis
+        update_progress(
+            video_id,
+            status='paused_at_phase1',
+            current_phase='phase1',
+            spec=spec,
+            phase_outputs=video.phase_outputs
+        )
+
+        # Check YOLO mode (auto_continue)
+        if hasattr(video, 'auto_continue') and video.auto_continue:
+            logger.info(f"🚀 YOLO mode enabled - auto-continuing to Phase 2")
+            approve_checkpoint(checkpoint_id)
+
+            # Import here to avoid circular dependency
+            from app.orchestrator.pipeline import dispatch_next_phase
+            dispatch_next_phase(video_id, checkpoint_id)
+        else:
+            logger.info(f"⏸️  Pipeline paused at Phase 1 - awaiting user approval")
+
+    finally:
+        db.close()
+
+    # Success - return PhaseOutput with checkpoint_id
+    return output.model_dump()
 
 
 def plan_with_gpt4_turbo(
@@ -291,9 +370,9 @@ def plan_with_gpt4_turbo(
     logger.info(f"   Duration: {duration_seconds:.2f}s")
     logger.info(f"   Total video duration: {spec['duration']}s")
     logger.info(f"   Beats: {len(spec['beats'])}")
-    
-    # Success - return PhaseOutput
-    return PhaseOutput(
+
+    # Build PhaseOutput
+    output = PhaseOutput(
         video_id=video_id,
         phase="phase1_planning",
         status="success",
@@ -304,7 +383,82 @@ def plan_with_gpt4_turbo(
         cost_usd=cost,
         duration_seconds=duration_seconds,
         error_message=None
-    ).dict()
+    )
+
+    # Get user_id from video record
+    db = SessionLocal()
+    try:
+        video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+        if not video:
+            logger.error(f"Video {video_id} not found")
+            raise Exception(f"Video {video_id} not found")
+
+        user_id = video.user_id
+
+        # Create checkpoint record
+        logger.info(f"Creating Phase 1 checkpoint for video {video_id}")
+        checkpoint_id = create_checkpoint(
+            video_id=video_id,
+            branch_name='main',  # Always start on main branch
+            phase_number=1,
+            version=1,  # First version
+            phase_output=output.model_dump(),
+            cost_usd=cost,
+            user_id=user_id,
+            parent_checkpoint_id=None  # Root checkpoint
+        )
+        logger.info(f"✅ Created checkpoint {checkpoint_id}")
+
+        # Create artifact for spec (stored in DB, not S3)
+        artifact_id = create_artifact(
+            checkpoint_id=checkpoint_id,
+            artifact_type='spec',
+            artifact_key='spec',
+            s3_url='',  # Spec stored in DB, not S3
+            s3_key='',
+            version=1,
+            metadata={'spec': spec}
+        )
+        logger.info(f"✅ Created spec artifact {artifact_id}")
+
+        # Add checkpoint_id to output
+        output.checkpoint_id = checkpoint_id
+
+        # Update video status to paused
+        video.status = VideoStatus.PAUSED_AT_PHASE1
+        video.current_phase = 'phase1'
+        if not video.phase_outputs:
+            video.phase_outputs = {}
+        video.phase_outputs['phase1_planning'] = output.model_dump()
+        video.spec = spec  # Store spec in DB
+        db.commit()
+        logger.info(f"✅ Updated video status to PAUSED_AT_PHASE1")
+
+        # Update progress in Redis
+        update_progress(
+            video_id,
+            status='paused_at_phase1',
+            current_phase='phase1',
+            spec=spec,
+            phase_outputs=video.phase_outputs
+        )
+
+        # Check YOLO mode (auto_continue)
+        if hasattr(video, 'auto_continue') and video.auto_continue:
+            logger.info(f"🚀 YOLO mode enabled - auto-continuing to Phase 2")
+            approve_checkpoint(checkpoint_id)
+
+            # Import here to avoid circular dependency
+            from app.orchestrator.pipeline import dispatch_next_phase
+            dispatch_next_phase(video_id, checkpoint_id)
+        else:
+            logger.info(f"⏸️  Pipeline paused at Phase 1 - awaiting user approval")
+
+    finally:
+        db.close()
+
+    # Success - return PhaseOutput with checkpoint_id
+    return output.model_dump()
 
 
 # ===== Prompt Builders =====

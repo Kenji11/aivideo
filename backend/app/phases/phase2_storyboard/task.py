@@ -14,17 +14,33 @@ from app.common.constants import COST_FLUX_DEV_IMAGE
 from app.common.exceptions import PhaseException
 from app.orchestrator.progress import update_progress, update_cost
 from app.database import SessionLocal
-from app.common.models import VideoGeneration
+from app.common.models import VideoGeneration, VideoStatus
 from sqlalchemy.orm.attributes import flag_modified
+from app.database.checkpoint_queries import create_checkpoint, create_artifact, approve_checkpoint
 
 logger = logging.getLogger(__name__)
 
 
-def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
+def _generate_storyboard_impl(
+    video_id: str,
+    spec: dict,
+    user_id: str = None,
+    branch_name: str = 'main',
+    parent_checkpoint_id: str = None,
+    version: int = 1
+):
     """
     Core implementation of storyboard generation (without Celery wrapper).
-    
+
     This function contains the actual logic and can be called directly for testing.
+
+    Args:
+        video_id: Video generation ID
+        spec: Video specification from Phase 1
+        user_id: User ID for S3 organization
+        branch_name: Branch name for checkpoint tree (default: 'main')
+        parent_checkpoint_id: Parent checkpoint ID (from Phase 1)
+        version: Version number for artifact versioning (default: 1)
     """
     start_time = time.time()
     
@@ -68,14 +84,15 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
                 f"beat_id={beat.get('beat_id')}, duration={beat.get('duration')}s"
             )
             
-            # Generate image for this beat
+            # Generate image for this beat with versioning
             beat_image_info = generate_beat_image(
                 video_id=video_id,
                 beat_index=beat_index,
                 beat=beat,
                 style=style,
                 product=product,
-                user_id=user_id
+                user_id=user_id,
+                version=version  # Pass version for S3 path
             )
             
             # Add image URL to the beat in spec
@@ -125,33 +142,7 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
             redis_client.set_video_storyboard_urls(video_id, storyboard_urls)
             logger.info(f"✅ Persisted {len(storyboard_urls)} storyboard URLs to Redis")
         
-        # Store Phase 2 output in database
-        db = SessionLocal()
-        try:
-            video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
-            if video:
-                if video.phase_outputs is None:
-                    video.phase_outputs = {}
-                output_dict = {
-                    "video_id": video_id,
-                    "phase": "phase2_storyboard",
-                    "status": "success",
-                    "output_data": {
-                        "storyboard_images": storyboard_images,
-                        "spec": spec
-                    },
-                    "cost_usd": total_cost,
-                    "duration_seconds": duration_seconds,
-                    "error_message": None
-                }
-                video.phase_outputs['phase2_storyboard'] = output_dict
-                flag_modified(video, 'phase_outputs')
-                db.commit()
-        finally:
-            db.close()
-        
-        # Create success output
-        # Note: spec is updated in-place with image_url added to each beat
+        # Build PhaseOutput
         output = PhaseOutput(
             video_id=video_id,
             phase="phase2_storyboard",
@@ -164,7 +155,82 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None):
             duration_seconds=duration_seconds,
             error_message=None
         )
-        
+
+        # Create checkpoint and artifacts
+        db = SessionLocal()
+        try:
+            video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+            if not video:
+                logger.error(f"Video {video_id} not found")
+                raise PhaseException(f"Video {video_id} not found")
+
+            # Create checkpoint record
+            logger.info(f"Creating Phase 2 checkpoint for video {video_id} on branch '{branch_name}'")
+            checkpoint_id = create_checkpoint(
+                video_id=video_id,
+                branch_name=branch_name,
+                phase_number=2,
+                version=version,
+                phase_output=output.dict(),
+                cost_usd=total_cost,
+                user_id=user_id,
+                parent_checkpoint_id=parent_checkpoint_id
+            )
+            logger.info(f"✅ Created checkpoint {checkpoint_id}")
+
+            # Create artifacts for each beat image
+            for beat_image_info in storyboard_images:
+                artifact_id = create_artifact(
+                    checkpoint_id=checkpoint_id,
+                    artifact_type='beat_image',
+                    artifact_key=f"beat_{beat_image_info['beat_index']}",
+                    s3_url=beat_image_info['image_url'],
+                    s3_key=beat_image_info['s3_key'],
+                    version=version,
+                    metadata={
+                        'beat_id': beat_image_info['beat_id'],
+                        'prompt_used': beat_image_info['prompt_used'],
+                        'shot_type': beat_image_info['shot_type']
+                    }
+                )
+            logger.info(f"✅ Created {len(storyboard_images)} beat artifacts")
+
+            # Add checkpoint_id to output
+            output.checkpoint_id = checkpoint_id
+
+            # Update video status to paused
+            video.status = VideoStatus.PAUSED_AT_PHASE2
+            video.current_phase = 'phase2'
+            if video.phase_outputs is None:
+                video.phase_outputs = {}
+            video.phase_outputs['phase2_storyboard'] = output.dict()
+            flag_modified(video, 'phase_outputs')
+            db.commit()
+            logger.info(f"✅ Updated video status to PAUSED_AT_PHASE2")
+
+            # Update progress in Redis
+            update_progress(
+                video_id,
+                status='paused_at_phase2',
+                current_phase='phase2',
+                phase_outputs=video.phase_outputs
+            )
+
+            # Check YOLO mode (auto_continue)
+            if hasattr(video, 'auto_continue') and video.auto_continue:
+                logger.info(f"🚀 YOLO mode enabled - auto-continuing to Phase 3")
+                approve_checkpoint(checkpoint_id)
+
+                # Import here to avoid circular dependency
+                from app.orchestrator.pipeline import dispatch_next_phase
+                dispatch_next_phase(video_id, checkpoint_id)
+            else:
+                logger.info(f"⏸️  Pipeline paused at Phase 2 - awaiting user approval")
+
+        finally:
+            db.close()
+
+        # Return PhaseOutput with checkpoint_id
         return output.dict()
         
     except Exception as e:
@@ -256,6 +322,20 @@ def generate_storyboard(self, phase1_output: dict, user_id: str = None):
     # Extract spec and video_id from Phase 1 output
     video_id = phase1_output['video_id']
     spec = phase1_output['output_data']['spec']
-    
-    # Call core implementation
-    return _generate_storyboard_impl(video_id, spec, user_id)
+
+    # Extract branch context from Phase 1 output (for checkpoint tree)
+    branch_name = phase1_output.get('_branch_name', 'main')
+    parent_checkpoint_id = phase1_output.get('checkpoint_id')
+    version = phase1_output.get('_version', 1)
+
+    logger.info(f"Phase 2 starting with branch context: branch={branch_name}, version={version}, parent_checkpoint={parent_checkpoint_id}")
+
+    # Call core implementation with branch context
+    return _generate_storyboard_impl(
+        video_id,
+        spec,
+        user_id,
+        branch_name=branch_name,
+        parent_checkpoint_id=parent_checkpoint_id,
+        version=version
+    )
