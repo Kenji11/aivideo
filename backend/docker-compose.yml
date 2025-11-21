@@ -29,6 +29,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        DEV: ${DEV:-true}  # Install dev dependencies (defaults to true)
     ports:
       - "8000:8000"
     depends_on:
@@ -53,6 +55,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        DEV: ${DEV:-true}  # Install dev dependencies (defaults to true)
     depends_on:
       postgres:
         condition: service_healthy

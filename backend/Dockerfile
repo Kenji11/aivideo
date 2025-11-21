@@ -9,9 +9,16 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
+# Accept DEV build argument (defaults to false for production)
+ARG DEV=false
+
 # Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements-dev.txt ./
+RUN if [ "$DEV" = "true" ] ; then \
+        pip install --no-cache-dir -r requirements-dev.txt ; \
+    else \
+        pip install --no-cache-dir -r requirements.txt ; \
+    fi
 
 # Copy application code
 COPY . .
