@@ -2,10 +2,10 @@
 
 ## PR #5: ControlNet Image Generation
 
-**Goal:** Enhance Phase 2 storyboard generation to use reference assets with ControlNet for product consistency.
+**Goal:** Enhance Phase 2 storyboard generation to use reference assets with ControlNet for product consistency using flux-dev-controlnet.
 
 **Estimated Time:** 4-5 days  
-**Dependencies:** PR #4
+**Dependencies:** PR #4 ✅
 
 ---
 
@@ -40,15 +40,21 @@
 
 **File:** `backend/app/services/controlnet.py`
 
+**Note:** Add cost constant to `backend/app/common/constants.py`:
+```python
+COST_FLUX_DEV_CONTROLNET_IMAGE = 0.058  # flux-dev with ControlNet support
+```
+
 - [ ] Implement `generate_with_controlnet(prompt: str, control_image_path: str, conditioning_scale: float, width: int, height: int) -> Image`
-- [ ] Call Replicate SDXL + ControlNet model
-  - [ ] Model: `lucataco/sdxl-controlnet`
+- [ ] Call Replicate flux-dev-controlnet model
+  - [ ] Model: `black-forest-labs/flux-dev-controlnet` (or equivalent flux-dev with ControlNet support)
   - [ ] Parameters:
     - [ ] prompt (text prompt)
     - [ ] image (control image file)
     - [ ] conditioning_scale (0.5-1.0, default 0.75)
-    - [ ] width (1280)
-    - [ ] height (720)
+    - [ ] aspect_ratio ("16:9" for 1280x720)
+    - [ ] output_format ("png")
+    - [ ] output_quality (90)
     - [ ] num_inference_steps (30)
     - [ ] controlnet_type ("canny")
 - [ ] Download result from Replicate URL
@@ -73,21 +79,21 @@
 - [ ] For each beat:
   - [ ] Check if references exist in mapping
   - [ ] If yes: use ControlNet generation
-  - [ ] If no: fallback to regular SDXL
+  - [ ] If no: fallback to regular flux-dev
 - [ ] Implement ControlNet path:
   - [ ] Get product_ref from reference_mapping[beat_id]
   - [ ] Download product reference image from S3
   - [ ] Preprocess for ControlNet (extract edges)
-  - [ ] Generate with ControlNet
+  - [ ] Generate with flux-dev-controlnet
   - [ ] Apply logo overlay (if logo_ref exists)
   - [ ] Upload to S3
 - [ ] Implement fallback path (no references):
-  - [ ] Use existing SDXL generation
+  - [ ] Use existing flux-dev generation (current implementation)
   - [ ] No changes to current logic
 - [ ] Track which path was used (for debugging)
 - [ ] Update cost tracking
-  - [ ] SDXL: $0.0055
-  - [ ] SDXL + ControlNet: $0.010
+  - [ ] flux-dev: $0.025 (COST_FLUX_DEV_IMAGE - already exists)
+  - [ ] flux-dev-controlnet: $0.058 (COST_FLUX_DEV_CONTROLNET_IMAGE - **NEW constant to add to constants.py**)
 - [ ] Write integration test
 
 ---
@@ -155,14 +161,14 @@
   ```python
   IMAGE_QUALITY_TIERS = {
       "draft": {
-          "model": "sdxl",
+          "model": "flux-dev",
           "use_references": False,
-          "cost_per_image": 0.0055
+          "cost_per_image": 0.025
       },
       "standard": {
-          "model": "sdxl-controlnet",
+          "model": "flux-dev-controlnet",
           "use_references": True,
-          "cost_per_image": 0.010
+          "cost_per_image": 0.058
       },
       "final": {
           "model": "flux-pro",
@@ -228,11 +234,11 @@
 
 **Integration Tests:**
 - [ ] Generate storyboard with references (standard tier)
-  - [ ] Verify ControlNet used
+  - [ ] Verify flux-dev-controlnet used
   - [ ] Verify product consistency across beats
   - [ ] Verify logo overlaid
 - [ ] Generate storyboard without references (draft tier)
-  - [ ] Verify regular SDXL used
+  - [ ] Verify regular flux-dev used
   - [ ] Verify no ControlNet processing
 - [ ] Generate storyboard with references (final tier)
   - [ ] Verify Flux Pro used (if implemented)
@@ -241,7 +247,7 @@
 - [ ] Generate 5 videos with same product reference
 - [ ] Visual inspection: Is product consistent across storyboards?
 - [ ] Expected: 85% consistency (product recognizable)
-- [ ] Compare to baseline (without ControlNet)
+- [ ] Compare to baseline (without flux-dev-controlnet)
 - [ ] Verify logo placement looks good
 - [ ] Test with different logo sizes
 - [ ] Test with different image compositions
@@ -249,7 +255,7 @@
 **Performance:**
 - [ ] Measure storyboard generation time with ControlNet
   - [ ] Target: <10s per image
-  - [ ] Compare to baseline (regular SDXL ~8s)
+  - [ ] Compare to baseline (regular flux-dev ~8s)
 - [ ] Test with large reference images (10MB)
 - [ ] Test concurrent storyboard generation
 
@@ -257,7 +263,7 @@
 
 ### Acceptance Criteria
 
-- [ ] Phase 2 supports reference assets via ControlNet
+- [ ] Phase 2 supports reference assets via flux-dev-controlnet
 - [ ] Product consistency in storyboards: >85% (visual QA)
 - [ ] Logo overlay works with 100% accuracy
 - [ ] Logo positioning avoids busy areas
@@ -265,7 +271,7 @@
 - [ ] Cost tracking accurate for different tiers
 - [ ] Frontend shows quality selector
 - [ ] Reference assets visibly used in storyboards
-- [ ] Fallback to regular SDXL works when no references
+- [ ] Fallback to regular flux-dev works when no references
 - [ ] All tests pass
 - [ ] Performance acceptable (<10s per storyboard image)
 

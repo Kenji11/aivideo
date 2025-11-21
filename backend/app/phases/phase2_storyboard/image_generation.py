@@ -11,10 +11,16 @@ import logging
 from typing import Dict
 from app.services.replicate import replicate_client
 from app.services.s3 import s3_client
-from app.common.constants import get_video_s3_key
+from app.services.controlnet import controlnet_service
+from app.common.constants import get_video_s3_key, COST_FLUX_DEV_IMAGE, COST_FLUX_DEV_CONTROLNET_IMAGE
 from app.common.exceptions import PhaseException
+from app.database import SessionLocal
+from app.common.models import Asset
 
 logger = logging.getLogger(__name__)
+
+# Debug flag: Exit early after model decision (for debugging ControlNet selection)
+DEBUG_EXIT_AFTER_MODEL_DECISION = False  # Set to True to enable debug mode
 
 
 def generate_beat_image(
@@ -71,9 +77,21 @@ def generate_beat_image(
     # Check if this beat has reference assets in the mapping
     beat_id = beat.get('beat_id')
     reference_info = None
+    
+    # Debug logging
+    logger.info(f"🔍 ControlNet Debug - Beat ID: {beat_id}")
+    logger.info(f"🔍 ControlNet Debug - reference_mapping exists: {reference_mapping is not None}")
+    if reference_mapping:
+        logger.info(f"🔍 ControlNet Debug - reference_mapping keys: {list(reference_mapping.keys())}")
+    logger.info(f"🔍 ControlNet Debug - user_assets exists: {user_assets is not None}")
+    if user_assets:
+        logger.info(f"🔍 ControlNet Debug - user_assets count: {len(user_assets)}")
+    
     if reference_mapping and beat_id and beat_id in reference_mapping:
         reference_info = reference_mapping[beat_id]
-        logger.info(f"Beat {beat_id} has reference mapping: {reference_info}")
+        logger.info(f"✅ Beat {beat_id} has reference mapping: {reference_info}")
+    else:
+        logger.info(f"⚠️ Beat {beat_id} has NO reference mapping (reference_mapping={reference_mapping is not None}, beat_id={beat_id}, in_mapping={beat_id in reference_mapping if reference_mapping and beat_id else False})")
     
     # Enhance prompt with reference asset information
     reference_prompt_parts = []
@@ -154,39 +172,127 @@ def generate_beat_image(
         f"{full_prompt[:100]}..."
     )
     
-    try:
-        # Call Replicate FLUX Dev model (same as Phase 3)
-        # Cost: $0.025/image (better quality than SDXL)
-        logger.info(f"   Using Replicate FLUX Dev model...")
-        output = replicate_client.run(
-            "black-forest-labs/flux-dev",
-            input={
-                "prompt": full_prompt,
-                "aspect_ratio": "16:9",  # 1280x720 aspect ratio
-                "output_format": "png",
-                "output_quality": 90,  # High quality for storyboards
-            },
-            timeout=60
-        )
+    # Determine if we should use ControlNet (if product reference exists)
+    use_controlnet = False
+    product_asset_id = None
+    
+    logger.info(f"🔍 ControlNet Decision - reference_info exists: {reference_info is not None}")
+    logger.info(f"🔍 ControlNet Decision - user_assets exists: {user_assets is not None}")
+    
+    if reference_info and user_assets:
+        asset_ids = reference_info.get('asset_ids', [])
+        usage_type = reference_info.get('usage_type', '')
         
-        # Extract image URL from output
-        # FLUX Dev returns a URL or list of URLs
-        if isinstance(output, str):
-            image_url = output
-        elif isinstance(output, list) and len(output) > 0:
-            image_url = output[0]
+        logger.info(f"🔍 ControlNet Decision - asset_ids: {asset_ids}, usage_type: {usage_type}")
+        
+        # Use ControlNet if we have a product reference
+        if usage_type == 'product' and asset_ids:
+            product_asset_id = asset_ids[0]  # Use first product asset
+            use_controlnet = True
+            logger.info(f"   ✅ Using ControlNet with product asset: {product_asset_id}")
         else:
-            # Handle iterator/other formats
-            image_url = list(output)[0] if hasattr(output, '__iter__') else str(output)
+            logger.info(f"   ⚠️ Not using ControlNet - usage_type='{usage_type}' (needs 'product'), asset_ids={asset_ids}")
+    else:
+        logger.info(f"   ⚠️ Not using ControlNet - reference_info={reference_info is not None}, user_assets={user_assets is not None}")
+    
+    # DEBUG: Exit early after model decision
+    if DEBUG_EXIT_AFTER_MODEL_DECISION:
+        logger.info("=" * 80)
+        logger.info("🔴 DEBUG MODE: Exiting early after model decision")
+        logger.info(f"   Model selected: {'flux-dev-controlnet' if use_controlnet else 'flux-dev'}")
+        logger.info(f"   Product asset ID: {product_asset_id}")
+        logger.info(f"   Beat ID: {beat_id}")
+        logger.info("=" * 80)
+        raise PhaseException(f"DEBUG: Early exit after model decision - would use {'ControlNet' if use_controlnet else 'regular flux-dev'}")
+    
+    try:
+        temp_path = None
+        if use_controlnet and product_asset_id:
+            # ControlNet path: Download product image, preprocess, generate with ControlNet
+            db = SessionLocal()
+            try:
+                asset = db.query(Asset).filter(Asset.id == product_asset_id).first()
+                if not asset or not asset.s3_url:
+                    logger.warning(f"Product asset {product_asset_id} not found or missing S3 URL, falling back to regular flux-dev")
+                    use_controlnet = False
+                else:
+                    # Download product image from S3
+                    try:
+                        product_image_path = s3_client.download_temp(asset.s3_url)
+                        if not product_image_path or not os.path.exists(product_image_path):
+                            logger.warning(f"Failed to download product image from {asset.s3_url}, falling back to regular flux-dev")
+                            use_controlnet = False
+                        else:
+                            control_image_path = None
+                            try:
+                                # Preprocess for ControlNet (extract edges)
+                                control_image_path = controlnet_service.preprocess_for_controlnet(
+                                    product_image_path,
+                                    method="canny"
+                                )
+                                
+                                # Generate with ControlNet
+                                generated_image_url = controlnet_service.generate_with_controlnet(
+                                    prompt=full_prompt,
+                                    control_image_path=control_image_path,
+                                    conditioning_scale=0.75,
+                                    aspect_ratio="16:9"
+                                )
+                                
+                                # Download generated image
+                                response = requests.get(generated_image_url, timeout=60)
+                                response.raise_for_status()
+                                
+                                # Save to temp file
+                                temp_path = tempfile.mktemp(suffix='.png')
+                                with open(temp_path, 'wb') as f:
+                                    f.write(response.content)
+                                
+                                logger.info(f"   ✅ Generated with ControlNet (cost: ${COST_FLUX_DEV_CONTROLNET_IMAGE:.4f})")
+                            finally:
+                                # Cleanup preprocessing temp files
+                                if product_image_path and os.path.exists(product_image_path):
+                                    os.remove(product_image_path)
+                                if control_image_path and os.path.exists(control_image_path):
+                                    os.remove(control_image_path)
+                    except Exception as e:
+                        logger.warning(f"Error downloading/preprocessing product image: {str(e)}, falling back to regular flux-dev")
+                        use_controlnet = False
+            finally:
+                db.close()
         
-        # Download image
-        response = requests.get(image_url, timeout=60)
-        response.raise_for_status()
-        
-        # Save to temp file
-        temp_path = tempfile.mktemp(suffix='.png')
-        with open(temp_path, 'wb') as f:
-            f.write(response.content)
+        if not use_controlnet or temp_path is None:
+            # Regular flux-dev path (no ControlNet)
+            logger.info(f"   Using Replicate FLUX Dev model (no ControlNet)...")
+            output = replicate_client.run(
+                "black-forest-labs/flux-dev",
+                input={
+                    "prompt": full_prompt,
+                    "aspect_ratio": "16:9",  # 1280x720 aspect ratio
+                    "output_format": "png",
+                    "output_quality": 90,  # High quality for storyboards
+                },
+                timeout=60
+            )
+            
+            # Extract image URL from output
+            if isinstance(output, str):
+                generated_image_url = output
+            elif isinstance(output, list) and len(output) > 0:
+                generated_image_url = output[0]
+            else:
+                generated_image_url = list(output)[0] if hasattr(output, '__iter__') else str(output)
+            
+            # Download image
+            response = requests.get(generated_image_url, timeout=60)
+            response.raise_for_status()
+            
+            # Save to temp file
+            temp_path = tempfile.mktemp(suffix='.png')
+            with open(temp_path, 'wb') as f:
+                f.write(response.content)
+            
+            logger.info(f"   ✅ Generated with flux-dev (cost: ${COST_FLUX_DEV_IMAGE:.4f})")
         
         # Upload to S3 using user-scoped structure
         if not user_id:
@@ -210,7 +316,8 @@ def generate_beat_image(
             "image_url": s3_url,
             "shot_type": shot_type,
             "prompt_used": full_prompt,
-            "referenced_asset_ids": referenced_asset_ids  # Track which assets were used
+            "referenced_asset_ids": referenced_asset_ids,  # Track which assets were used
+            "used_controlnet": use_controlnet  # Track which generation path was used
         }
         
     except Exception as e:
