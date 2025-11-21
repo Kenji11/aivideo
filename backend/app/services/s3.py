@@ -3,6 +3,8 @@ import tempfile
 import os
 from app.config import get_settings
 import logging
+from PIL import Image
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +178,106 @@ class S3Client:
             
         except Exception as e:
             logger.error(f"Failed to delete directory with prefix '{prefix}': {str(e)}")
+            return False
+    
+    def upload_thumbnail(self, image_path_or_pil: str | Image.Image, user_id: str, original_filename: str) -> str:
+        """Upload a thumbnail image to S3
+        
+        Args:
+            image_path_or_pil: Either a file path (str) or PIL Image object
+            user_id: User ID
+            original_filename: Original filename (e.g., "nike_sneaker.png")
+            
+        Returns:
+            S3 URL of the uploaded thumbnail
+        """
+        from app.common.constants import get_asset_thumbnail_s3_key
+        
+        try:
+            # Load image if path provided
+            if isinstance(image_path_or_pil, str):
+                img = Image.open(image_path_or_pil)
+            else:
+                img = image_path_or_pil.copy()  # Make a copy to avoid modifying original
+            
+            # Convert RGBA to RGB if needed (for JPEG)
+            if img.mode == 'RGBA':
+                # Create white background
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                background.paste(img, mask=img.split()[3])  # Use alpha channel as mask
+                img = background
+            elif img.mode not in ('RGB', 'L'):
+                img = img.convert('RGB')
+            
+            # Resize to 400x400 maintaining aspect ratio
+            img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+            
+            # Create new image with 400x400 (pad if needed)
+            thumbnail = Image.new('RGB', (400, 400), (255, 255, 255))
+            # Center the thumbnail
+            x_offset = (400 - img.width) // 2
+            y_offset = (400 - img.height) // 2
+            thumbnail.paste(img, (x_offset, y_offset))
+            
+            # Save to temporary file
+            temp_path = tempfile.mktemp(suffix='.jpg')
+            thumbnail.save(temp_path, 'JPEG', quality=85, optimize=True)
+            
+            # Generate S3 key
+            s3_key = get_asset_thumbnail_s3_key(user_id, original_filename)
+            
+            # Upload to S3
+            self.client.upload_file(temp_path, self.bucket, s3_key)
+            
+            # Clean up temp file
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            
+            # Generate presigned URL
+            s3_url = self.generate_presigned_url(s3_key, expiration=3600 * 24 * 7)  # 7 days
+            logger.info(f"Uploaded thumbnail to S3: {s3_key}")
+            return s3_url
+            
+        except Exception as e:
+            logger.error(f"Failed to upload thumbnail: {str(e)}")
+            raise
+    
+    def delete_asset_files(self, user_id: str, filename: str) -> bool:
+        """Delete all files for an asset (original, thumbnail, preprocessed)
+        
+        Args:
+            user_id: User ID
+            filename: Original filename (e.g., "nike_sneaker.png")
+            
+        Returns:
+            True if all deletions succeed, False otherwise
+        """
+        from app.common.constants import get_asset_s3_key, get_asset_thumbnail_s3_key
+        from pathlib import Path
+        
+        try:
+            # Get base name without extension
+            base_name = Path(filename).stem
+            
+            # List all files with prefix {user_id}/assets/{base_name}
+            prefix = f"{user_id}/assets/{base_name}"
+            files = self.list_files(prefix)
+            
+            if not files:
+                logger.info(f"No files found for asset: {filename}")
+                return True
+            
+            # Delete all matching files
+            all_succeeded = True
+            for file_key in files:
+                if not self.delete_file(file_key):
+                    all_succeeded = False
+            
+            logger.info(f"Deleted {len(files)} files for asset: {filename}")
+            return all_succeeded
+            
+        except Exception as e:
+            logger.error(f"Failed to delete asset files for '{filename}': {str(e)}")
             return False
 
 # Initialize with error handling - don't crash on import

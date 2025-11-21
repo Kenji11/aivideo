@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     environment:
       POSTGRES_DB: videogen
       POSTGRES_USER: dev
@@ -41,11 +41,15 @@ services:
     environment:
       DATABASE_URL: postgresql://dev:devpass@postgres:5432/videogen
       REDIS_URL: redis://redis:6379/0
+      # CLIP model configuration
+      CLIP_MODEL: ViT-B/32
+      CLIP_MODEL_CACHE: /mnt/models
       # Firebase credentials: JSON file path and private_key from .env file
       # Other env vars (REPLICATE_API_TOKEN, OPENAI_API_KEY, AWS_*, FIREBASE_*) loaded from .env file via env_file directive
     volumes:
       - ./app:/app/app
       - ./firebase-credentials.json:/app/firebase-credentials.json:ro  # Firebase credentials JSON (without private_key)
+      - clip-models:/mnt/models  # CLIP model cache volume
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   worker:
@@ -62,14 +66,19 @@ services:
     environment:
       DATABASE_URL: postgresql://dev:devpass@postgres:5432/videogen
       REDIS_URL: redis://redis:6379/0
+      # CLIP model configuration
+      CLIP_MODEL: ViT-B/32
+      CLIP_MODEL_CACHE: /mnt/models
       # Firebase credentials: JSON file path and private_key from .env file
       # Other env vars (REPLICATE_API_TOKEN, OPENAI_API_KEY, AWS_*, FIREBASE_*) loaded from .env file via env_file directive
     volumes:
       - ./app:/app/app
       - ./firebase-credentials.json:/app/firebase-credentials.json:ro  # Firebase credentials JSON (without private_key)
+      - clip-models:/mnt/models  # CLIP model cache volume
     command: celery -A app.orchestrator.celery_app worker --loglevel=info --concurrency=2
 
 volumes:
   postgres_data:
+  clip-models:  # CLIP model cache volume (persists across container restarts)
 
 

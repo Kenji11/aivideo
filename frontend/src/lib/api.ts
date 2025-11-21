@@ -51,17 +51,12 @@ apiClient.interceptors.request.use(
       const token = await getIdToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
-        console.log(`[API] Added auth token to ${config.method?.toUpperCase()} ${config.url}`);
-      } else {
-        console.warn(`[API] No auth token available for ${config.method?.toUpperCase()} ${config.url}`);
       }
     } catch (error) {
       // If token retrieval fails, log the error
       console.error('[API] Failed to get auth token:', error);
-      console.warn(`[API] Request will proceed without token: ${config.method?.toUpperCase()} ${config.url}`);
     }
     
-    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
     return config;
   },
   (error) => {
@@ -136,6 +131,7 @@ export interface StatusResponse {
 
 export interface VideoResponse {
   video_id: string;
+  title: string;
   status: string;
   final_video_url?: string;
   cost_usd: number;
@@ -164,15 +160,40 @@ export interface UploadResponse {
 export interface AssetListItem {
   asset_id: string;
   filename: string;
+  name?: string;
   asset_type: string;
+  reference_asset_type?: string;
   file_size_bytes: number;
   s3_url: string;
+  thumbnail_url?: string;
+  width?: number;
+  height?: number;
+  is_logo?: boolean;
+  primary_object?: string;  // For hover tooltip
+  analysis?: any;  // Analysis status indicator
+  similarity_score?: number;  // For search results
   created_at?: string;
+}
+
+export interface AssetDetail extends AssetListItem {
+  description?: string;
+  has_transparency?: boolean;
+  logo_position_preference?: string;
+  primary_object?: string;
+  colors?: string[];
+  dominant_colors_rgb?: number[][];
+  style_tags?: string[];
+  recommended_shot_types?: string[];
+  usage_contexts?: string[];
+  usage_count?: number;
+  updated_at?: string;
 }
 
 export interface AssetListResponse {
   assets: AssetListItem[];
   total: number;
+  limit?: number;
+  offset?: number;
   user_id: string;
 }
 
@@ -183,6 +204,7 @@ export interface VideoListItem {
   progress: number;
   current_phase?: string;
   final_video_url?: string;
+  thumbnail_url?: string;
   cost_usd: number;
   created_at: string;
   completed_at?: string;
@@ -324,9 +346,89 @@ export const api = {
   /**
    * Get all assets for a user
    */
-  async getAssets(userId?: string): Promise<AssetListResponse> {
-    const params = userId ? { user_id: userId } : {};
+  async getAssets(params?: {
+    reference_asset_type?: string;
+    is_logo?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<AssetListResponse> {
     const response = await apiClient.get<AssetListResponse>('/api/assets', { params });
+    return response.data;
+  },
+
+  /**
+   * Get a single asset by ID
+   */
+  async getAsset(assetId: string): Promise<AssetDetail> {
+    const response = await apiClient.get<AssetDetail>(`/api/assets/${assetId}`);
+    return response.data;
+  },
+
+  /**
+   * Update asset metadata
+   */
+  async updateAsset(
+    assetId: string,
+    updates: {
+      name?: string;
+      description?: string;
+      reference_asset_type?: string;
+      logo_position_preference?: string;
+    }
+  ): Promise<AssetDetail> {
+    const formData = new FormData();
+    if (updates.name !== undefined) formData.append('name', updates.name);
+    if (updates.description !== undefined) formData.append('description', updates.description);
+    if (updates.reference_asset_type !== undefined) formData.append('reference_asset_type', updates.reference_asset_type);
+    if (updates.logo_position_preference !== undefined) formData.append('logo_position_preference', updates.logo_position_preference);
+
+    const response = await apiClient.patch<AssetDetail>(`/api/assets/${assetId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  /**
+   * Delete an asset
+   */
+  async deleteAsset(assetId: string): Promise<void> {
+    await apiClient.delete(`/api/assets/${assetId}`);
+  },
+
+  /**
+   * Upload assets with metadata
+   */
+  async uploadAssetsWithMetadata(
+    files: File[],
+    metadata?: {
+      name?: string;
+      description?: string;
+      reference_asset_type?: string;
+    },
+    onProgress?: (progress: number) => void
+  ): Promise<UploadResponse> {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append('files', file);
+    });
+    if (metadata?.name) formData.append('name', metadata.name);
+    if (metadata?.description) formData.append('description', metadata.description);
+    if (metadata?.reference_asset_type) formData.append('reference_asset_type', metadata.reference_asset_type);
+
+    const response = await apiClient.post<UploadResponse>('/api/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent: any) => {
+        if (onProgress && progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percentCompleted);
+        }
+      },
+    });
+
     return response.data;
   },
 
@@ -454,6 +556,49 @@ export const api = {
    */
   async getEditingStatus(videoId: string): Promise<EditingStatus> {
     const response = await apiClient.get<EditingStatus>(`/api/video/${videoId}/editing/status`);
+    return response.data;
+  },
+
+  /**
+   * Search assets by text query
+   */
+  async searchAssets(params: {
+    q: string;
+    asset_type?: string;
+    limit?: number;
+  }): Promise<AssetListResponse & { query: string }> {
+    const response = await apiClient.get<AssetListResponse & { query: string }>('/api/assets/search', { params });
+    return response.data;
+  },
+
+  /**
+   * Find similar assets to a given asset
+   */
+  async getSimilarAssets(
+    assetId: string,
+    params?: {
+      limit?: number;
+      exclude_self?: boolean;
+    }
+  ): Promise<AssetListResponse & { reference_asset_id: string }> {
+    const response = await apiClient.get<AssetListResponse & { reference_asset_id: string }>(
+      `/api/assets/${assetId}/similar`,
+      { params }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get style-consistent asset recommendations
+   */
+  async recommendAssets(selectedAssetIds: string[], limit?: number): Promise<AssetListResponse & { selected_asset_ids: string[] }> {
+    const response = await apiClient.post<AssetListResponse & { selected_asset_ids: string[] }>(
+      '/api/assets/recommend',
+      {
+        selected_asset_ids: selectedAssetIds,
+        limit: limit || 10,
+      }
+    );
     return response.data;
   },
 };
