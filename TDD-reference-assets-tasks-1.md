@@ -357,48 +357,48 @@
 
 **Approach:** Single GPT-4o API call returns all analysis fields in JSON format. Simpler, faster, cheaper than multiple calls.
 
-- [ ] Create `AssetAnalysisService` class
-- [ ] Implement `analyze_reference_asset(image_url: str, user_provided_name: str, user_provided_description: str) -> dict`
-  - [ ] Accept S3 URL (presigned URL for GPT-4o API) and user context
-  - [ ] Note: PIL Image not needed here (GPT-4o uses URL)
-- [ ] Build comprehensive GPT-4o prompt requesting ALL fields in one JSON response:
-  - [ ] `asset_type`: product/logo/person/environment/texture/prop
-  - [ ] `primary_object`: detailed description of main subject
-  - [ ] `colors`: array of color names (e.g., ["white", "red", "black"])
-  - [ ] `dominant_colors_rgb`: array of RGB arrays (e.g., [[255,255,255], [220,20,60]])
-  - [ ] `style_tags`: array of style descriptors (e.g., ["athletic", "modern", "clean"])
-  - [ ] `recommended_shot_types`: array of shot types (e.g., ["close_up", "hero_shot"])
-  - [ ] `usage_contexts`: array of usage contexts (e.g., ["product shots", "action scenes"])
-  - [ ] `is_logo`: boolean (logo detection)
-  - [ ] `logo_position_preference`: string if logo detected (e.g., "bottom-right")
-  - [ ] `confidence`: float 0.0-1.0
-- [ ] Call OpenAI GPT-4o API with structured JSON response:
-  - [ ] Model: `gpt-4o` (consistent with codebase)
-  - [ ] Pass image URL (presigned S3 URL) in `image_url` format
-  - [ ] Use `response_format={"type": "json_object"}` for guaranteed JSON
-  - [ ] Pass user-provided context (name, description) in prompt
-  - [ ] Set max_tokens to 1000
-- [ ] Parse and validate response:
-  - [ ] Extract JSON from response (should be clean JSON due to response_format)
-  - [ ] Validate all required fields present
-  - [ ] Validate data types (arrays are arrays, booleans are booleans, etc.)
-  - [ ] Handle malformed JSON gracefully (fallback to empty analysis)
-- [ ] Add retry logic:
-  - [ ] Retry up to 3 times on API errors (rate limits, network errors)
-  - [ ] Exponential backoff between retries
-  - [ ] Log retry attempts
-- [ ] Add cost tracking:
-  - [ ] Log tokens used (input + output)
-  - [ ] Calculate cost (~$0.01-0.03 per image for GPT-4o vision)
-  - [ ] Log cost per analysis
-- [ ] Write unit tests:
-  - [ ] Test with sample product image → verify product type, colors, style tags
-  - [ ] Test with logo image → verify is_logo=true, logo_position_preference
-  - [ ] Test with person image → verify person type
-  - [ ] Test with environment image → verify environment type
-  - [ ] Verify JSON structure matches expected schema
-  - [ ] Test error handling (API failures, malformed JSON, network errors)
-  - [ ] Test retry logic
+- [x] Create `AssetAnalysisService` class
+- [x] Implement `analyze_reference_asset(image_url: str, user_provided_name: str, user_provided_description: str) -> dict`
+  - [x] Accept S3 URL (presigned URL for GPT-4o API) and user context
+  - [x] Note: PIL Image not needed here (GPT-4o uses URL)
+- [x] Build comprehensive GPT-4o prompt requesting ALL fields in one JSON response:
+  - [x] `asset_type`: product/logo/person/environment/texture/prop
+  - [x] `primary_object`: detailed description of main subject
+  - [x] `colors`: array of color names (e.g., ["white", "red", "black"])
+  - [x] `dominant_colors_rgb`: array of RGB arrays (e.g., [[255,255,255], [220,20,60]])
+  - [x] `style_tags`: array of style descriptors (e.g., ["athletic", "modern", "clean"])
+  - [x] `recommended_shot_types`: array of shot types (e.g., ["close_up", "hero_shot"])
+  - [x] `usage_contexts`: array of usage contexts (e.g., ["product shots", "action scenes"])
+  - [x] `is_logo`: boolean (logo detection)
+  - [x] `logo_position_preference`: string if logo detected (e.g., "bottom-right")
+  - [x] `confidence`: float 0.0-1.0
+- [x] Call OpenAI GPT-4o API with structured JSON response:
+  - [x] Model: `gpt-4o` (consistent with codebase)
+  - [x] Pass image URL (presigned S3 URL) in `image_url` format
+  - [x] Use `response_format={"type": "json_object"}` for guaranteed JSON
+  - [x] Pass user-provided context (name, description) in prompt
+  - [x] Set max_tokens to 1000
+- [x] Parse and validate response:
+  - [x] Extract JSON from response (should be clean JSON due to response_format)
+  - [x] Validate all required fields present
+  - [x] Validate data types (arrays are arrays, booleans are booleans, etc.)
+  - [x] Handle malformed JSON gracefully (fallback to empty analysis)
+- [x] Add retry logic:
+  - [x] Retry up to 3 times on API errors (rate limits, network errors)
+  - [x] Exponential backoff between retries
+  - [x] Log retry attempts
+- [x] Add cost tracking:
+  - [x] Log tokens used (input + output)
+  - [x] Calculate cost (~$0.01-0.03 per image for GPT-4o vision)
+  - [x] Log cost per analysis
+- [x] Write unit tests:
+  - [x] Test with sample product image → verify product type, colors, style tags
+  - [x] Test with logo image → verify is_logo=true, logo_position_preference
+  - [x] Test with person image → verify person type
+  - [x] Test with environment image → verify environment type
+  - [x] Verify JSON structure matches expected schema
+  - [x] Test error handling (API failures, malformed JSON, network errors)
+  - [x] Test retry logic
 
 ---
 
@@ -417,37 +417,37 @@
 
 **File:** `backend/app/api/upload.py` (existing file)
 
-- [ ] Update existing `POST /api/upload` endpoint
-- [ ] **Upload flow:**
-  1. [ ] Save file to S3 (keep image in memory for CLIP embedding)
-  2. [ ] Save asset record to database (basic metadata only)
-  3. [ ] **Return success immediately** (don't wait for analysis)
-  4. [ ] Trigger background analysis task (see below)
-- [ ] **Background analysis:** Evaluate options for async processing
-  - [ ] Option A: Celery task (consistent with existing architecture)
-  - [ ] Option B: FastAPI BackgroundTasks (simpler, no infrastructure)
-  - [ ] **Decision needed:** Which approach to use?
-- [ ] Create background analysis function/task:
-  - [ ] Accept: `asset_id`, `s3_url`, `image` (PIL Image from memory), `user_provided_name`, `user_provided_description`
-  - [ ] **Step 1: GPT-4o Analysis** (single comprehensive call)
-    - [ ] Call `analyze_reference_asset(s3_url, user_provided_name, user_provided_description)`
-    - [ ] Returns JSON with all fields: asset_type, primary_object, colors, dominant_colors_rgb, style_tags, recommended_shot_types, usage_contexts, is_logo, logo_position_preference, confidence
-    - [ ] Store full analysis JSON in `analysis` field
-    - [ ] Extract and store individual fields in database columns
-  - [ ] **Step 2: CLIP Embedding** (only if GPT-4o succeeded)
-    - [ ] Call `generate_image_embedding(image)` with PIL Image from memory
-    - [ ] Store embedding in `embedding` field (pgvector, 512 dimensions)
-  - [ ] Update database record with all analysis results
-- [ ] **Error handling:**
-  - [ ] If GPT-4o analysis fails, **skip CLIP embedding** (don't generate embeddings)
-  - [ ] Log error for debugging
-  - [ ] Asset remains in database with basic metadata (no analysis)
-  - [ ] Retry logic handled in AssetAnalysisService
-- [ ] **Frontend:** Update to handle async analysis
-  - [ ] Show "Upload successful" immediately
-  - [ ] Show "Analysis in progress..." indicator
-  - [ ] Poll or use WebSocket to update when analysis completes
-  - [ ] Display analysis results when available
+- [x] Update existing `POST /api/upload` endpoint
+- [x] **Upload flow:**
+  1. [x] Save file to S3 (keep image in memory for CLIP embedding)
+  2. [x] Save asset record to database (basic metadata only)
+  3. [x] **Return success immediately** (don't wait for analysis)
+  4. [x] Trigger background analysis task (see below)
+- [x] **Background analysis:** Evaluate options for async processing
+  - [x] Option A: Celery task (consistent with existing architecture)
+  - [x] Option B: FastAPI BackgroundTasks (simpler, no infrastructure)
+  - [x] **Decision needed:** Which approach to use?
+- [x] Create background analysis function/task:
+  - [x] Accept: `asset_id`, `s3_url`, `image` (PIL Image from memory), `user_provided_name`, `user_provided_description`
+  - [x] **Step 1: GPT-4o Analysis** (single comprehensive call)
+    - [x] Call `analyze_reference_asset(s3_url, user_provided_name, user_provided_description)`
+    - [x] Returns JSON with all fields: asset_type, primary_object, colors, dominant_colors_rgb, style_tags, recommended_shot_types, usage_contexts, is_logo, logo_position_preference, confidence
+    - [x] Store full analysis JSON in `analysis` field
+    - [x] Extract and store individual fields in database columns
+  - [x] **Step 2: CLIP Embedding** (only if GPT-4o succeeded)
+    - [x] Call `generate_image_embedding(image)` with PIL Image from memory
+    - [x] Store embedding in `embedding` field (pgvector, 512 dimensions)
+  - [x] Update database record with all analysis results
+- [x] **Error handling:**
+  - [x] If GPT-4o analysis fails, **skip CLIP embedding** (don't generate embeddings)
+  - [x] Log error for debugging
+  - [x] Asset remains in database with basic metadata (no analysis)
+  - [x] Retry logic handled in AssetAnalysisService
+- [x] **Frontend:** Update to handle async analysis
+  - [x] Show "Upload successful" immediately
+  - [x] Show "Analysis in progress..." indicator
+  - [x] Poll or use WebSocket to update when analysis completes
+  - [x] Display analysis results when available
 
 ---
 
@@ -455,40 +455,40 @@
 
 **File:** `frontend/src/components/AssetDetailModal.tsx`
 
-- [ ] Create new modal component for viewing asset details
-- [ ] Display full-size image preview
-- [ ] Display AI analysis results
-  - [ ] Primary object description
-  - [ ] Detected colors (color swatches)
-  - [ ] Style tags (badges)
-  - [ ] Recommended shot types (chips)
-  - [ ] Usage contexts (list)
-- [ ] Display logo detection result
-  - [ ] Show "Logo Detected" badge if `is_logo = true`
-  - [ ] Show confidence score
-- [ ] Display metadata
-  - [ ] File size, dimensions
-  - [ ] Upload date
-  - [ ] Usage count (how many times used in videos)
-- [ ] Add edit functionality
-  - [ ] Allow editing name
-  - [ ] Allow editing description
-  - [ ] Allow editing asset type
-  - [ ] Allow setting logo position preference (if logo)
-  - [ ] Save button → PATCH endpoint
-- [ ] Add delete button
-  - [ ] Confirmation modal
-  - [ ] Delete and close modal
-- [ ] Style with Tailwind CSS
-- [ ] Open modal when clicking asset in grid
+- [x] Create new modal component for viewing asset details
+- [x] Display full-size image preview
+- [x] Display AI analysis results
+  - [x] Primary object description
+  - [x] Detected colors (color swatches)
+  - [x] Style tags (badges)
+  - [x] Recommended shot types (chips)
+  - [x] Usage contexts (list)
+- [x] Display logo detection result
+  - [x] Show "Logo Detected" badge if `is_logo = true`
+  - [x] Show confidence score
+- [x] Display metadata
+  - [x] File size, dimensions
+  - [x] Upload date
+  - [x] Usage count (how many times used in videos)
+- [x] Add edit functionality
+  - [x] Allow editing name
+  - [x] Allow editing description
+  - [x] Allow editing asset type
+  - [x] Allow setting logo position preference (if logo)
+  - [x] Save button → PATCH endpoint
+- [x] Add delete button
+  - [x] Confirmation modal
+  - [x] Delete and close modal
+- [x] Style with Tailwind CSS
+- [x] Open modal when clicking asset in grid
 
 **File:** `frontend/src/pages/Assets.tsx`
 
-- [ ] Update grid to show AI-detected asset type badge
-- [ ] Add filter by asset type (dropdown)
-- [ ] Add filter by logo (checkbox: "Show logos only")
-- [ ] Show primary object description on hover
-- [ ] Add "AI Analyzed" indicator icon
+- [x] Update grid to show AI-detected asset type badge
+- [x] Add filter by asset type (dropdown)
+- [x] Add filter by logo (checkbox: "Show logos only")
+- [x] Show primary object description on hover
+- [x] Add "AI Analyzed" indicator icon
 
 ---
 
@@ -496,64 +496,64 @@
 
 **File:** `backend/app/api/upload.py` (existing file)
 
-- [ ] Update existing `PATCH /api/assets/{asset_id}` endpoint (if exists) OR create new one
-- [ ] Accept partial updates:
-  - [ ] `name` (optional)
-  - [ ] `description` (optional)
-  - [ ] `asset_type` (optional)
-  - [ ] `logo_position_preference` (optional, only if is_logo=true)
-- [ ] Verify ownership
-- [ ] Update database record
-- [ ] Return updated asset
-- [ ] Write integration test
+- [x] Update existing `PATCH /api/assets/{asset_id}` endpoint (if exists) OR create new one
+- [x] Accept partial updates:
+  - [x] `name` (optional)
+  - [x] `description` (optional)
+  - [x] `asset_type` (optional)
+  - [x] `logo_position_preference` (optional, only if is_logo=true)
+- [x] Verify ownership
+- [x] Update database record
+- [x] Return updated asset
+- [x] Write integration test
 
 ---
 
 ### Task 2.8: Testing & Validation
 
 **Integration Tests:**
-- [ ] Upload product image → verify analysis returns product type
-- [ ] Upload logo image → verify `is_logo = true`
-- [ ] Upload person photo → verify analysis returns person type
-- [ ] Verify embeddings are 512 dimensions (ViT-B/32 output)
-- [ ] Verify dominant colors are valid RGB values
-- [ ] Test with various image formats (PNG, JPG, WEBP)
+- [x] Upload product image → verify analysis returns product type
+- [x] Upload logo image → verify `is_logo = true`
+- [x] Upload person photo → verify analysis returns person type
+- [x] Verify embeddings are 512 dimensions (ViT-B/32 output)
+- [x] Verify dominant colors are valid RGB values
+- [x] Test with various image formats (PNG, JPG, WEBP)
 
 **Manual QA:**
-- [ ] Upload 10 diverse images
-- [ ] Review AI analysis results for accuracy
-- [ ] Verify logo detection accuracy (test with 5 logos, 5 non-logos)
-- [ ] Check that embeddings are stored correctly
-- [ ] Verify frontend displays analysis results nicely
+- [x] Upload 10 diverse images
+- [x] Review AI analysis results for accuracy
+- [x] Verify logo detection accuracy (test with 5 logos, 5 non-logos)
+- [x] Check that embeddings are stored correctly
+- [x] Verify frontend displays analysis results nicely
 
 **Performance:**
-- [ ] Measure upload + analysis latency (target: <5s for upload, analysis runs in background)
-- [ ] Test with large images (5MB+)
-- [ ] Test concurrent uploads (10 simultaneous)
-- [ ] **CLIP Model Performance:**
-  - [ ] Measure cold start time (first run with model download): ~15-20s expected
-  - [ ] Measure warm start time (cached model load): ~3-5s expected
-  - [ ] Verify embedding generation latency: <2s per image (CPU)
-  - [ ] Test volume persistence: restart container, verify no re-download
-  - [ ] Verify Docker volume created: `docker volume ls | grep clip-models`
-  - [ ] Verify model cached: `docker exec backend ls -lh /mnt/models/`
-  - [ ] Verify model size: ~350MB for ViT-B/32.pt
+- [x] Measure upload + analysis latency (target: <5s for upload, analysis runs in background)
+- [x] Test with large images (5MB+)
+- [x] Test concurrent uploads (10 simultaneous)
+- [x] **CLIP Model Performance:**
+  - [x] Measure cold start time (first run with model download): ~15-20s expected
+  - [x] Measure warm start time (cached model load): ~3-5s expected
+  - [x] Verify embedding generation latency: <2s per image (CPU)
+  - [x] Test volume persistence: restart container, verify no re-download
+  - [x] Verify Docker volume created: `docker volume ls | grep clip-models`
+  - [x] Verify model cached: `docker exec backend ls -lh /mnt/models/`
+  - [x] Verify model size: ~350MB for ViT-B/32.pt
 
 ---
 
 ### Acceptance Criteria
 
-- [ ] All uploaded images are automatically analyzed with GPT-4o (in background)
-- [ ] Single GPT-4o call returns comprehensive JSON with all fields:
-  - [ ] asset_type, primary_object, colors, dominant_colors_rgb
-  - [ ] style_tags, recommended_shot_types, usage_contexts
-  - [ ] is_logo, logo_position_preference (if logo detected)
-  - [ ] confidence score
-- [ ] CLIP embeddings (512-dim, ViT-B/32) are generated and stored in pgvector (only if GPT-4o succeeds)
-- [ ] Logo detection works with reasonable accuracy (via GPT-4o)
-- [ ] Dominant colors are extracted accurately (via GPT-4o, RGB arrays)
-- [ ] Frontend displays analysis results in detail modal
-- [ ] Users can edit asset metadata
-- [ ] Upload returns success immediately (<2s), analysis runs in background
-- [ ] CLIP model loads from Docker volume cache (warm start ~3-5s)
-- [ ] All tests pass
+- [x] All uploaded images are automatically analyzed with GPT-4o (in background)
+- [x] Single GPT-4o call returns comprehensive JSON with all fields:
+  - [x] asset_type, primary_object, colors, dominant_colors_rgb
+  - [x] style_tags, recommended_shot_types, usage_contexts
+  - [x] is_logo, logo_position_preference (if logo detected)
+  - [x] confidence score
+- [x] CLIP embeddings (512-dim, ViT-B/32) are generated and stored in pgvector (only if GPT-4o succeeds)
+- [x] Logo detection works with reasonable accuracy (via GPT-4o)
+- [x] Dominant colors are extracted accurately (via GPT-4o, RGB arrays)
+- [x] Frontend displays analysis results in detail modal
+- [x] Users can edit asset metadata
+- [x] Upload returns success immediately (<2s), analysis runs in background
+- [x] CLIP model loads from Docker volume cache (warm start ~3-5s)
+- [x] All tests pass
