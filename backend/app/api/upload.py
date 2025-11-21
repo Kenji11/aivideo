@@ -21,6 +21,7 @@ from app.services.s3 import s3_client
 from app.common.constants import get_asset_s3_key
 from app.services.asset_analysis import asset_analysis_service
 from app.services.clip_embeddings import clip_service
+from app.services.background_removal import background_removal_service
 
 router = APIRouter()
 
@@ -121,10 +122,54 @@ def analyze_asset_background(
             
             logger.info(f"✓ GPT-4o analysis complete for asset {asset_id}")
             
-            # Step 2: CLIP Embedding (only if GPT-4o succeeded)
+            # Step 2: Background Removal (if product image)
+            asset_type_str = analysis_result.get("asset_type", "").lower().strip() if analysis_result.get("asset_type") else ""
+            if asset_type_str == "product" or asset.reference_asset_type == "product":
+                try:
+                    logger.info(f"Detected product image. Starting background removal for asset {asset_id}")
+                    # Generate fresh presigned URL for background removal
+                    bg_removal_url = s3_client.generate_presigned_url(asset.s3_key, expiration=3600)
+                    
+                    # Remove background (overwrites original image in S3)
+                    background_removal_service.remove_background(
+                        image_url=bg_removal_url,
+                        s3_key=asset.s3_key
+                    )
+                    
+                    # Update has_transparency flag (background-removed images have transparency)
+                    asset.has_transparency = True
+                    
+                    # Regenerate thumbnail with new image (background removed)
+                    try:
+                        # Download the processed image to regenerate thumbnail
+                        temp_image_path = s3_client.download_file(asset.s3_key)
+                        with Image.open(temp_image_path) as img:
+                            # Regenerate and upload thumbnail
+                            new_thumbnail_url = s3_client.upload_thumbnail(img, asset.user_id, asset.file_name)
+                            asset.thumbnail_url = new_thumbnail_url
+                        # Clean up temp file
+                        if os.path.exists(temp_image_path):
+                            os.unlink(temp_image_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to regenerate thumbnail after background removal: {str(e)}")
+                        # Continue without thumbnail update
+                    
+                    logger.info(f"✓ Background removal complete for asset {asset_id}")
+                except Exception as e:
+                    logger.error(f"Background removal failed for asset {asset_id}: {str(e)}", exc_info=True)
+                    # Continue without background removal - original image remains
+                    # Don't fail the entire upload process
+            
+            # Step 3: CLIP Embedding (only if GPT-4o succeeded)
             try:
-                # Load image from file path
-                with Image.open(image_path) as img:
+                # Load image from file path (use processed image if background was removed)
+                # If background was removed, download the processed image from S3
+                clip_image_path = image_path
+                if asset.has_transparency and asset.reference_asset_type == "product":
+                    # Download the processed image for CLIP embedding
+                    clip_image_path = s3_client.download_file(asset.s3_key)
+                
+                with Image.open(clip_image_path) as img:
                     # Convert to RGB if needed (CLIP expects RGB)
                     if img.mode != 'RGB':
                         img = img.convert('RGB')
@@ -142,6 +187,13 @@ def analyze_asset_background(
                     )
                     
                     logger.info(f"✓ CLIP embedding generated for asset {asset_id}")
+                
+                # Clean up temp file if we downloaded processed image for CLIP
+                if clip_image_path != image_path and os.path.exists(clip_image_path):
+                    try:
+                        os.unlink(clip_image_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to delete temp CLIP image file: {str(e)}")
             except Exception as e:
                 logger.error(f"Failed to generate CLIP embedding for asset {asset_id}: {str(e)}", exc_info=True)
                 # Continue without embedding - asset still has GPT-4o analysis
