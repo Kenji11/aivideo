@@ -160,3 +160,29 @@ class ContinueResponse(BaseModel):
     next_phase: int
     branch_name: str
     created_new_branch: bool
+
+class SpecEditRequest(BaseModel):
+    """Request to edit Phase 1 spec"""
+    beats: Optional[List[Dict]] = None
+    style: Optional[Dict] = None
+    product: Optional[Dict] = None
+    audio: Optional[Dict] = None
+
+class RegenerateBeatRequest(BaseModel):
+    """Request to regenerate a beat image at Phase 2"""
+    beat_index: int
+    prompt_override: Optional[str] = None
+
+class RegenerateChunkRequest(BaseModel):
+    """Request to regenerate a video chunk at Phase 3"""
+    model_config = {"protected_namespaces": ()}
+
+    chunk_index: int
+    model_override: Optional[str] = None
+
+class ArtifactEditResponse(BaseModel):
+    """Response from artifact editing endpoints"""
+    artifact_id: str
+    version: int
+    s3_url: Optional[str] = None
+    message: str

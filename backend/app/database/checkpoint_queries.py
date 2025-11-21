@@ -469,6 +469,73 @@ def build_checkpoint_tree(video_id: str) -> List[Dict[str, Any]]:
     return roots
 
 
+def update_artifact(
+    artifact_id: str,
+    s3_url: Optional[str] = None,
+    s3_key: Optional[str] = None,
+    version: Optional[int] = None,
+    metadata: Optional[Dict] = None,
+    parent_artifact_id: Optional[str] = None
+) -> bool:
+    """
+    Update an existing artifact's fields.
+
+    Args:
+        artifact_id: ID of artifact to update
+        s3_url: New S3 URL (optional)
+        s3_key: New S3 key (optional)
+        version: New version number (optional)
+        metadata: New metadata (optional)
+        parent_artifact_id: New parent artifact ID (optional)
+
+    Returns:
+        True if updated successfully
+    """
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            # Build dynamic UPDATE query
+            updates = []
+            params = []
+
+            if s3_url is not None:
+                updates.append("s3_url = %s")
+                params.append(s3_url)
+
+            if s3_key is not None:
+                updates.append("s3_key = %s")
+                params.append(s3_key)
+
+            if version is not None:
+                updates.append("version = %s")
+                params.append(version)
+
+            if metadata is not None:
+                updates.append("metadata = %s")
+                params.append(psycopg2.extras.Json(metadata))
+
+            if parent_artifact_id is not None:
+                updates.append("parent_artifact_id = %s")
+                params.append(parent_artifact_id)
+
+            if not updates:
+                return False
+
+            params.append(artifact_id)
+            query = f"""
+                UPDATE checkpoint_artifacts
+                SET {", ".join(updates)}
+                WHERE id = %s
+            """
+
+            cur.execute(query, params)
+            updated = cur.rowcount > 0
+        conn.commit()
+        return updated
+    finally:
+        conn.close()
+
+
 def update_checkpoint_phase_output(
     checkpoint_id: str,
     phase_output_updates: Dict
