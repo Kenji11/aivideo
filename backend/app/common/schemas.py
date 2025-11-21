@@ -101,6 +101,7 @@ class StatusResponse(BaseModel):
     error: Optional[str]
     storyboard_urls: Optional[List[str]] = None  # Phase 2 storyboard images
     reference_assets: Optional[Dict] = None  # Phase 3 reference assets
+    chunk_urls: Optional[List[str]] = None  # Phase 3 individual chunk videos
     stitched_video_url: Optional[str] = None  # Phase 4 stitched video
     final_video_url: Optional[str] = None  # Phase 5 final video (with audio)
     current_chunk_index: Optional[int] = None  # Current chunk being processed in Phase 4

@@ -1,6 +1,7 @@
 import boto3
 import tempfile
 import os
+import mimetypes
 from app.config import get_settings
 import logging
 
@@ -18,9 +19,37 @@ class S3Client:
         )
         self.bucket = settings.s3_bucket
     
-    def upload_file(self, file_path: str, key: str) -> str:
-        """Upload file to S3"""
-        self.client.upload_file(file_path, self.bucket, key)
+    def upload_file(self, file_path: str, key: str, content_type: str = None) -> str:
+        """Upload file to S3 with proper Content-Type metadata
+        
+        Args:
+            file_path: Local path to file to upload
+            key: S3 key (path) where file should be stored
+            content_type: Optional MIME type. If not provided, will be guessed from file extension.
+        """
+        # Determine Content-Type if not provided
+        if content_type is None:
+            content_type, _ = mimetypes.guess_type(key)
+            if content_type is None:
+                # Default based on extension
+                ext = os.path.splitext(key)[1].lower()
+                if ext == '.mp4':
+                    content_type = 'video/mp4'
+                elif ext == '.png':
+                    content_type = 'image/png'
+                elif ext == '.jpg' or ext == '.jpeg':
+                    content_type = 'image/jpeg'
+                elif ext == '.mp3':
+                    content_type = 'audio/mpeg'
+                elif ext == '.wav':
+                    content_type = 'audio/wav'
+                else:
+                    content_type = 'application/octet-stream'
+        
+        # Upload with Content-Type metadata
+        extra_args = {'ContentType': content_type}
+        self.client.upload_file(file_path, self.bucket, key, ExtraArgs=extra_args)
+        logger.debug(f"Uploaded {file_path} to s3://{self.bucket}/{key} with Content-Type: {content_type}")
         return f"s3://{self.bucket}/{key}"
     
     def generate_presigned_url(self, key: str, expiration: int = 3600) -> str:
@@ -119,6 +148,36 @@ class S3Client:
             return True
         except Exception as e:
             logger.error(f"Failed to delete S3 file '{key}': {str(e)}")
+            return False
+    
+    def update_content_type(self, key: str, content_type: str) -> bool:
+        """Update Content-Type metadata for an existing S3 object
+        
+        Args:
+            key: S3 key of the object to update
+            content_type: MIME type to set (e.g., 'video/mp4')
+            
+        Returns:
+            True on success, False on failure
+        """
+        try:
+            # Extract key from S3 URL if needed
+            if key.startswith('s3://'):
+                key = key.replace(f's3://{self.bucket}/', '')
+            
+            # Copy object to itself with updated metadata
+            copy_source = {'Bucket': self.bucket, 'Key': key}
+            self.client.copy_object(
+                CopySource=copy_source,
+                Bucket=self.bucket,
+                Key=key,
+                ContentType=content_type,
+                MetadataDirective='REPLACE'
+            )
+            logger.info(f"Updated Content-Type for {key} to {content_type}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update Content-Type for '{key}': {str(e)}")
             return False
     
     def delete_directory(self, prefix: str) -> bool:

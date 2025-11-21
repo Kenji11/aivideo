@@ -68,7 +68,6 @@ export interface GenerateRequest {
   assets?: string[]; // For backward compatibility, can also be reference_assets
   reference_assets?: string[];
   model?: string; // Video generation model to use (e.g., 'hailuo', 'kling', 'sora')
-  auto_continue?: boolean; // YOLO mode - auto-continue without pausing at checkpoints
 }
 
 export interface GenerateResponse {
@@ -98,6 +97,7 @@ export interface StatusResponse {
   error?: string;
   reference_assets?: ReferenceAssets;
   storyboard_urls?: string[];
+  chunk_urls?: string[];  // Phase 3 individual chunk videos
   stitched_video_url?: string;
   final_video_url?: string;  // Phase 5 final video (with audio)
   current_chunk_index?: number;  // Current chunk being processed (0-based)
@@ -106,92 +106,6 @@ export interface StatusResponse {
   current_checkpoint?: CheckpointInfo;
   checkpoint_tree?: CheckpointTreeNode[];
   active_branches?: BranchInfo[];
-}
-
-// Checkpoint-related types
-export interface CheckpointInfo {
-  checkpoint_id: string;
-  branch_name: string;
-  phase_number: number;
-  version: number;
-  status: 'pending' | 'approved' | 'abandoned';
-  created_at: string;
-  artifacts: Record<string, ArtifactResponse>;
-}
-
-export interface ArtifactResponse {
-  id: string;
-  artifact_type: string;
-  artifact_key: string;
-  s3_url: string;
-  version: number;
-  metadata?: any;
-  created_at: string;
-}
-
-export interface CheckpointResponse {
-  id: string;
-  video_id: string;
-  branch_name: string;
-  phase_number: number;
-  version: number;
-  status: 'pending' | 'approved' | 'abandoned';
-  approved_at?: string;
-  created_at: string;
-  cost_usd: number;
-  parent_checkpoint_id?: string;
-  artifacts?: ArtifactResponse[];
-}
-
-export interface CheckpointTreeNode {
-  checkpoint: CheckpointResponse;
-  children: CheckpointTreeNode[];
-}
-
-export interface BranchInfo {
-  branch_name: string;
-  latest_checkpoint_id: string;
-  phase_number: number;
-  status: string;
-  can_continue: boolean;
-}
-
-export interface ContinueRequest {
-  checkpoint_id: string;
-}
-
-export interface ContinueResponse {
-  message: string;
-  next_phase: number;
-  branch_name: string;
-  created_new_branch: boolean;
-}
-
-export interface SpecEditRequest {
-  beats?: any[];
-  style?: any;
-  product?: any;
-  audio?: any;
-}
-
-export interface RegenerateBeatRequest {
-  beat_index: number;
-  prompt_override?: string;
-}
-
-export interface RegenerateChunkRequest {
-  chunk_index: number;
-  model_override?: string;
-}
-
-export interface CheckpointListResponse {
-  checkpoints: CheckpointResponse[];
-  tree: CheckpointTreeNode[];
-}
-
-export interface CheckpointDetailResponse {
-  checkpoint: CheckpointResponse;
-  artifacts: ArtifactResponse[];
 }
 
 export interface VideoResponse {
@@ -251,6 +165,45 @@ export interface VideoListItem {
 export interface VideoListResponse {
   videos: VideoListItem[];
   total: number;
+}
+
+// Checkpoint-related types
+export interface CheckpointListResponse {
+  checkpoints: CheckpointResponse[];
+  tree: CheckpointTreeNode[];
+}
+
+export interface CheckpointDetailResponse {
+  checkpoint: CheckpointResponse;
+  artifacts: ArtifactResponse[];
+}
+
+export interface ContinueRequest {
+  checkpoint_id: string;
+}
+
+export interface ContinueResponse {
+  message: string;
+  next_phase: number;
+  branch_name: string;
+  created_new_branch: boolean;
+}
+
+export interface SpecEditRequest {
+  beats?: any[];
+  style?: any;
+  product?: any;
+  audio?: any;
+}
+
+export interface RegenerateBeatRequest {
+  beat_index: number;
+  prompt_override?: string;
+}
+
+export interface RegenerateChunkRequest {
+  chunk_index: number;
+  model_override?: string;
 }
 
 // API functions

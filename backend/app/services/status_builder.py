@@ -1,11 +1,12 @@
 # Helper functions for building StatusResponse from Redis or DB
 from typing import Dict, Any, Optional, List
-from app.common.schemas import StatusResponse, CheckpointInfo, ArtifactResponse, CheckpointTreeNode, BranchInfo
+from app.common.schemas import StatusResponse, CheckpointInfo, CheckpointTreeNode, BranchInfo, CheckpointResponse, ArtifactResponse
 from app.common.models import VideoGeneration
 from app.services.redis import RedisClient
 from app.services.s3 import s3_client
 from app.database.checkpoint_queries import (
     get_current_checkpoint,
+    get_checkpoint_artifacts,
     get_latest_artifacts_for_checkpoint,
     build_checkpoint_tree,
     get_leaf_checkpoints
@@ -56,41 +57,45 @@ def _get_presigned_url_from_cache(video_id: str, key: str, s3_url: str) -> str:
 
 
 def _build_checkpoint_info(video_id: str) -> Optional[CheckpointInfo]:
-    """Build checkpoint info for status response"""
-    current_checkpoint = get_current_checkpoint(video_id)
-
-    if not current_checkpoint:
-        return None
-
-    # Get latest artifacts (handles mixed versions)
-    artifacts_dict = get_latest_artifacts_for_checkpoint(current_checkpoint['id'])
-
-    # Convert to ArtifactResponse objects
-    artifacts = {}
-    for artifact_key, artifact_data in artifacts_dict.items():
-        # Convert S3 URL to presigned
-        s3_url = artifact_data.get('s3_url', '')
-        presigned_url = _get_presigned_url_from_cache(video_id, f"artifact_{artifact_data['id']}", s3_url)
-
-        artifacts[artifact_key] = ArtifactResponse(
-            id=artifact_data['id'],
-            artifact_type=artifact_data['artifact_type'],
-            artifact_key=artifact_key,
-            s3_url=presigned_url,
-            version=artifact_data['version'],
-            metadata=artifact_data.get('metadata'),
-            created_at=artifact_data['created_at']
+    """Build CheckpointInfo from current checkpoint"""
+    try:
+        current_checkpoint = get_current_checkpoint(video_id)
+        if not current_checkpoint:
+            return None
+        
+        # Get artifacts for this checkpoint
+        artifacts_dict = {}
+        artifacts = get_latest_artifacts_for_checkpoint(current_checkpoint['id'])
+        
+        for artifact_key, artifact_data in artifacts.items():
+            artifact_s3_url = artifact_data['s3_url']
+            presigned_url = _get_presigned_url_from_cache(
+                video_id,
+                artifact_key,
+                artifact_s3_url
+            )
+            
+            artifacts_dict[artifact_key] = ArtifactResponse(
+                id=artifact_data['id'],
+                artifact_type=artifact_data['artifact_type'],
+                artifact_key=artifact_key,
+                s3_url=presigned_url,
+                version=artifact_data['version'],
+                metadata=artifact_data.get('metadata'),
+                created_at=artifact_data['created_at']
+            )
+        
+        return CheckpointInfo(
+            checkpoint_id=current_checkpoint['id'],
+            branch_name=current_checkpoint['branch_name'],
+            phase_number=current_checkpoint['phase_number'],
+            version=current_checkpoint['version'],
+            status=current_checkpoint['status'],
+            created_at=current_checkpoint['created_at'],
+            artifacts=artifacts_dict
         )
-
-    return CheckpointInfo(
-        checkpoint_id=current_checkpoint['id'],
-        branch_name=current_checkpoint['branch_name'],
-        phase_number=current_checkpoint['phase_number'],
-        version=current_checkpoint['version'],
-        status=current_checkpoint['status'],
-        created_at=current_checkpoint['created_at'],
-        artifacts=artifacts
-    )
+    except Exception:
+        return None
 
 
 def _build_checkpoint_tree_nodes(video_id: str) -> Optional[List[CheckpointTreeNode]]:
@@ -99,11 +104,30 @@ def _build_checkpoint_tree_nodes(video_id: str) -> Optional[List[CheckpointTreeN
         tree_data = build_checkpoint_tree(video_id)
         if not tree_data:
             return None
-
+        
         def convert_to_node(cp_data: Dict) -> CheckpointTreeNode:
-            from app.common.schemas import CheckpointResponse
-
-            # Build CheckpointResponse - cp_data is the checkpoint dict itself
+            # Get artifacts for this checkpoint
+            artifacts_list = []
+            artifacts = get_latest_artifacts_for_checkpoint(cp_data['id'])
+            
+            for artifact_key, artifact_data in artifacts.items():
+                artifact_s3_url = artifact_data['s3_url']
+                presigned_url = _get_presigned_url_from_cache(
+                    video_id,
+                    artifact_key,
+                    artifact_s3_url
+                )
+                
+                artifacts_list.append(ArtifactResponse(
+                    id=artifact_data['id'],
+                    artifact_type=artifact_data['artifact_type'],
+                    artifact_key=artifact_key,
+                    s3_url=presigned_url,
+                    version=artifact_data['version'],
+                    metadata=artifact_data.get('metadata'),
+                    created_at=artifact_data['created_at']
+                ))
+            
             checkpoint = CheckpointResponse(
                 id=cp_data['id'],
                 video_id=cp_data['video_id'],
@@ -116,39 +140,40 @@ def _build_checkpoint_tree_nodes(video_id: str) -> Optional[List[CheckpointTreeN
                 cost_usd=cp_data.get('cost_usd', 0.0),
                 parent_checkpoint_id=cp_data.get('parent_checkpoint_id'),
                 user_id=cp_data['user_id'],
-                edit_description=cp_data.get('edit_description')
+                edit_description=cp_data.get('edit_description'),
+                artifacts=artifacts_list
             )
-
+            
             # Recursively convert children
             children = [convert_to_node(child) for child in cp_data.get('children', [])]
-
-            return CheckpointTreeNode(
-                checkpoint=checkpoint,
-                children=children
-            )
-
-        return [convert_to_node(node) for node in tree_data]
+            
+            return CheckpointTreeNode(checkpoint=checkpoint, children=children)
+        
+        return [convert_to_node(root) for root in tree_data]
     except Exception:
         return None
 
 
 def _build_active_branches(video_id: str) -> Optional[List[BranchInfo]]:
-    """Build active branches for status response"""
+    """Build active branches list from leaf checkpoints"""
     try:
         leaf_checkpoints = get_leaf_checkpoints(video_id)
         if not leaf_checkpoints:
             return None
-
+        
         branches = []
-        for checkpoint in leaf_checkpoints:
+        for cp in leaf_checkpoints:
+            # Check if checkpoint can continue (is pending)
+            can_continue = cp['status'] == 'pending'
+            
             branches.append(BranchInfo(
-                branch_name=checkpoint['branch_name'],
-                latest_checkpoint_id=checkpoint['id'],
-                phase_number=checkpoint['phase_number'],
-                status=checkpoint['status'],
-                can_continue=(checkpoint['status'] == 'approved')
+                branch_name=cp['branch_name'],
+                latest_checkpoint_id=cp['id'],
+                phase_number=cp['phase_number'],
+                status=cp['status'],
+                can_continue=can_continue
             ))
-
+        
         return branches
     except Exception:
         return None
@@ -210,6 +235,7 @@ def build_status_response_from_redis_video_data(redis_data: Dict[str, Any]) -> S
         
         # Phase 3: Stitched video and chunk progress
         phase3_output = phase_outputs.get('phase3_chunks')
+        chunk_urls = None
         if phase3_output:
             if isinstance(phase3_output, dict):
                 current_chunk_index = phase3_output.get('current_chunk_index')
@@ -222,6 +248,16 @@ def build_status_response_from_redis_video_data(redis_data: Dict[str, Any]) -> S
                     stitched_video_url = _get_presigned_url_from_cache(
                         video_id, "stitched_video_url", stitched_url
                     )
+                
+                # Extract chunk URLs
+                chunk_urls_raw = phase3_data.get('chunk_urls', [])
+                if chunk_urls_raw:
+                    chunk_urls = []
+                    for idx, url in enumerate(chunk_urls_raw):
+                        presigned = _get_presigned_url_from_cache(
+                            video_id, f"chunk_{idx}", url
+                        )
+                        chunk_urls.append(presigned)
     
     # Phase 4: Final video
     final_video_url = None
@@ -243,7 +279,7 @@ def build_status_response_from_redis_video_data(redis_data: Dict[str, Any]) -> S
     current_checkpoint = _build_checkpoint_info(video_id)
     checkpoint_tree = _build_checkpoint_tree_nodes(video_id)
     active_branches = _build_active_branches(video_id)
-
+    
     return StatusResponse(
         video_id=video_id,
         status=status,
@@ -253,6 +289,7 @@ def build_status_response_from_redis_video_data(redis_data: Dict[str, Any]) -> S
         error=error,
         storyboard_urls=storyboard_urls,
         reference_assets=reference_assets,
+        chunk_urls=chunk_urls,
         stitched_video_url=stitched_video_url,
         final_video_url=final_video_url,
         current_chunk_index=current_chunk_index,
@@ -310,6 +347,7 @@ def build_status_response_from_db(video: VideoGeneration) -> StatusResponse:
         
         # Phase 3: Stitched video and chunk progress
         phase3_output = video.phase_outputs.get('phase3_chunks')
+        chunk_urls = None
         if phase3_output:
             if isinstance(phase3_output, dict):
                 current_chunk_index = phase3_output.get('current_chunk_index')
@@ -322,6 +360,16 @@ def build_status_response_from_db(video: VideoGeneration) -> StatusResponse:
                     stitched_video_url = _get_presigned_url_from_cache(
                         video.id, "stitched_video_url", stitched_url
                     )
+                
+                # Extract chunk URLs from phase_outputs or video.chunk_urls
+                chunk_urls_raw = phase3_data.get('chunk_urls') or video.chunk_urls or []
+                if chunk_urls_raw:
+                    chunk_urls = []
+                    for idx, url in enumerate(chunk_urls_raw):
+                        presigned = _get_presigned_url_from_cache(
+                            video.id, f"chunk_{idx}", url
+                        )
+                        chunk_urls.append(presigned)
     
     # Phase 4: Final video
     final_video_url = None
@@ -339,11 +387,6 @@ def build_status_response_from_db(video: VideoGeneration) -> StatusResponse:
                     video.id, "refined_video_url", refined_url
                 )
     
-    # Build checkpoint information
-    current_checkpoint = _build_checkpoint_info(video.id)
-    checkpoint_tree = _build_checkpoint_tree_nodes(video.id)
-    active_branches = _build_active_branches(video.id)
-
     return StatusResponse(
         video_id=video.id,
         status=video.status.value,
@@ -353,6 +396,7 @@ def build_status_response_from_db(video: VideoGeneration) -> StatusResponse:
         error=video.error_message,
         storyboard_urls=storyboard_urls,
         reference_assets=reference_assets,
+        chunk_urls=chunk_urls,
         stitched_video_url=stitched_video_url,
         final_video_url=final_video_url,
         current_chunk_index=current_chunk_index,
