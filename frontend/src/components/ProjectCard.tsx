@@ -57,17 +57,50 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
           className="aspect-video bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 flex items-center justify-center relative overflow-hidden cursor-pointer"
         >
         {hasVideo && project.final_video_url ? (
-          <video
-            src={project.final_video_url}
-            className="w-full h-full object-cover"
-            muted
-            preload="none"
-            onMouseEnter={(e) => e.currentTarget.play()}
-            onMouseLeave={(e) => {
-              e.currentTarget.pause();
-              e.currentTarget.currentTime = 0;
-            }}
-          />
+          <>
+            {/* Show thumbnail if available, otherwise show video directly */}
+            {project.thumbnail_url ? (
+              <>
+                <img
+                  src={project.thumbnail_url}
+                  alt={project.title}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback to video if thumbnail fails to load
+                    const target = e.currentTarget;
+                    target.style.display = 'none';
+                    const video = target.nextElementSibling as HTMLVideoElement;
+                    if (video) {
+                      video.style.display = 'block';
+                    }
+                  }}
+                />
+                <video
+                  src={project.final_video_url}
+                  className="w-full h-full object-cover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                  muted
+                  preload="none"
+                  onMouseEnter={(e) => e.currentTarget.play()}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.pause();
+                    e.currentTarget.currentTime = 0;
+                  }}
+                />
+              </>
+            ) : (
+              <video
+                src={project.final_video_url}
+                className="w-full h-full object-cover"
+                muted
+                preload="none"
+                onMouseEnter={(e) => e.currentTarget.play()}
+                onMouseLeave={(e) => {
+                  e.currentTarget.pause();
+                  e.currentTarget.currentTime = 0;
+                }}
+              />
+            )}
+          </>
         ) : (
           <>
             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/30 flex items-center justify-center">
