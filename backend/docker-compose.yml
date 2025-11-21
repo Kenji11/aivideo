@@ -45,6 +45,7 @@ services:
       # Other env vars (REPLICATE_API_TOKEN, OPENAI_API_KEY, AWS_*, FIREBASE_*) loaded from .env file via env_file directive
     volumes:
       - ./app:/app/app
+      - ./tests:/app/tests
       - ./firebase-credentials.json:/app/firebase-credentials.json:ro  # Firebase credentials JSON (without private_key)
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
@@ -66,6 +67,7 @@ services:
       # Other env vars (REPLICATE_API_TOKEN, OPENAI_API_KEY, AWS_*, FIREBASE_*) loaded from .env file via env_file directive
     volumes:
       - ./app:/app/app
+      - ./tests:/app/tests
       - ./firebase-credentials.json:/app/firebase-credentials.json:ro  # Firebase credentials JSON (without private_key)
     command: celery -A app.orchestrator.celery_app worker --loglevel=info --concurrency=2
 
