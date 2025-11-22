@@ -88,7 +88,6 @@ export const getIdToken = async (forceRefresh: boolean = false): Promise<string 
   return new Promise((resolve) => {
     // Set a timeout to avoid waiting forever
     const timeout = setTimeout(() => {
-      console.warn('[Firebase] Timeout waiting for auth state');
       resolve(null);
     }, 2000); // 2 second timeout
     

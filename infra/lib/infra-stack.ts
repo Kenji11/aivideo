@@ -169,6 +169,15 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     );
 
     videoBucket.grantReadWrite(taskExecutionRole);
+    
+    // Grant read access to clip-models in the same bucket (for CLIP model download on startup)
+    taskExecutionRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['s3:GetObject'],
+        resources: [`${videoBucket.bucketArn}/clip-models/*`],
+      })
+    );
 
     // Security group for Redis
     const redisSecurityGroup = new ec2.SecurityGroup(this, 'RedisSecurityGroup', {
@@ -251,6 +260,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       memoryLimitMiB: 512,
       cpu: 256,
       executionRole: taskExecutionRole,
+      ephemeralStorageGiB: 21, // 21GB minimum for CLIP model download/extraction (Fargate minimum is 21GiB)
     });
 
     // Extract tag from image URI (default to 'latest')
@@ -322,6 +332,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       memoryLimitMiB: 4096,  // 4GB - increased from 512MB to prevent OOM kills
       cpu: 1024,  // 1 vCPU - increased to match memory (Fargate requires CPU:Memory ratio)
       executionRole: taskExecutionRole,
+      ephemeralStorageGiB: 21, // 21GB minimum for CLIP model download/extraction (Fargate minimum is 21GiB)
     });
 
     // Extract tag from image URI (default to 'latest')

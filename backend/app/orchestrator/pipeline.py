@@ -4,6 +4,7 @@ import logging
 from celery import chain
 from celery.exceptions import Retry
 from app.orchestrator.celery_app import celery_app
+from app.phases.phase0_reference_prep.task import prepare_references
 from app.phases.phase1_validate.task import plan_video_intelligent
 from app.phases.phase2_storyboard.task import generate_storyboard
 from app.phases.phase3_chunks.task import generate_chunks
@@ -81,8 +82,11 @@ def run_pipeline(self, video_id: str, prompt: str, assets: list = None, model: s
     
     # Create chain workflow - each phase receives previous phase's PhaseOutput as first arg
     workflow = chain(
-        # Phase 1: Intelligent video planning (beat-based architecture)
-        plan_video_intelligent.s(video_id, prompt),
+        # Phase 0: Reference asset preparation (entity extraction & product selection)
+        prepare_references.s(video_id, prompt, user_id),
+        
+        # Phase 1: Intelligent video planning (receives Phase 0 output, beat-based architecture)
+        plan_video_intelligent.s(video_id=video_id, prompt=prompt),
         
         # Phase 2: Generate storyboard images (receives Phase 1 output)
         generate_storyboard.s(user_id),
