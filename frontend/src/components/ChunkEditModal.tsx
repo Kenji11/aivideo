@@ -176,12 +176,28 @@ export function ChunkEditModal({
 
   const handlePlayPause = () => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video) {
+      console.error('[ChunkEditModal] Video ref is null');
+      return;
+    }
+
+    console.log('[ChunkEditModal] Play/Pause clicked. Current state:', {
+      paused: video.paused,
+      readyState: video.readyState,
+      networkState: video.networkState,
+      src: video.src,
+      duration: video.duration
+    });
 
     if (video.paused) {
-      video.play();
+      video.play().then(() => {
+        console.log('[ChunkEditModal] Video playing successfully');
+      }).catch((error) => {
+        console.error('[ChunkEditModal] Error playing video:', error);
+      });
     } else {
       video.pause();
+      console.log('[ChunkEditModal] Video paused');
     }
   };
 
@@ -262,8 +278,29 @@ export function ChunkEditModal({
               src={chunkUrl}
               preload="metadata"
               className="w-full h-full"
+              onLoadedMetadata={(e) => {
+                const video = e.currentTarget;
+                console.log('[ChunkEditModal] Video metadata loaded:', {
+                  duration: video.duration,
+                  videoWidth: video.videoWidth,
+                  videoHeight: video.videoHeight,
+                  src: chunkUrl
+                });
+              }}
+              onLoadedData={(e) => {
+                console.log('[ChunkEditModal] Video data loaded, readyState:', e.currentTarget.readyState);
+              }}
               onError={(e) => {
-                console.error(`Failed to load chunk ${chunkIndex + 1}:`, e);
+                const video = e.currentTarget;
+                console.error('[ChunkEditModal] Failed to load chunk:', {
+                  index: chunkIndex + 1,
+                  src: chunkUrl,
+                  error: video.error,
+                  errorCode: video.error?.code,
+                  errorMessage: video.error?.message,
+                  networkState: video.networkState,
+                  readyState: video.readyState
+                });
               }}
             >
               Your browser does not support the video tag.
