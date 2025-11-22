@@ -257,8 +257,8 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     );
 
     const apiTaskDefinition = new ecs.FargateTaskDefinition(this, 'APITaskDefinition', {
-      memoryLimitMiB: 512,
-      cpu: 256,
+      memoryLimitMiB: 2048,  // 2GB - upgraded from 512MB for CLIP model loading and API requests
+      cpu: 1024,  // 1 vCPU - increased to match memory (Fargate requires CPU:Memory ratio)
       executionRole: taskExecutionRole,
       ephemeralStorageGiB: 21, // 21GB minimum for CLIP model download/extraction (Fargate minimum is 21GiB)
     });
@@ -267,7 +267,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     const imageTag = imageUri.includes(':') ? imageUri.split(':')[1] : 'latest';
     const apiContainer = apiTaskDefinition.addContainer('APIContainer', {
       image: ecs.ContainerImage.fromEcrRepository(ecrRepository, imageTag),
-      memoryLimitMiB: 512,
+      memoryLimitMiB: 2048,  // 2GB - upgraded from 512MB
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'api',
         logGroup,
@@ -325,7 +325,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     apiService.node.addDependency(redisService);
 
     // Worker Service
-    // Increased memory to 4GB to handle video processing workloads
+    // Increased memory to 8GB to handle video processing workloads
     // Video processing (image downloads, PIL operations, video generation, frame extraction)
     // with 2 concurrent workers requires significant memory
     const workerTaskDefinition = new ecs.FargateTaskDefinition(this, 'WorkerTaskDefinition', {
