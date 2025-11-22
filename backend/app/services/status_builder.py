@@ -267,15 +267,9 @@ def build_status_response_from_redis_video_data(redis_data: Dict[str, Any]) -> S
     final_url = metadata.get('final_video_url')
     if final_url:
         final_video_url = _get_presigned_url_from_cache(video_id, "final_video_url", final_url)
-    elif phase_outputs:
-        phase4_output = phase_outputs.get('phase4_refine')
-        if phase4_output and phase4_output.get('status') == 'success':
-            phase4_data = phase4_output.get('output_data', {})
-            refined_url = phase4_data.get('refined_video_url')
-            if refined_url:
-                final_video_url = _get_presigned_url_from_cache(
-                    video_id, "refined_video_url", refined_url
-                )
+    # Phase 4 removed - fall back to stitched video from Phase 3 as final output
+    elif stitched_video_url:
+        final_video_url = stitched_video_url
     
     # Build checkpoint information
     current_checkpoint = _build_checkpoint_info(video_id)
@@ -373,21 +367,15 @@ def build_status_response_from_db(video: VideoGeneration) -> StatusResponse:
                         )
                         chunk_urls.append(presigned)
     
-    # Phase 4: Final video
+    # Phase 4 removed - use Phase 3 stitched video as final output
     final_video_url = None
     if video.final_video_url:
         final_video_url = _get_presigned_url_from_cache(
             video.id, "final_video_url", video.final_video_url
         )
-    elif video.phase_outputs:
-        phase4_output = video.phase_outputs.get('phase4_refine')
-        if phase4_output and phase4_output.get('status') == 'success':
-            phase4_data = phase4_output.get('output_data', {})
-            refined_url = phase4_data.get('refined_video_url') or video.refined_url
-            if refined_url:
-                final_video_url = _get_presigned_url_from_cache(
-                    video.id, "refined_video_url", refined_url
-                )
+    # Fall back to stitched video from Phase 3
+    elif stitched_video_url:
+        final_video_url = stitched_video_url
     
     # Build checkpoint information
     current_checkpoint = _build_checkpoint_info(video.id)

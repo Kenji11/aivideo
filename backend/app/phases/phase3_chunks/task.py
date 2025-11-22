@@ -482,10 +482,11 @@ def generate_chunks(
             # Add checkpoint_id to output
             output.checkpoint_id = checkpoint_id
 
-            # Update video status to paused
-            video.status = VideoStatus.PAUSED_AT_PHASE3
+            # Update video status to COMPLETE (Phase 4 removed from pipeline)
+            video.status = VideoStatus.COMPLETE
             video.current_phase = 'phase3'
-            video.progress = 60.0  # Phase 3 complete (60% of total pipeline)
+            video.progress = 100.0  # Phase 3 is now the final phase
+            video.completed_at = datetime.now(timezone.utc)
             if video.phase_outputs is None:
                 video.phase_outputs = {}
             video.phase_outputs['phase3_chunks'] = output.dict()
@@ -494,27 +495,18 @@ def generate_chunks(
             video.final_video_url = stitched_video_url
             flag_modified(video, 'phase_outputs')
             db.commit()
-            print(f"✅ Updated video status to PAUSED_AT_PHASE3")
+            print(f"✅ Updated video status to COMPLETE (Phase 3 is terminal)")
 
             # Update progress in Redis
             update_progress(
                 video_id,
-                status='paused_at_phase3',
+                status='complete',
                 current_phase='phase3',
-                progress=60.0,
+                progress=100.0,
                 phase_outputs=video.phase_outputs
             )
 
-            # Check YOLO mode (auto_continue)
-            if hasattr(video, 'auto_continue') and video.auto_continue:
-                print(f"🚀 YOLO mode enabled - auto-continuing to Phase 4")
-                approve_checkpoint(checkpoint_id)
-
-                # Import here to avoid circular dependency
-                from app.orchestrator.pipeline import dispatch_next_phase
-                dispatch_next_phase(video_id, checkpoint_id)
-            else:
-                print(f"⏸️  Pipeline paused at Phase 3 - awaiting user approval")
+            print(f"🎉 Pipeline complete - Phase 3 is terminal (Phase 4 removed)")
 
         finally:
             db.close()

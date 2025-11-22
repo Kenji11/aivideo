@@ -7,7 +7,7 @@ from app.orchestrator.celery_app import celery_app
 from app.phases.phase1_validate.task import plan_video_intelligent
 from app.phases.phase2_storyboard.task import generate_storyboard
 from app.phases.phase3_chunks.task import generate_chunks
-from app.phases.phase4_refine.task import refine_video
+# Phase 4 removed from pipeline (music generation moved to export options)
 from app.database import SessionLocal
 from app.common.models import VideoGeneration, VideoStatus
 from app.orchestrator.progress import update_progress
@@ -157,9 +157,7 @@ def dispatch_next_phase(video_id: str, checkpoint_id: str):
         # Dispatch Phase 3: Chunk generation
         generate_chunks.delay(phase_output, user_id, model)
     elif phase_number == 3:
-        # Dispatch Phase 4: Refinement
-        refine_video.delay(phase_output, user_id)
-    elif phase_number == 4:
-        logger.info(f"Phase 4 is terminal - no next phase to dispatch")
+        # Phase 3 is now terminal (Phase 4 removed from pipeline)
+        logger.info(f"Phase 3 is terminal - no next phase to dispatch")
     else:
         logger.error(f"Invalid phase number: {phase_number}")
