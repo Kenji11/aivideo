@@ -53,7 +53,7 @@ class S3Client:
         return f"s3://{self.bucket}/{key}"
     
     def generate_presigned_url(self, key: str, expiration: int = 3600) -> str:
-        """Generate presigned URL"""
+        """Generate presigned URL for secure temporary access (both uploads and downloads)"""
         return self.client.generate_presigned_url(
             'get_object',
             Params={'Bucket': self.bucket, 'Key': key},
