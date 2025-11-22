@@ -64,6 +64,7 @@ def prepare_references(
         user_assets = extraction_result["user_assets"]
         has_assets = extraction_result["has_assets"]
         product_mentioned = extraction_result["product_mentioned"]
+        brand_mentioned = extraction_result["brand_mentioned"]
         
         # If user has no assets, return early
         if not has_assets:
@@ -81,7 +82,8 @@ def prepare_references(
                     "recommended_logo": None,
                     "selection_rationale": "User has no reference assets uploaded",
                     "has_assets": False,
-                    "product_mentioned": False
+                    "product_mentioned": False,
+                    "brand_mentioned": False
                 },
                 cost_usd=0.0,
                 duration_seconds=duration
@@ -90,12 +92,15 @@ def prepare_references(
         logger.info(f"   Extracted entities: product={entities.get('product')}, brand={entities.get('brand')}, category={entities.get('product_category')}")
         logger.info(f"   User has {len(user_assets)} assets")
         logger.info(f"   Product mentioned in prompt: {product_mentioned}")
+        logger.info(f"   Brand mentioned in prompt: {brand_mentioned}")
         
         # Step 2: Select best product
         product_selection = product_selector_service.select_best_product(
             user_assets=user_assets,
             entities=entities,
-            prompt=prompt
+            prompt=prompt,
+            product_mentioned=product_mentioned,
+            brand_mentioned=brand_mentioned
         )
         
         recommended_product = product_selection["selected_product"]
@@ -158,7 +163,8 @@ def prepare_references(
                 "product_confidence": product_confidence if recommended_product else 0.0,
                 "logo_confidence": logo_confidence if recommended_logo else 0.0,
                 "has_assets": True,
-                "product_mentioned": product_mentioned
+                "product_mentioned": product_mentioned,
+                "brand_mentioned": brand_mentioned
             },
             cost_usd=cost_usd,
             duration_seconds=duration
