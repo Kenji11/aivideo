@@ -1,13 +1,21 @@
 FROM python:3.11-slim
 
-# Install FFmpeg and system dependencies (including OpenCV dependencies)
+# Install FFmpeg, system dependencies, and AWS CLI v2
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsm6 \
     libxext6 \
     libglib2.0-0 \
     libxrender-dev \
+    curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install AWS CLI v2
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws/install && \
+    rm -rf aws awscliv2.zip
 
 WORKDIR /app
 
@@ -30,9 +38,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Copy and set up entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Set CLIP model environment variables
 ENV CLIP_MODEL=ViT-B/32
 ENV CLIP_MODEL_CACHE=/mnt/models
 
-# Default command (overridden in docker-compose for worker)
+# Use entrypoint script (will download model from S3 if needed, then run command)
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
