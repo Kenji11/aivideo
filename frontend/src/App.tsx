@@ -24,7 +24,6 @@ import { ExportPanel } from './components/ExportPanel';
 const Auth = lazy(() => import('./pages/Auth').then(module => ({ default: module.Auth })));
 import { AssetLibrary } from './pages/AssetLibrary';
 import { UploadVideo } from './pages/UploadVideo';
-import { VideoStatus } from './pages/VideoStatus';
 import { Preview } from './pages/Preview';
 // Commented out - may use later
 // import { Settings as SettingsPage } from './pages/Settings';
@@ -51,19 +50,11 @@ function ExportRouteWrapper() {
       title: 'Export Started',
       description: 'Your video is being exported',
     });
-    if (videoId) {
-      navigate(`/preview/${videoId}`);
-    } else {
-      navigate('/projects');
-    }
+    navigate(`/video/${videoId}`);
   };
-  
+
   const handleCancel = () => {
-    if (videoId) {
-      navigate(`/preview/${videoId}`);
-    } else {
-      navigate('/projects');
-    }
+    navigate(`/video/${videoId}`);
   };
   
   return <ExportPanel onExport={handleExport} onCancel={handleCancel} />;
@@ -106,13 +97,9 @@ function AppContent() {
 
   const handleProjectSelect = (project: VideoListItem) => {
     setSelectedProject(project);
-    if (project.status === 'complete' && project.final_video_url) {
-      setTitle(project.title);
-      navigate(`/preview/${project.video_id}`);
-    } else if (project.status !== 'complete' && project.status !== 'failed') {
-      // Navigate to processing page for videos that are still processing
-      navigate(`/processing/${project.video_id}`);
-    }
+    setTitle(project.title);
+    // Navigate all project types to unified video page
+    navigate(`/video/${project.video_id}`);
   };
 
   const handleDeleteProject = (videoId: string) => {
@@ -171,7 +158,7 @@ function AppContent() {
 
   const getCurrentStep = () => {
     if (location.pathname.startsWith('/processing')) return 2;
-    if (location.pathname.startsWith('/preview')) return 3;
+    if (location.pathname.startsWith('/video')) return 3;
     if (location.pathname === '/download') return 4;
     return 1;
   };
@@ -398,9 +385,7 @@ function AppContent() {
             </div>
           } />
 
-          <Route path="/processing/:videoId" element={<VideoStatus />} />
-
-          <Route path="/preview/:videoId" element={<Preview />} />
+          <Route path="/video/:videoId" element={<Preview />} />
 
           <Route path="/download" element={
             <div className="space-y-6 animate-fade-in">

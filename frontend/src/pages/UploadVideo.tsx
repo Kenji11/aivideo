@@ -57,9 +57,9 @@ export function UploadVideo({
         auto_continue: autoContinue
       });
       
-      console.log('[UploadVideo] Video generation started, navigating to:', `/processing/${response.video_id}`);
-      // Navigate to processing page with videoId in route
-      navigate(`/processing/${response.video_id}`);
+      console.log('[UploadVideo] Video generation started, navigating to:', `/video/${response.video_id}`);
+      // Navigate to video page (which will show processing UI)
+      navigate(`/video/${response.video_id}`);
       onNotification?.('success', 'Generation Started', 'Your video is being created...');
     } catch (error) {
       console.error('[UploadVideo] Failed to generate video:', error);
