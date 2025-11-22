@@ -5,7 +5,6 @@ import { Header } from './components/Header';
 import { StepIndicator } from './components/StepIndicator';
 import { toast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
-import { ExportPanel } from './components/ExportPanel';
 import { Auth } from './pages/Auth';
 import { AssetLibrary } from './pages/AssetLibrary';
 import { UploadVideo } from './pages/UploadVideo';
@@ -14,37 +13,6 @@ import { Preview } from './pages/Preview';
 import { Projects } from './pages/Projects';
 import { useAuth } from './contexts/AuthContext';
 import { useDarkMode } from './lib/useDarkMode';
-import { useParams } from 'react-router-dom';
-
-// Export Route Wrapper Component
-function ExportRouteWrapper() {
-  const navigate = useNavigate();
-  const { videoId } = useParams<{ videoId: string }>();
-  
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleExport = (_settings: any) => {
-    toast({
-      variant: 'default',
-      title: 'Export Started',
-      description: 'Your video is being exported',
-    });
-    if (videoId) {
-      navigate(`/preview/${videoId}`);
-    } else {
-      navigate('/projects');
-    }
-  };
-  
-  const handleCancel = () => {
-    if (videoId) {
-      navigate(`/preview/${videoId}`);
-    } else {
-      navigate('/projects');
-    }
-  };
-  
-  return <ExportPanel onExport={handleExport} onCancel={handleCancel} />;
-}
 
 // Main App Content (inside router)
 function AppContent() {
@@ -164,7 +132,6 @@ function AppContent() {
             </div>
           } />
 
-          <Route path="/export/:videoId" element={<ExportRouteWrapper />} />
           <Route path="/asset-library" element={<AssetLibrary />} />
         </Routes>
       </div>

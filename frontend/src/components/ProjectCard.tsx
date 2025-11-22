@@ -1,4 +1,4 @@
-import { Play, Trash2, Calendar, Video as VideoIcon, Loader2 } from 'lucide-react';
+import { Play, Trash2, Calendar, Video as VideoIcon, Loader2, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { VideoListItem } from '../lib/api';
 import { formatDistanceToNow } from 'date-fns';
@@ -11,6 +11,7 @@ interface ProjectCardProps {
   project: VideoListItem;
   onSelect?: (project: VideoListItem) => void;
   onDelete?: (projectId: string) => void;
+  onDownload?: (project: VideoListItem) => void;
 }
 
 const statusConfig: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
@@ -24,7 +25,7 @@ const statusConfig: Record<string, { variant: 'default' | 'secondary' | 'destruc
   failed: { variant: 'destructive', label: 'Failed' },
 };
 
-export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
+export function ProjectCard({ project, onSelect, onDelete, onDownload }: ProjectCardProps) {
   const status = statusConfig[project.status] || statusConfig.queued;
   const isProcessing = project.status !== 'complete' && project.status !== 'failed';
   const hasVideo = project.final_video_url || project.status === 'complete';
@@ -161,19 +162,37 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
           </div>
         )}
 
-        {onDelete && (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete?.(project.video_id);
-            }}
-            className="w-full"
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete
-          </Button>
+        {(onDownload || onDelete) && (
+          <div className="flex gap-2">
+            {onDownload && project.status === 'complete' && project.final_video_url && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDownload?.(project);
+                }}
+                className="flex-1"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.(project.video_id);
+                }}
+                className={onDownload && project.status === 'complete' && project.final_video_url ? 'flex-1' : 'w-full'}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

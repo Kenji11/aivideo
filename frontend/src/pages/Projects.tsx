@@ -47,6 +47,20 @@ export function Projects() {
     setDeleteDialogOpen(true);
   };
 
+  const handleDownload = (project: VideoListItem) => {
+    if (project.final_video_url) {
+      const link = document.createElement('a');
+      link.href = project.final_video_url;
+      link.download = `${project.title || 'video'}.mp4`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      addNotification('success', 'Download Started', 'Your video download has started');
+    } else {
+      addNotification('error', 'Video Not Ready', 'Video is not available for download');
+    }
+  };
+
   const confirmDelete = async () => {
     if (!videoToDelete) return;
     
@@ -123,6 +137,7 @@ export function Projects() {
                 project={project}
                 onSelect={handleProjectSelect}
                 onDelete={handleDeleteProject}
+                onDownload={handleDownload}
               />
             ))}
           </div>
