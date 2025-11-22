@@ -462,7 +462,7 @@ export const api = {
   async estimateEditCost(
     videoId: string,
     chunkIndices: number[],
-    model: string = 'hailuo'
+    model: string = 'hailuo_fast'
   ): Promise<CostEstimate> {
     const response = await apiClient.post<CostEstimate>(
       `/api/video/${videoId}/edit/estimate`,
