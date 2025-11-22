@@ -265,6 +265,7 @@ def plan_with_gpt4o_mini(
         # Update video status to paused
         video.status = VideoStatus.PAUSED_AT_PHASE1
         video.current_phase = 'phase1'
+        video.progress = 20.0  # Phase 1 complete (20% of total pipeline)
         if not video.phase_outputs:
             video.phase_outputs = {}
         video.phase_outputs['phase1_planning'] = output.model_dump()
@@ -277,6 +278,7 @@ def plan_with_gpt4o_mini(
             video_id,
             status='paused_at_phase1',
             current_phase='phase1',
+            progress=20.0,
             spec=spec,
             phase_outputs=video.phase_outputs
         )
@@ -427,6 +429,7 @@ def plan_with_gpt4_turbo(
         # Update video status to paused
         video.status = VideoStatus.PAUSED_AT_PHASE1
         video.current_phase = 'phase1'
+        video.progress = 20.0  # Phase 1 complete (20% of total pipeline)
         if not video.phase_outputs:
             video.phase_outputs = {}
         video.phase_outputs['phase1_planning'] = output.model_dump()
@@ -439,6 +442,7 @@ def plan_with_gpt4_turbo(
             video_id,
             status='paused_at_phase1',
             current_phase='phase1',
+            progress=20.0,
             spec=spec,
             phase_outputs=video.phase_outputs
         )

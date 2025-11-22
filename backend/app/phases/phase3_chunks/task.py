@@ -485,6 +485,7 @@ def generate_chunks(
             # Update video status to paused
             video.status = VideoStatus.PAUSED_AT_PHASE3
             video.current_phase = 'phase3'
+            video.progress = 60.0  # Phase 3 complete (60% of total pipeline)
             if video.phase_outputs is None:
                 video.phase_outputs = {}
             video.phase_outputs['phase3_chunks'] = output.dict()
@@ -500,6 +501,7 @@ def generate_chunks(
                 video_id,
                 status='paused_at_phase3',
                 current_phase='phase3',
+                progress=60.0,
                 phase_outputs=video.phase_outputs
             )
 

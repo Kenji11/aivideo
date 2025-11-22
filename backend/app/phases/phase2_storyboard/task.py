@@ -201,6 +201,7 @@ def _generate_storyboard_impl(
             # Update video status to paused
             video.status = VideoStatus.PAUSED_AT_PHASE2
             video.current_phase = 'phase2'
+            video.progress = 40.0  # Phase 2 complete (40% of total pipeline)
             if video.phase_outputs is None:
                 video.phase_outputs = {}
             video.phase_outputs['phase2_storyboard'] = output.dict()
@@ -213,6 +214,7 @@ def _generate_storyboard_impl(
                 video_id,
                 status='paused_at_phase2',
                 current_phase='phase2',
+                progress=40.0,
                 phase_outputs=video.phase_outputs
             )
 
