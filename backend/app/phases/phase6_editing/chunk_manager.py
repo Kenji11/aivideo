@@ -11,7 +11,11 @@ from app.common.models import VideoGeneration
 from app.services.s3 import s3_client
 from app.services.redis import RedisClient
 from app.phases.phase6_editing.schemas import ChunkVersion, ChunkMetadata
+from app.phases.phase3_chunks.model_config import get_model_config, get_default_model
 import logging
+import subprocess
+import tempfile
+import os
 
 logger = logging.getLogger(__name__)
 redis_client = RedisClient()
@@ -66,22 +70,18 @@ class ChunkManager:
             spec = video.spec or {}
             beats = spec.get('beats', [])
             
-            # Find which beat this chunk belongs to
-            chunk_duration = spec.get('chunk_duration', 5.0)
-            chunk_start_time = chunk_index * chunk_duration
+            # Get model from current selected version, or from phase3 output, or fallback to spec
+            # Phase3 stores the actual model used in spec.model
+            model = spec.get('model', 'hailuo_fast')
             
-            # Find beat that contains this chunk
-            beat_info = None
-            for beat in beats:
-                beat_start = beat.get('start_time', 0)
-                beat_duration = beat.get('duration', 0)
-                if beat_start <= chunk_start_time < beat_start + beat_duration:
-                    beat_info = beat
-                    break
+            # Also check phase3 output for the model that was actually used
+            phase_outputs = video.phase_outputs or {}
+            phase3_output = phase_outputs.get('phase3_chunks', {})
+            phase3_spec = phase3_output.get('output_data', {}).get('spec', {})
+            if phase3_spec.get('model'):
+                model = phase3_spec.get('model')
             
-            # Get model from current selected version, or fallback to spec
-            model = spec.get('model', 'hailuo')
-            prompt = beat_info.get('prompt', '') if beat_info else ''
+            prompt = ''
             cost = 0.0
             
             # Check if this chunk has versions tracked (for replaced/split chunks)
@@ -116,6 +116,58 @@ class ChunkManager:
                 total_cost = phase3_output.get('cost_usd', phase3_data.get('total_cost', 0.0))
                 chunk_count = len(chunk_urls)
                 cost = total_cost / chunk_count if chunk_count > 0 else 0.0
+            
+            # Get duration - use model config first (fast), extract from file only if cache exists
+            # For performance, we use model config as primary source and only extract when explicitly needed
+            phase_outputs = video.phase_outputs or {}
+            editing_data = phase_outputs.get('phase6_editing', {})
+            chunk_durations_cache = editing_data.get('chunk_durations', {})
+            
+            chunk_key = f'chunk_{chunk_index}'
+            if chunk_key in chunk_durations_cache:
+                # Use cached duration (fast, from previous extraction)
+                chunk_duration = chunk_durations_cache[chunk_key]
+                logger.debug(f"Using cached duration {chunk_duration:.2f}s for chunk {chunk_index}")
+            else:
+                # Use model config duration (fast, no file download needed)
+                # We'll extract actual duration later if needed (e.g., for split operations)
+                try:
+                    model_config = get_model_config(model)
+                    chunk_duration = model_config.get('actual_chunk_duration', 5.0)
+                    logger.debug(f"Using model config duration {chunk_duration:.2f}s for chunk {chunk_index} (model: {model})")
+                except Exception as e:
+                    logger.warning(f"Could not get model config for {model}, using fallback: {e}")
+                    chunk_duration = spec.get('chunk_duration', 5.0)
+            
+            # Calculate chunk start time using cached durations or model config (fast)
+            chunk_start_time = 0.0
+            for i in range(chunk_index):
+                prev_chunk_key = f'chunk_{i}'
+                if prev_chunk_key in chunk_durations_cache:
+                    # Use cached duration
+                    chunk_start_time += chunk_durations_cache[prev_chunk_key]
+                else:
+                    # Use model config duration for previous chunks (fast, no file download)
+                    try:
+                        prev_model_config = get_model_config(model)
+                        prev_duration = prev_model_config.get('actual_chunk_duration', 5.0)
+                        chunk_start_time += prev_duration
+                    except Exception:
+                        # Fallback to current chunk duration
+                        chunk_start_time += chunk_duration
+            
+            # Find beat that contains this chunk
+            beat_info = None
+            for beat in beats:
+                beat_start = beat.get('start_time', 0)
+                beat_duration = beat.get('duration', 0)
+                if beat_start <= chunk_start_time < beat_start + beat_duration:
+                    beat_info = beat
+                    break
+            
+            # Use prompt from beat if not set from version
+            if not prompt and beat_info:
+                prompt = beat_info.get('prompt', '')
             
             # Ensure chunk_url is set (fallback to chunk_urls array)
             if not chunk_url and chunk_index < len(chunk_urls):
@@ -574,4 +626,126 @@ class ChunkManager:
         except Exception as e:
             logger.error(f"Error getting current chunk version for video {video_id}, chunk {chunk_index}: {e}")
             return None
+    
+    def set_selected_version(self, video_id: str, chunk_index: int, version_id: str) -> bool:
+        """
+        Set the currently selected version for a chunk.
+        
+        Args:
+            video_id: Video ID
+            chunk_index: Chunk index (0-based)
+            version_id: Version identifier ('original', 'replacement_1', etc.)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            video = self.db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+            if not video:
+                return False
+            
+            # Initialize phase_outputs if needed
+            if not video.phase_outputs:
+                video.phase_outputs = {}
+            if 'phase6_editing' not in video.phase_outputs:
+                video.phase_outputs['phase6_editing'] = {}
+            if 'chunk_versions' not in video.phase_outputs['phase6_editing']:
+                video.phase_outputs['phase6_editing']['chunk_versions'] = {}
+            
+            chunk_key = f'chunk_{chunk_index}'
+            chunk_versions = video.phase_outputs['phase6_editing']['chunk_versions']
+            
+            if chunk_key not in chunk_versions:
+                chunk_versions[chunk_key] = {
+                    'original': {},
+                    'replacements': {},
+                    'current_selected': 'original'
+                }
+            
+            # Set the selected version
+            chunk_versions[chunk_key]['current_selected'] = version_id
+            
+            # Mark as modified for SQLAlchemy
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(video, 'phase_outputs')
+            self.db.commit()
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error setting selected version for video {video_id}, chunk {chunk_index}: {e}")
+            self.db.rollback()
+            return False
+    
+    def _get_video_duration_from_file(self, video_url: str, video_id: str, chunk_index: int) -> float:
+        """
+        Extract actual video duration from the video file using ffprobe.
+        
+        Args:
+            video_url: S3 URL or key of the video file
+            video_id: Video ID (for logging)
+            chunk_index: Chunk index (for logging)
+            
+        Returns:
+            Duration in seconds, or 5.0 as fallback
+        """
+        temp_dir = None
+        try:
+            # Download video to temp file
+            temp_dir = tempfile.mkdtemp()
+            temp_video_path = os.path.join(temp_dir, f'chunk_{chunk_index}.mp4')
+            
+            # Extract S3 key from URL
+            if video_url.startswith('s3://'):
+                chunk_key = video_url.replace(f's3://{s3_client.bucket}/', '')
+                s3_client.download_file(chunk_key, temp_video_path)
+            elif video_url.startswith('http'):
+                # Presigned URL - download using requests
+                import requests
+                response = requests.get(video_url, stream=True, timeout=30)
+                response.raise_for_status()
+                with open(temp_video_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+            else:
+                # Assume it's an S3 key
+                chunk_key = video_url
+                s3_client.download_file(chunk_key, temp_video_path)
+            
+            # Use ffprobe to get duration
+            probe_cmd = [
+                'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                '-of', 'default=noprint_wrappers=1:nokey=1', temp_video_path
+            ]
+            probe_result = subprocess.run(probe_cmd, capture_output=True, text=True, check=True, timeout=10)
+            duration = float(probe_result.stdout.strip())
+            
+            logger.debug(f"Extracted duration {duration:.2f}s from video file for chunk {chunk_index}")
+            return duration
+            
+        except Exception as e:
+            logger.warning(f"Could not extract duration from video file for chunk {chunk_index}: {e}. Using fallback.")
+            # Fallback: try to get from model config if we have the model
+            try:
+                video = self.db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+                if video:
+                    spec = video.spec or {}
+                    model = spec.get('model', 'hailuo_fast')
+                    phase_outputs = video.phase_outputs or {}
+                    phase3_output = phase_outputs.get('phase3_chunks', {})
+                    phase3_spec = phase3_output.get('output_data', {}).get('spec', {})
+                    if phase3_spec.get('model'):
+                        model = phase3_spec.get('model')
+                    model_config = get_model_config(model)
+                    return model_config.get('actual_chunk_duration', 5.0)
+            except Exception:
+                pass
+            return 5.0  # Final fallback
+        finally:
+            # Clean up temp directory
+            if temp_dir and os.path.exists(temp_dir):
+                try:
+                    import shutil
+                    shutil.rmtree(temp_dir)
+                except Exception:
+                    pass
 
