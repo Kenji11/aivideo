@@ -1098,10 +1098,12 @@ export function Preview() {
                                                 phase2Artifacts?.storyboardUrls?.[index];
                             
                             return (
-                              <div 
-                                key={index} 
+                              <div
+                                key={index}
                                 className="relative aspect-video rounded-lg overflow-hidden border border-border bg-card cursor-pointer hover:border-primary transition-colors group"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  console.log('[Preview] Chunk clicked:', index, 'chunkUrl:', phase3Artifacts.chunkUrls[index]);
+                                  e.stopPropagation();
                                   setSelectedChunkIndex(index);
                                   setChunkEditModalOpen(true);
                                 }}
@@ -1275,7 +1277,10 @@ export function Preview() {
       {selectedChunkIndex !== null && phase3Artifacts?.chunkUrls && (
         <ChunkEditModal
           open={chunkEditModalOpen}
-          onOpenChange={setChunkEditModalOpen}
+          onOpenChange={(open) => {
+            console.log('[Preview] Modal open change:', open);
+            setChunkEditModalOpen(open);
+          }}
           chunkIndex={selectedChunkIndex}
           chunkUrl={phase3Artifacts.chunkUrls[selectedChunkIndex]}
           beatImageUrl={
