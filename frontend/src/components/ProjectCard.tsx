@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { useRef, useEffect } from 'react';
 
 interface ProjectCardProps {
   project: VideoListItem;
@@ -28,6 +29,30 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
   const status = statusConfig[project.status] || statusConfig.queued;
   const isProcessing = project.status !== 'complete' && project.status !== 'failed';
   const hasVideo = project.final_video_url || project.status === 'complete';
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Cleanup video on unmount
+  useEffect(() => {
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.src = '';
+        videoRef.current.load();
+      }
+    };
+  }, []);
+
+  const handleClick = () => {
+    // Clean up video before navigation to prevent abort errors
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.src = '';
+    }
+    // Small delay to allow cleanup
+    setTimeout(() => {
+      onSelect?.(project);
+    }, 50);
+  };
 
   // Determine navigation route based on status
   const getVideoRoute = () => {
@@ -47,6 +72,11 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
         to={videoRoute}
         className="block"
         onClick={(e) => {
+          // Clean up video before navigation to prevent abort errors
+          if (videoRef.current) {
+            videoRef.current.pause();
+            videoRef.current.src = '';
+          }
           // Still call onSelect if provided (for backwards compatibility)
           if (onSelect) {
             onSelect(project);
@@ -76,27 +106,55 @@ export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
                   }}
                 />
                 <video
+                  ref={videoRef}
                   src={project.final_video_url}
                   className="w-full h-full object-cover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                   muted
                   preload="none"
-                  onMouseEnter={(e) => e.currentTarget.play()}
+                  onMouseEnter={(e) => {
+                    if (videoRef.current && !videoRef.current.paused) return;
+                    e.currentTarget.play().catch(() => {
+                      // Ignore play errors (e.g., if video is being cleaned up)
+                    });
+                  }}
                   onMouseLeave={(e) => {
                     e.currentTarget.pause();
                     e.currentTarget.currentTime = 0;
+                  }}
+                  onError={(e) => {
+                    // Silently handle video errors
+                    console.debug('ProjectCard video error (expected when navigating):', e);
+                  }}
+                  onAbort={(e) => {
+                    // Silently handle abort (expected when navigating)
+                    console.debug('ProjectCard video aborted (expected when navigating)');
                   }}
                 />
               </>
             ) : (
               <video
+                ref={videoRef}
                 src={project.final_video_url}
                 className="w-full h-full object-cover"
                 muted
                 preload="none"
-                onMouseEnter={(e) => e.currentTarget.play()}
+                onMouseEnter={(e) => {
+                  if (videoRef.current && !videoRef.current.paused) return;
+                  e.currentTarget.play().catch(() => {
+                    // Ignore play errors (e.g., if video is being cleaned up)
+                  });
+                }}
                 onMouseLeave={(e) => {
                   e.currentTarget.pause();
                   e.currentTarget.currentTime = 0;
+                }}
+                onError={(e) => {
+                  // Silently handle video errors
+                  console.debug('ProjectCard video error (expected when navigating):', e);
+                }}
+                onAbort={(e) => {
+                  // Silently handle abort (expected when navigating)
+                  console.debug('ProjectCard video aborted (expected when navigating)');
                 }}
               />
             )}

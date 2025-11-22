@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { RefreshCw, Trash2, Scissors, ArrowUpDown, DollarSign, Loader2, Undo2 } from 'lucide-react';
-import { api, ChunkMetadata, EditingAction, CostEstimate } from '../../lib/api';
+import { api, ChunkMetadata, EditingAction, CostEstimate, getModelDisplayName } from '../../lib/api';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,7 +43,7 @@ export function EditActions({
   const [costEstimateDialogOpen, setCostEstimateDialogOpen] = useState(false);
   
   const [newPrompt, setNewPrompt] = useState('');
-  const [newModel, setNewModel] = useState('hailuo');
+  const [newModel, setNewModel] = useState('hailuo_fast');
   const [splitTime, setSplitTime] = useState<number | ''>('');
   const [splitMethod, setSplitMethod] = useState<'time' | 'percentage'>('time');
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null);
@@ -70,7 +70,7 @@ export function EditActions({
   }, [selectedChunks, videoId]);
 
   const models = [
-    { value: 'hailuo', label: 'Hailuo Fast' },
+    { value: 'hailuo_fast', label: 'Hailuo Fast' },
     { value: 'hailuo_23', label: 'Hailuo 2.3' },
     { value: 'veo_fast', label: 'Veo Fast' },
     { value: 'veo', label: 'Veo Standard' },
@@ -97,7 +97,7 @@ export function EditActions({
           action_type: 'replace',
           chunk_indices: selectedChunks,
           new_prompt: newPrompt || undefined,
-          new_model: newModel !== 'hailuo' ? newModel : undefined,
+          new_model: newModel !== 'hailuo_fast' ? newModel : undefined,
           keep_original: true,
         },
       ];
@@ -112,7 +112,7 @@ export function EditActions({
 
       // Reset form
       setNewPrompt('');
-      setNewModel('hailuo');
+      setNewModel('hailuo_fast');
       setSplitTime(''); // Reset split time
       
       // Poll for completion
@@ -773,7 +773,7 @@ export function EditActions({
                 )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Model:</span>
-                  <span className="font-medium">{costEstimate.model}</span>
+                  <span className="font-medium">{getModelDisplayName(costEstimate.model)}</span>
                 </div>
               </div>
               {Object.keys(costEstimate.cost_per_chunk).length > 0 && (

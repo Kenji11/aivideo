@@ -1,6 +1,37 @@
 import axios from 'axios';
 import { getIdToken } from './firebase';
 
+/**
+ * Map model identifier to display name
+ */
+export function getModelDisplayName(modelId: string | undefined | null): string {
+  if (!modelId) return 'Unknown';
+  
+  const modelMap: Record<string, string> = {
+    'hailuo': 'Hailuo Fast',
+    'hailuo_fast': 'Hailuo Fast',
+    'hailuo_23': 'Hailuo 2.3',
+    'veo_fast': 'Veo Fast',
+    'veo': 'Veo Standard',
+    'runway': 'Runway Gen-2',
+    'runway_gen4_turbo': 'Runway Gen-4 Turbo',
+    'kling_16_pro': 'Kling 1.6 Pro',
+    'kling_21': 'Kling 2.1',
+    'kling_21_1080p': 'Kling 2.1 (1080p)',
+    'kling_25_pro': 'Kling 2.5 Turbo Pro',
+    'minimax_video_01': 'Minimax Video-01',
+    'wan': 'Wan 2.1',
+    'zeroscope': 'Zeroscope',
+    'animatediff': 'AnimateDiff',
+    'pixverse': 'Pixverse v5',
+    'wan_25_t2v': 'Wan 2.5 T2V',
+    'wan_25_i2v': 'Wan 2.5 I2V Fast',
+    'sora': 'Sora 2',
+  };
+  
+  return modelMap[modelId] || modelId;
+}
+
 // Get API URL from environment variable, default to localhost:8000
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -431,7 +462,7 @@ export const api = {
   async estimateEditCost(
     videoId: string,
     chunkIndices: number[],
-    model: string = 'hailuo'
+    model: string = 'hailuo_fast'
   ): Promise<CostEstimate> {
     const response = await apiClient.post<CostEstimate>(
       `/api/video/${videoId}/edit/estimate`,

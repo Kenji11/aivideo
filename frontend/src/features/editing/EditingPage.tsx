@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { api, ChunksListResponse, ChunkMetadata } from '../../lib/api';
@@ -7,6 +7,7 @@ import { ChunkTimeline } from './ChunkTimeline';
 import { ChunkPreview } from './ChunkPreview';
 import { EditActions } from './EditActions';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 
 export function EditingPage() {
   const navigate = useNavigate();
@@ -18,6 +19,8 @@ export function EditingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [stitchedVideoUrl, setStitchedVideoUrl] = useState<string | null>(null);
+  const loadingAbortControllerRef = useRef<AbortController | null>(null);
+  const isLoadingRef = useRef(false);
 
   useEffect(() => {
     if (!videoId) {
@@ -31,23 +34,94 @@ export function EditingPage() {
     }
 
     loadChunks();
+    
+    // Cleanup on unmount
+    return () => {
+      if (loadingAbortControllerRef.current) {
+        loadingAbortControllerRef.current.abort();
+      }
+    };
   }, [videoId]);
 
   const loadChunks = async () => {
     if (!videoId) return;
     
+    // Prevent multiple simultaneous loads
+    if (isLoadingRef.current) {
+      return;
+    }
+    
+    // Abort any previous request
+    if (loadingAbortControllerRef.current) {
+      loadingAbortControllerRef.current.abort();
+    }
+    
+    // Create new abort controller
+    const abortController = new AbortController();
+    loadingAbortControllerRef.current = abortController;
+    
+    isLoadingRef.current = true;
     setIsLoading(true);
+    
     try {
+      console.log('[EditingPage] Loading chunks for video:', videoId);
+      const startTime = Date.now();
+      
       const response: ChunksListResponse = await api.getChunks(videoId);
+      
+      const loadTime = Date.now() - startTime;
+      console.log(`[EditingPage] Chunks loaded in ${loadTime}ms, got ${response.chunks.length} chunks`);
+      console.log('[EditingPage] Chunks data:', response.chunks);
+      
+      // Check if this is still the current request (not aborted or replaced)
+      const isCurrentRequest = loadingAbortControllerRef.current === abortController;
+      const wasAborted = abortController.signal.aborted;
+      
+      if (wasAborted && !isCurrentRequest) {
+        console.log('[EditingPage] Request was replaced by a new one, skipping state update');
+        isLoadingRef.current = false;
+        setIsLoading(false);
+        return;
+      }
+      
+      // Validate chunks data
+      if (!response.chunks || response.chunks.length === 0) {
+        console.warn('[EditingPage] No chunks in response');
+        toast({
+          variant: 'destructive',
+          title: 'No Chunks',
+          description: 'No chunks found for this video',
+        });
+        isLoadingRef.current = false;
+        setIsLoading(false);
+        return;
+      }
+      
+      // Update state with chunks data (even if aborted, as long as it's still the current request)
+      // The abort might have been from cleanup, but if fetch completed, we should update
       setChunks(response.chunks);
       setStitchedVideoUrl(response.stitched_video_url || null);
+      console.log('[EditingPage] Chunks state updated, chunks.length:', response.chunks.length);
+      
+      // Set loading to false after successful load
+      isLoadingRef.current = false;
+      setIsLoading(false);
+      console.log('[EditingPage] Loading state set to false');
     } catch (error: any) {
+      // Ignore abort errors
+      if (error.name === 'AbortError' || abortController.signal.aborted) {
+        console.log('[EditingPage] Request was aborted in catch, skipping state update');
+        isLoadingRef.current = false;
+        setIsLoading(false);
+        return;
+      }
+      console.error('[EditingPage] Error loading chunks:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
         description: error.message || 'Failed to load chunks',
       });
-    } finally {
+      isLoadingRef.current = false;
       setIsLoading(false);
     }
   };
@@ -67,9 +141,12 @@ export function EditingPage() {
 
   const handleEditComplete = () => {
     // Reload chunks after editing
-    loadChunks();
-    setSelectedChunks([]);
-    setSelectedChunkIndex(null);
+    // Use a small delay to allow any ongoing video loads to complete
+    setTimeout(() => {
+      loadChunks();
+      setSelectedChunks([]);
+      setSelectedChunkIndex(null);
+    }, 100);
   };
 
   const handleProceedToRefinement = () => {
@@ -77,6 +154,9 @@ export function EditingPage() {
     // Navigate to processing page to continue with Phase 4
     navigate(`/processing/${videoId}`);
   };
+
+  // Debug: Log current state
+  console.log('[EditingPage] Render - isLoading:', isLoading, 'chunks.length:', chunks.length);
 
   if (isLoading) {
     return (
@@ -126,22 +206,28 @@ export function EditingPage() {
           {/* Left Column: Timeline */}
           <div className="lg:col-span-2 space-y-6">
             {/* Chunk Timeline */}
-            <div className="card p-6">
+            <Card className="p-6">
               <h2 className="text-xl font-semibold mb-4">Chunk Timeline</h2>
-              <ChunkTimeline
-                chunks={chunks}
-                selectedChunks={selectedChunks}
-                onChunkSelect={handleChunkSelect}
-                onReorder={(newOrder) => {
-                  // Handle reorder
-                  console.log('Reorder:', newOrder);
-                }}
-              />
-            </div>
+              {chunks.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No chunks available. Please wait for chunks to load.
+                </div>
+              ) : (
+                <ChunkTimeline
+                  chunks={chunks}
+                  selectedChunks={selectedChunks}
+                  onChunkSelect={handleChunkSelect}
+                  onReorder={(newOrder) => {
+                    // Handle reorder
+                    console.log('Reorder:', newOrder);
+                  }}
+                />
+              )}
+            </Card>
 
             {/* Chunk Preview */}
             {selectedChunkIndex !== null && selectedChunkIndex < chunks.length && (
-              <div className="card p-6">
+              <Card className="p-6">
                 <h2 className="text-xl font-semibold mb-4">
                   Chunk {selectedChunkIndex + 1} Preview
                 </h2>
@@ -150,13 +236,13 @@ export function EditingPage() {
                   chunk={chunks[selectedChunkIndex]}
                   onVersionChange={handleEditComplete}
                 />
-              </div>
+              </Card>
             )}
           </div>
 
           {/* Right Column: Edit Actions */}
           <div className="lg:col-span-1">
-            <div className="card p-6 sticky top-4">
+            <Card className="p-6 sticky top-4">
               <h2 className="text-xl font-semibold mb-4">Edit Actions</h2>
               <EditActions
                 videoId={videoId!}
@@ -165,7 +251,7 @@ export function EditingPage() {
                 onEditComplete={handleEditComplete}
                 onProcessingChange={setIsProcessing}
               />
-            </div>
+            </Card>
           </div>
         </div>
       </div>

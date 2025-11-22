@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Pause, Loader2 } from 'lucide-react';
-import { api, ChunkMetadata, ChunkVersion } from '../../lib/api';
+import { api, ChunkMetadata, ChunkVersion, getModelDisplayName } from '../../lib/api';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -17,26 +17,82 @@ export function ChunkPreview({ videoId, chunk, onVersionChange }: ChunkPreviewPr
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const loadingAbortControllerRef = React.useRef<AbortController | null>(null);
+  const currentLoadRef = React.useRef<string | null>(null);
 
   useEffect(() => {
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      // Abort any in-flight requests
+      if (loadingAbortControllerRef.current) {
+        loadingAbortControllerRef.current.abort();
+      }
+      // Pause and clear video
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.src = '';
+        videoRef.current.load();
+      }
+    };
+  }, [selectedVersion, videoId, chunk.chunk_index]);
+
+  useEffect(() => {
+    const loadKey = `${videoId}-${chunk.chunk_index}-${selectedVersion}`;
+    // Skip if already loading this exact combination
+    if (currentLoadRef.current === loadKey) {
+      return;
+    }
+    currentLoadRef.current = loadKey;
     loadPreviewUrl(selectedVersion);
   }, [selectedVersion, videoId, chunk.chunk_index]);
 
   const loadPreviewUrl = async (version: string) => {
+    // Abort any previous request
+    if (loadingAbortControllerRef.current) {
+      loadingAbortControllerRef.current.abort();
+    }
+    
+    // Create new abort controller for this request
+    const abortController = new AbortController();
+    loadingAbortControllerRef.current = abortController;
+    
     setIsLoadingPreview(true);
-    setPreviewUrl(null); // Clear previous URL
+    
+    // Don't clear the URL immediately - let the video finish loading if possible
+    // Only clear if we're switching to a different version
     try {
       const response = await api.getChunkPreview(videoId, chunk.chunk_index, version);
+      
+      // Check if request was aborted
+      if (abortController.signal.aborted) {
+        return;
+      }
+      
       if (response.preview_url) {
-        setPreviewUrl(response.preview_url);
+        // Only update if this is still the current load
+        const loadKey = `${videoId}-${chunk.chunk_index}-${version}`;
+        if (currentLoadRef.current === loadKey) {
+          setPreviewUrl(response.preview_url);
+        }
       } else {
         console.error('No preview URL returned from API');
+        if (!abortController.signal.aborted) {
+          setPreviewUrl(null);
+        }
       }
     } catch (error: any) {
+      // Ignore abort errors
+      if (error.name === 'AbortError' || abortController.signal.aborted) {
+        return;
+      }
       console.error('Failed to load preview:', error);
-      setPreviewUrl(null);
+      if (!abortController.signal.aborted) {
+        setPreviewUrl(null);
+      }
     } finally {
-      setIsLoadingPreview(false);
+      if (!abortController.signal.aborted) {
+        setIsLoadingPreview(false);
+      }
     }
   };
 
@@ -103,6 +159,14 @@ export function ChunkPreview({ videoId, chunk, onVersionChange }: ChunkPreviewPr
               controls
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
+              onError={(e) => {
+                console.error('Video loading error:', e);
+                // Don't show error to user, just log it
+              }}
+              onAbort={(e) => {
+                // Ignore abort events - they're expected when switching videos
+                console.debug('Video load aborted (expected when switching)');
+              }}
             />
             {!isPlaying && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/50">
@@ -130,7 +194,7 @@ export function ChunkPreview({ videoId, chunk, onVersionChange }: ChunkPreviewPr
           <div className="flex items-center gap-4">
             <div>
               <span className="text-muted-foreground">Model: </span>
-              <span className="font-medium">{currentVersionData.model || chunk.model}</span>
+              <span className="font-medium">{getModelDisplayName(currentVersionData.model || chunk.model)}</span>
             </div>
             {currentVersionData.cost && (
               <div>
