@@ -43,7 +43,7 @@ export function EditActions({
   const [costEstimateDialogOpen, setCostEstimateDialogOpen] = useState(false);
   
   const [newPrompt, setNewPrompt] = useState('');
-  const [newModel, setNewModel] = useState('hailuo');
+  const [newModel, setNewModel] = useState('hailuo_fast');
   const [splitTime, setSplitTime] = useState<number | ''>('');
   const [splitMethod, setSplitMethod] = useState<'time' | 'percentage'>('time');
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null);
@@ -70,7 +70,7 @@ export function EditActions({
   }, [selectedChunks, videoId]);
 
   const models = [
-    { value: 'hailuo', label: 'Hailuo Fast' },
+    { value: 'hailuo_fast', label: 'Hailuo Fast' },
     { value: 'hailuo_23', label: 'Hailuo 2.3' },
     { value: 'veo_fast', label: 'Veo Fast' },
     { value: 'veo', label: 'Veo Standard' },
@@ -97,7 +97,7 @@ export function EditActions({
           action_type: 'replace',
           chunk_indices: selectedChunks,
           new_prompt: newPrompt || undefined,
-          new_model: newModel !== 'hailuo' ? newModel : undefined,
+          new_model: newModel !== 'hailuo_fast' ? newModel : undefined,
           keep_original: true,
         },
       ];
@@ -112,7 +112,7 @@ export function EditActions({
 
       // Reset form
       setNewPrompt('');
-      setNewModel('hailuo');
+      setNewModel('hailuo_fast');
       setSplitTime(''); // Reset split time
       
       // Poll for completion
