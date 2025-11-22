@@ -176,30 +176,50 @@ export function Preview() {
         })
       ]);
 
-      // Handle processing state
-      if (statusData) {
-        const status = statusData.status;
+      // Handle processing state - check statusData first, fall back to videoData.status
+      const statusSource = statusData || videoData;
+      if (statusSource) {
+        const status = statusSource.status;
         const processingStatuses = ['queued', 'validating', 'generating_animatic', 'generating_chunks', 'refining', 'exporting'];
-        const isCurrentlyProcessing = processingStatuses.includes(status) || status.includes('PAUSED_AT_PHASE');
+        const isCurrentlyProcessing = processingStatuses.includes(status) || status.toLowerCase().includes('paused_at_phase');
 
         setIsProcessing(isCurrentlyProcessing);
-        setCurrentPhase(statusData.current_phase || '');
-        setProgress(statusData.progress || 0);
 
-        // Handle storyboard updates
-        if (statusData.storyboard_urls) {
-          setStoryboardUrls(statusData.storyboard_urls);
-        }
+        // Only statusData has current_phase and progress fields
+        if (statusData) {
+          setCurrentPhase(statusData.current_phase || '');
+          setProgress(statusData.progress || 0);
 
-        // Handle failed state
-        if (status === 'failed') {
-          setFailedPhase({
-            phase: statusData.current_phase || 'unknown',
-            error: statusData.error || 'Unknown error'
-          });
-          setIsProcessing(false);
-        } else {
-          setFailedPhase(null);
+          // Handle storyboard updates
+          if (statusData.storyboard_urls) {
+            setStoryboardUrls(statusData.storyboard_urls);
+          }
+
+          // Handle failed state
+          if (status === 'failed') {
+            setFailedPhase({
+              phase: statusData.current_phase || 'unknown',
+              error: statusData.error || 'Unknown error'
+            });
+            setIsProcessing(false);
+          } else {
+            setFailedPhase(null);
+          }
+        } else if (videoData) {
+          // Fall back to videoData when statusData is unavailable
+          // VideoData doesn't have current_phase or progress, so use defaults
+          setCurrentPhase('');
+          setProgress(0);
+
+          if (status === 'failed') {
+            setFailedPhase({
+              phase: 'unknown',
+              error: 'Video generation failed'
+            });
+            setIsProcessing(false);
+          } else {
+            setFailedPhase(null);
+          }
         }
 
         // Initialize elapsed time tracking
