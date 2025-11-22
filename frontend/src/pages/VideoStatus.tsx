@@ -81,6 +81,7 @@ export function VideoStatus() {
       hasShownStitchedNotificationRef.current = false;
       // Reset state when starting a new video
       setStoryboardUrls(null);
+      setReferenceAssets(null);
       setStitchedVideoUrl(null);
       setCurrentChunkIndex(null);
       setTotalChunks(null);
@@ -120,6 +121,10 @@ export function VideoStatus() {
       });
     }
     
+    // Update reference assets if available
+    if (status.reference_assets) {
+      setReferenceAssets(status.reference_assets);
+    }
     
     // Update current chunk progress for Phase 4
     if (status.current_phase === 'phase4_chunks') {

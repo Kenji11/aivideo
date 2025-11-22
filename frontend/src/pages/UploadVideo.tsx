@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react';
 import { Sparkles, ExternalLink } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { generateVideo } from '../lib/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,35 +10,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { toast } from '@/hooks/use-toast';
 
-interface UploadVideoProps {
-  title: string;
-  description: string;
-  prompt: string;
-  selectedModel: string;
-  uploadedAssetIds: string[];
-  onTitleChange: (title: string) => void;
-  onDescriptionChange: (description: string) => void;
-  onPromptChange: (prompt: string) => void;
-  onModelChange: (model: string) => void;
-  onAssetsUploaded: (assetIds: string[]) => void;
-  onNotification?: (type: 'success' | 'error', title: string, message: string) => void;
-}
-
-export function UploadVideo({
-  title,
-  description,
-  prompt,
-  selectedModel,
-  uploadedAssetIds,
-  onTitleChange,
-  onDescriptionChange,
-  onPromptChange,
-  onModelChange,
-  onAssetsUploaded,
-  onNotification,
-}: UploadVideoProps) {
+export function UploadVideo() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [prompt, setPrompt] = useState('');
+  const [selectedModel, setSelectedModel] = useState<string>('veo_fast');
+  const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]);
+
+  // Load selected assets from URL params when returning from asset library
+  useEffect(() => {
+    const selectedAssets = searchParams.get('selectedAssets');
+    if (selectedAssets) {
+      try {
+        const assetIds = JSON.parse(decodeURIComponent(selectedAssets));
+        if (Array.isArray(assetIds)) {
+          setUploadedAssetIds(assetIds);
+        }
+      } catch (error) {
+        console.error('Failed to parse selected assets from URL:', error);
+      }
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,13 +47,29 @@ export function UploadVideo({
         reference_assets: uploadedAssetIds,
         model: selectedModel
       });
-      // Navigate to processing page with videoId in route
       navigate(`/processing/${response.video_id}`);
-      onNotification?.('success', 'Generation Started', 'Your video is being created...');
+      toast({
+        variant: 'default',
+        title: 'Generation Started',
+        description: 'Your video is being created...',
+      });
     } catch (error) {
       console.error('[UploadVideo] Failed to generate video:', error);
-      onNotification?.('error', 'Generation Failed', error instanceof Error ? error.message : 'Unknown error');
+      toast({
+        variant: 'destructive',
+        title: 'Generation Failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
+  };
+
+  const handleNavigateToAssetLibrary = () => {
+    // Store current selected assets in URL so we can restore them when returning
+    const params = new URLSearchParams();
+    if (uploadedAssetIds.length > 0) {
+      params.set('selectedAssets', encodeURIComponent(JSON.stringify(uploadedAssetIds)));
+    }
+    navigate(`/asset-library?${params.toString()}`);
   };
 
   return (
@@ -78,7 +91,7 @@ export function UploadVideo({
           <input
             type="text"
             value={title}
-            onChange={(e) => onTitleChange(e.target.value)}
+            onChange={(e) => setTitle(e.target.value)}
             placeholder="E.g., Summer Travel Vlog"
             className="input-field"
             required
@@ -91,7 +104,7 @@ export function UploadVideo({
           </label>
           <textarea
             value={description}
-            onChange={(e) => onDescriptionChange(e.target.value)}
+            onChange={(e) => setDescription(e.target.value)}
             placeholder="Add more context about your project..."
             className="input-field resize-none h-20"
           />
@@ -103,7 +116,7 @@ export function UploadVideo({
           </label>
           <textarea
             value={prompt}
-            onChange={(e) => onPromptChange(e.target.value)}
+            onChange={(e) => setPrompt(e.target.value)}
             placeholder="Describe your video in detail. E.g., Create a promotional video about sustainable living with nature scenes, uplifting music, and inspirational quotes..."
             className="input-field resize-none h-32"
             required
@@ -123,7 +136,7 @@ export function UploadVideo({
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate('/asset-library')}
+              onClick={handleNavigateToAssetLibrary}
               className="flex items-center gap-2"
             >
               <ExternalLink className="w-4 h-4" />
@@ -145,7 +158,7 @@ export function UploadVideo({
           </label>
           <Select
             value={selectedModel}
-            onValueChange={onModelChange}
+            onValueChange={setSelectedModel}
           >
             <SelectTrigger className="w-full h-auto py-3">
               <SelectValue />
