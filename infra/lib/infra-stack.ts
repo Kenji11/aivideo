@@ -260,7 +260,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       memoryLimitMiB: 512,
       cpu: 256,
       executionRole: taskExecutionRole,
-      ephemeralStorageGiB: 20, // 20GB for CLIP model download/extraction
+      ephemeralStorageGiB: 21, // 21GB minimum for CLIP model download/extraction (Fargate minimum is 21GiB)
     });
 
     // Extract tag from image URI (default to 'latest')
@@ -332,7 +332,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
       memoryLimitMiB: 4096,  // 4GB - increased from 512MB to prevent OOM kills
       cpu: 1024,  // 1 vCPU - increased to match memory (Fargate requires CPU:Memory ratio)
       executionRole: taskExecutionRole,
-      ephemeralStorageGiB: 20, // 20GB for CLIP model download/extraction
+      ephemeralStorageGiB: 21, // 21GB minimum for CLIP model download/extraction (Fargate minimum is 21GiB)
     });
 
     // Extract tag from image URI (default to 'latest')
