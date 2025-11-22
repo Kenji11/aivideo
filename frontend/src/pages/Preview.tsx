@@ -181,7 +181,8 @@ export function Preview() {
       if (statusSource) {
         const status = statusSource.status;
         const processingStatuses = ['queued', 'validating', 'generating_animatic', 'generating_chunks', 'refining', 'exporting'];
-        const isCurrentlyProcessing = processingStatuses.includes(status) || status.toLowerCase().includes('paused_at_phase');
+        // PAUSED states should show checkpoint UI, not processing UI
+        const isCurrentlyProcessing = processingStatuses.includes(status);
 
         setIsProcessing(isCurrentlyProcessing);
 
