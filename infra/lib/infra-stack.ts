@@ -257,8 +257,8 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     );
 
     const apiTaskDefinition = new ecs.FargateTaskDefinition(this, 'APITaskDefinition', {
-      memoryLimitMiB: 512,
-      cpu: 256,
+      memoryLimitMiB: 2048,  // 2GB - increased from 512MB for CLIP model loading
+      cpu: 1024,  // 1 vCPU - increased to match memory (Fargate requires CPU:Memory ratio)
       executionRole: taskExecutionRole,
       ephemeralStorageGiB: 21, // 21GB minimum for CLIP model download/extraction (Fargate minimum is 21GiB)
     });
@@ -267,7 +267,7 @@ export class DaveVictorVincentAIVideoGenerationStack extends cdk.Stack {
     const imageTag = imageUri.includes(':') ? imageUri.split(':')[1] : 'latest';
     const apiContainer = apiTaskDefinition.addContainer('APIContainer', {
       image: ecs.ContainerImage.fromEcrRepository(ecrRepository, imageTag),
-      memoryLimitMiB: 512,
+      memoryLimitMiB: 2048,  // 2GB - increased from 512MB for CLIP model loading
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: 'api',
         logGroup,
