@@ -30,7 +30,6 @@ export function Preview() {
     phase1: 0,
     phase2: null,
     phase3: null,
-    phase4: null,
   });
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
   const [videoTitle, setVideoTitle] = useState<string>('');
@@ -42,6 +41,7 @@ export function Preview() {
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
   const [currentPhase, setCurrentPhase] = useState<string>('');
   const [progress, setProgress] = useState<number>(0);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
@@ -80,11 +80,7 @@ export function Preview() {
     return getChildrenOfCheckpoint(checkpointTree, phase2Checkpoint.id);
   }, [checkpointTree, checkpointIndices.phase1, checkpointIndices.phase2]);
   
-  const phase4Checkpoints = useMemo(() => {
-    const phase3Checkpoint = getSelectedCheckpoint(3, checkpointIndices, checkpointTree);
-    if (!phase3Checkpoint) return [];
-    return getChildrenOfCheckpoint(checkpointTree, phase3Checkpoint.id);
-  }, [checkpointTree, checkpointIndices.phase1, checkpointIndices.phase2, checkpointIndices.phase3]);
+  // Phase 4 removed from pipeline
 
   // Get selected checkpoints
   const selectedPhase1 = useMemo(() => {
@@ -94,13 +90,13 @@ export function Preview() {
   }, [checkpointIndices, checkpointTree, phase1Checkpoints.length]);
   const selectedPhase2 = useMemo(() => getSelectedCheckpoint(2, checkpointIndices, checkpointTree), [checkpointIndices, checkpointTree]);
   const selectedPhase3 = useMemo(() => getSelectedCheckpoint(3, checkpointIndices, checkpointTree), [checkpointIndices, checkpointTree]);
-  const selectedPhase4 = useMemo(() => getSelectedCheckpoint(4, checkpointIndices, checkpointTree), [checkpointIndices, checkpointTree]);
+  // Phase 4 removed from pipeline
 
   // Initialize checkpoint indices based on current_checkpoint or first Phase 1
   const initializeCheckpointIndices = useCallback((tree: CheckpointTreeNode[], currentCheckpointId?: string) => {
     const phase1Checkpoints = getPhase1Checkpoints(tree);
     if (phase1Checkpoints.length === 0) {
-      return { phase1: 0, phase2: null, phase3: null, phase4: null };
+      return { phase1: 0, phase2: null, phase3: null };
     }
 
     let initialPhase1Index = 0;
@@ -120,10 +116,9 @@ export function Preview() {
       phase1: initialPhase1Index,
       phase2: null,
       phase3: null,
-      phase4: null,
     };
 
-    // Walk down to find corresponding Phase 2/3/4 if they exist
+    // Walk down to find corresponding Phase 2/3 if they exist
     const phase1Checkpoint = phase1Checkpoints[initialPhase1Index];
     if (phase1Checkpoint) {
       const phase2Children = getChildrenOfCheckpoint(tree, phase1Checkpoint.id);
@@ -133,11 +128,7 @@ export function Preview() {
         const phase3Children = getChildrenOfCheckpoint(tree, phase2Checkpoint.id);
         if (phase3Children.length > 0) {
           indices.phase3 = 0;
-          const phase3Checkpoint = phase3Children[0];
-          const phase4Children = getChildrenOfCheckpoint(tree, phase3Checkpoint.id);
-          if (phase4Children.length > 0) {
-            indices.phase4 = 0;
-          }
+          // Phase 4 removed from pipeline
         }
       }
     }
@@ -180,11 +171,18 @@ export function Preview() {
       const statusSource = statusData || videoData;
       if (statusSource) {
         const status = statusSource.status;
+        const statusLower = status.toLowerCase();
         const processingStatuses = ['queued', 'validating', 'generating_animatic', 'generating_chunks', 'refining', 'exporting'];
-        // PAUSED states should show checkpoint UI, not processing UI
-        const isCurrentlyProcessing = processingStatuses.includes(status);
+        const pausedStatuses = ['paused_at_phase1', 'paused_at_phase2', 'paused_at_phase3'];
+
+        // PAUSED states should show checkpoint UI, not processing UI (case-insensitive)
+        const isCurrentlyProcessing = processingStatuses.includes(statusLower);
+        const isCurrentlyPaused = pausedStatuses.includes(statusLower);
+
+        console.log('[Preview] Status detection:', { status, isCurrentlyProcessing, isCurrentlyPaused, statusData: !!statusData, videoData: !!videoData });
 
         setIsProcessing(isCurrentlyProcessing);
+        setIsPaused(isCurrentlyPaused);
 
         // Only statusData has current_phase and progress fields
         if (statusData) {
@@ -196,8 +194,8 @@ export function Preview() {
             setStoryboardUrls(statusData.storyboard_urls);
           }
 
-          // Handle failed state
-          if (status === 'failed') {
+          // Handle failed state (case-insensitive)
+          if (statusLower === 'failed') {
             setFailedPhase({
               phase: statusData.current_phase || 'unknown',
               error: statusData.error || 'Unknown error'
@@ -212,7 +210,7 @@ export function Preview() {
           setCurrentPhase('');
           setProgress(0);
 
-          if (status === 'failed') {
+          if (statusLower === 'failed') {
             setFailedPhase({
               phase: 'unknown',
               error: 'Video generation failed'
@@ -361,16 +359,11 @@ export function Preview() {
         changed = true;
       }
 
-      // Auto-select Phase 4 if available and not selected
-      if (phase4Checkpoints.length > 0 && next.phase4 === null) {
-        console.log('[Preview] Auto-selecting Phase 4, found', phase4Checkpoints.length, 'checkpoints');
-        next.phase4 = 0;
-        changed = true;
-      }
+      // Phase 4 removed from pipeline
 
       return changed ? next : prev;
     });
-  }, [phase2Checkpoints, phase3Checkpoints, phase4Checkpoints]);
+  }, [phase2Checkpoints, phase3Checkpoints]);
 
   // Arrow key navigation
   useEffect(() => {
@@ -384,16 +377,12 @@ export function Preview() {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
         
-        // Determine which phase to navigate based on current selections
-        let targetPhase: 1 | 2 | 3 | 4 = 1;
+        // Determine which phase to navigate based on current selections (Phase 4 removed)
+        let targetPhase: 1 | 2 | 3 = 1;
         let targetCheckpoints: CheckpointResponse[] = [];
         let currentIndex: number | null = null;
 
-        if (checkpointIndices.phase4 !== null && phase4Checkpoints.length > 0) {
-          targetPhase = 4;
-          targetCheckpoints = phase4Checkpoints;
-          currentIndex = checkpointIndices.phase4;
-        } else if (checkpointIndices.phase3 !== null && phase3Checkpoints.length > 0) {
+        if (checkpointIndices.phase3 !== null && phase3Checkpoints.length > 0) {
           targetPhase = 3;
           targetCheckpoints = phase3Checkpoints;
           currentIndex = checkpointIndices.phase3;
@@ -420,18 +409,13 @@ export function Preview() {
             // Reset downstream phases when Phase 1 changes
             next.phase2 = null;
             next.phase3 = null;
-            next.phase4 = null;
           } else if (targetPhase === 2) {
             next.phase2 = newIndex;
             // Reset downstream phases when Phase 2 changes
             next.phase3 = null;
-            next.phase4 = null;
           } else if (targetPhase === 3) {
             next.phase3 = newIndex;
-            // Reset downstream phases when Phase 3 changes
-            next.phase4 = null;
-          } else if (targetPhase === 4) {
-            next.phase4 = newIndex;
+            // Phase 3 is now terminal (Phase 4 removed)
           }
           return next;
         });
@@ -440,10 +424,10 @@ export function Preview() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [checkpointIndices, phase1Checkpoints, phase2Checkpoints, phase3Checkpoints, phase4Checkpoints]);
+  }, [checkpointIndices, phase1Checkpoints, phase2Checkpoints, phase3Checkpoints]);
 
-  // Navigation handlers
-  const navigatePhase = (phase: 1 | 2 | 3 | 4, direction: 'prev' | 'next') => {
+  // Navigation handlers (Phase 4 removed)
+  const navigatePhase = (phase: 1 | 2 | 3, direction: 'prev' | 'next') => {
     setCheckpointIndices(prev => {
       const next = { ...prev };
       let checkpoints: CheckpointResponse[] = [];
@@ -458,9 +442,6 @@ export function Preview() {
       } else if (phase === 3) {
         checkpoints = phase3Checkpoints;
         currentIndex = prev.phase3;
-      } else if (phase === 4) {
-        checkpoints = phase4Checkpoints;
-        currentIndex = prev.phase4;
       }
 
       if (checkpoints.length <= 1 || currentIndex === null) return prev;
@@ -473,16 +454,12 @@ export function Preview() {
         next.phase1 = newIndex;
         next.phase2 = null;
         next.phase3 = null;
-        next.phase4 = null;
       } else if (phase === 2) {
         next.phase2 = newIndex;
         next.phase3 = null;
-        next.phase4 = null;
       } else if (phase === 3) {
         next.phase3 = newIndex;
-        next.phase4 = null;
-      } else if (phase === 4) {
-        next.phase4 = newIndex;
+        // Phase 3 is terminal
       }
 
       return next;
@@ -553,7 +530,7 @@ export function Preview() {
   const phase1Artifacts = extractArtifacts(selectedPhase1);
   const phase2Artifacts = extractArtifacts(selectedPhase2);
   const phase3Artifacts = extractArtifacts(selectedPhase3);
-  const phase4Artifacts = extractArtifacts(selectedPhase4);
+  // Phase 4 removed from pipeline
 
   const handleDownload = () => {
     if (videoUrl) {
@@ -856,6 +833,12 @@ export function Preview() {
           >
             Your browser does not support the video tag.
           </video>
+        ) : isPaused ? (
+          <div className="text-center text-white">
+            <Film className="w-20 h-20 mx-auto mb-4 opacity-50 animate-float" />
+            <p className="text-lg font-medium opacity-75">Generation Paused at Checkpoint</p>
+            <p className="text-sm opacity-50 mt-2">Review and approve the current phase below to continue</p>
+          </div>
         ) : (
           <div className="text-center text-white">
             <Film className="w-20 h-20 mx-auto mb-4 opacity-50 animate-float" />
@@ -875,6 +858,27 @@ export function Preview() {
             </p>
           )}
         </div>
+
+        {/* Progress indicator for paused videos */}
+        {isPaused && progress > 0 && (
+          <div className="card p-6 space-y-4 bg-primary/5 border-primary/20">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-foreground">Generation Progress</h3>
+              <span className="text-sm font-medium text-primary">{Math.round(progress)}% Complete</span>
+            </div>
+            <div className="space-y-2">
+              <div className="w-full bg-secondary rounded-full h-2">
+                <div
+                  className="bg-primary rounded-full h-2 transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Paused for review. Approve the current phase below to continue generation.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4 p-4 bg-card rounded-lg">
           <div>
@@ -1154,16 +1158,7 @@ export function Preview() {
                             );
                           })}
                         </div>
-                        {selectedPhase3.status === 'pending' && (
-                          <div className="flex gap-2 pt-2">
-                            <Button
-                              onClick={() => handleContinue(selectedPhase3.id)}
-                              disabled={isContinuing}
-                            >
-                              Continue to Phase 4
-                            </Button>
-                          </div>
-                        )}
+                        {/* Phase 3 is now terminal - no Phase 4 continuation */}
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">No video chunks available</p>
@@ -1173,86 +1168,7 @@ export function Preview() {
               </div>
             )}
 
-            {/* Phase 4: Final Video */}
-            {phase4Checkpoints.length > 0 && (
-              <div className="border border-border rounded-lg overflow-hidden">
-                <button
-                  onClick={() => togglePhase('phase4')}
-                  className="w-full px-4 py-3 bg-card hover:bg-muted/50 flex items-center justify-between transition-colors"
-                >
-                  <div className="flex items-center space-x-3">
-                    <Film className="w-5 h-5 text-primary" />
-                    <span className="font-medium text-foreground">
-                      Phase 4: Final Video (with Audio)
-                      {phase4Checkpoints.length > 1 && (
-                        <span className="ml-2 text-sm text-muted-foreground">
-                          (Checkpoint {checkpointIndices.phase4! + 1} of {phase4Checkpoints.length})
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {phase4Checkpoints.length > 1 && (
-                      <>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigatePhase(4, 'prev');
-                          }}
-                          className="p-1 hover:bg-muted rounded"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigatePhase(4, 'next');
-                          }}
-                          className="p-1 hover:bg-muted rounded"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </>
-                    )}
-                    {expandedPhases.has('phase4') ? (
-                      <ChevronUp className="w-5 h-5 text-muted-foreground" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                    )}
-                  </div>
-                </button>
-                {expandedPhases.has('phase4') && (
-                  <div className="p-4 border-t border-border bg-muted/30">
-                    {selectedPhase4 && phase4Artifacts?.finalVideoUrl ? (
-                      <div className="space-y-4">
-                        <video
-                          src={phase4Artifacts.finalVideoUrl}
-                          controls
-                          className="w-full rounded-lg border border-border"
-                          onError={(e) => {
-                            console.error('Failed to load final video:', e);
-                          }}
-                        >
-                          Your browser does not support the video tag.
-                        </video>
-                        {selectedPhase4.status === 'pending' && (
-                          <div className="flex gap-2 pt-2">
-                            <Button
-                              onClick={() => handleContinue(selectedPhase4.id)}
-                              disabled={isContinuing}
-                            >
-                              Approve & Complete
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No final video available</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Phase 4 removed from pipeline - Phase 3 is now terminal */}
           </div>
         ) : (
           <div className="space-y-4">

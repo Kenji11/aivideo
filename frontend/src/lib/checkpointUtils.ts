@@ -140,19 +140,20 @@ export function getCheckpointLineage(
 
 /**
  * Interface for checkpoint indices across phases
+ * Note: Phase 4 removed from pipeline (music generation moved to export options)
  */
 export interface CheckpointIndices {
   phase1: number;
   phase2: number | null;
   phase3: number | null;
-  phase4: number | null;
 }
 
 /**
  * Gets the selected checkpoint for a given phase based on checkpoint indices
+ * Phase 4 removed from pipeline
  */
 export function getSelectedCheckpoint(
-  phase: 1 | 2 | 3 | 4,
+  phase: 1 | 2 | 3,
   indices: CheckpointIndices,
   tree: CheckpointTreeNode[]
 ): CheckpointResponse | null {
@@ -173,13 +174,6 @@ export function getSelectedCheckpoint(
     if (!phase2Checkpoint) return null;
     const phase3Checkpoints = getChildrenOfCheckpoint(tree, phase2Checkpoint.id);
     return phase3Checkpoints[indices.phase3] || null;
-  }
-
-  if (phase === 4 && indices.phase4 !== null) {
-    const phase3Checkpoint = getSelectedCheckpoint(3, indices, tree);
-    if (!phase3Checkpoint) return null;
-    const phase4Checkpoints = getChildrenOfCheckpoint(tree, phase3Checkpoint.id);
-    return phase4Checkpoints[indices.phase4] || null;
   }
 
   return null;
