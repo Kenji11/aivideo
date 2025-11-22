@@ -163,9 +163,11 @@ def _build_active_branches(video_id: str) -> Optional[List[BranchInfo]]:
         
         branches = []
         for cp in leaf_checkpoints:
-            # Check if checkpoint can continue (is pending)
-            can_continue = cp['status'] == 'pending'
-            
+            # Check if checkpoint can continue
+            # - Phase 4 (terminal): cannot continue
+            # - Other phases: can continue (either approve pending or branch from edited approved)
+            can_continue = cp['phase_number'] < 4
+
             branches.append(BranchInfo(
                 branch_name=cp['branch_name'],
                 latest_checkpoint_id=cp['id'],
@@ -201,6 +203,7 @@ def build_status_response_from_redis_video_data(redis_data: Dict[str, Any]) -> S
     storyboard_urls = None
     reference_assets = None
     stitched_video_url = None
+    chunk_urls = None
     current_chunk_index = None
     total_chunks = None
     
@@ -235,7 +238,6 @@ def build_status_response_from_redis_video_data(redis_data: Dict[str, Any]) -> S
         
         # Phase 3: Stitched video and chunk progress
         phase3_output = phase_outputs.get('phase3_chunks')
-        chunk_urls = None
         if phase3_output:
             if isinstance(phase3_output, dict):
                 current_chunk_index = phase3_output.get('current_chunk_index')

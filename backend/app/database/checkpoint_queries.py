@@ -139,30 +139,20 @@ def approve_checkpoint(checkpoint_id: str) -> bool:
 
 def get_checkpoint_tree(video_id: str) -> List[Dict[str, Any]]:
     """
-    Get checkpoint tree structure using recursive CTE.
+    Get all checkpoints for a video.
 
     Returns:
-        List of checkpoint records with parent-child relationships
+        List of checkpoint records ordered by phase_number and created_at
     """
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Get all checkpoints for the video, ordered by phase and creation time
             cur.execute("""
-                WITH RECURSIVE checkpoint_tree AS (
-                    -- Base case: root checkpoints (no parent)
-                    SELECT *, 0 as depth
-                    FROM video_checkpoints
-                    WHERE video_id = %s AND parent_checkpoint_id IS NULL
-
-                    UNION ALL
-
-                    -- Recursive case: children
-                    SELECT c.*, t.depth + 1
-                    FROM video_checkpoints c
-                    JOIN checkpoint_tree t ON c.parent_checkpoint_id = t.id
-                )
-                SELECT * FROM checkpoint_tree
-                ORDER BY depth, created_at
+                SELECT *
+                FROM video_checkpoints
+                WHERE video_id = %s
+                ORDER BY phase_number, created_at
             """, (video_id,))
             return [dict(row) for row in cur.fetchall()]
     finally:
@@ -449,22 +439,67 @@ def build_checkpoint_tree(video_id: str) -> List[Dict[str, Any]]:
     Build a hierarchical tree structure from flat checkpoint list.
 
     Returns:
-        List of root checkpoints with nested children
+        List of root checkpoints (Phase 1) with nested children
     """
     checkpoints = get_checkpoint_tree(video_id)
+
+    if not checkpoints:
+        return []
 
     # Build lookup map
     checkpoint_map = {cp['id']: {**cp, 'children': []} for cp in checkpoints}
 
-    # Build tree structure
+    # Check if all checkpoints have null parent_checkpoint_id (legacy data)
+    all_have_null_parent = all(cp.get('parent_checkpoint_id') is None for cp in checkpoints)
+    
     roots = []
-    for cp in checkpoints:
-        if cp['parent_checkpoint_id']:
-            parent = checkpoint_map.get(cp['parent_checkpoint_id'])
-            if parent:
-                parent['children'].append(checkpoint_map[cp['id']])
-        else:
-            roots.append(checkpoint_map[cp['id']])
+    
+    if all_have_null_parent and len(checkpoints) > 1:
+        # Infer parent-child relationships from phase_number and creation order
+        # Sort by phase_number, then by created_at
+        sorted_checkpoints = sorted(
+            checkpoints,
+            key=lambda cp: (cp['phase_number'], cp['created_at'])
+        )
+        
+        # Build parent-child relationships
+        for cp in sorted_checkpoints:
+            if cp['phase_number'] == 1:
+                # Phase 1 checkpoints are roots
+                roots.append(checkpoint_map[cp['id']])
+            else:
+                # Find parent: the most recent checkpoint from the previous phase
+                # that was created before this checkpoint
+                parent_phase = cp['phase_number'] - 1
+                parent_candidates = [
+                    p for p in sorted_checkpoints
+                    if p['phase_number'] == parent_phase
+                    and p['created_at'] < cp['created_at']
+                ]
+                
+                if parent_candidates:
+                    # Use the most recent parent candidate
+                    parent = parent_candidates[-1]
+                    parent_node = checkpoint_map.get(parent['id'])
+                    if parent_node:
+                        parent_node['children'].append(checkpoint_map[cp['id']])
+                    else:
+                        # Fallback: make it a root if parent not found
+                        roots.append(checkpoint_map[cp['id']])
+                else:
+                    # No parent found, make it a root
+                    roots.append(checkpoint_map[cp['id']])
+    else:
+        # Use explicit parent_checkpoint_id relationships
+        for cp in checkpoints:
+            if cp.get('parent_checkpoint_id'):
+                parent = checkpoint_map.get(cp['parent_checkpoint_id'])
+                if parent:
+                    parent['children'].append(checkpoint_map[cp['id']])
+            else:
+                # Only Phase 1 checkpoints should be roots when using explicit relationships
+                if cp['phase_number'] == 1:
+                    roots.append(checkpoint_map[cp['id']])
 
     return roots
 

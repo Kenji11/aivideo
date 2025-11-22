@@ -224,7 +224,7 @@ async def get_checkpoint_tree_structure(
 
     # Convert to response schema
     def convert_tree_node(node: Dict) -> CheckpointTreeNode:
-        checkpoint_response = _build_checkpoint_response(node, include_artifacts=False)
+        checkpoint_response = _build_checkpoint_response(node, include_artifacts=True)
         children = [convert_tree_node(child) for child in node.get('children', [])]
         return CheckpointTreeNode(checkpoint=checkpoint_response, children=children)
 
@@ -261,12 +261,12 @@ async def continue_pipeline(
     if checkpoint['user_id'] != user_id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    # Check if already approved
-    if checkpoint['status'] == 'approved':
-        raise HTTPException(status_code=400, detail="Checkpoint already approved")
-
     # Check if checkpoint has been edited
     has_edits = has_checkpoint_been_edited(request.checkpoint_id)
+
+    # Check if already approved (only reject if approved AND no edits)
+    if checkpoint['status'] == 'approved' and not has_edits:
+        raise HTTPException(status_code=400, detail="Checkpoint already approved and has no edits")
 
     # Determine branch for next phase
     if has_edits:
@@ -278,22 +278,24 @@ async def continue_pipeline(
         next_branch = checkpoint['branch_name']
         created_new_branch = False
 
-    # Approve this checkpoint
-    approve_checkpoint(request.checkpoint_id)
-
-    # Get phase output to pass to next phase
-    phase_output = checkpoint['phase_output']
-
-    # Add branch context for next phase
-    phase_output['_branch_name'] = next_branch
-    phase_output['_parent_checkpoint_id'] = request.checkpoint_id
-    phase_output['_version'] = 1  # First version on new/same branch
+    # Approve this checkpoint (if not already approved)
+    if checkpoint['status'] != 'approved':
+        approve_checkpoint(request.checkpoint_id)
 
     # Determine next phase number
     next_phase_number = checkpoint['phase_number'] + 1
 
     if next_phase_number > 4:
         raise HTTPException(status_code=400, detail="Already at final phase")
+
+    # Update checkpoint's phase_output with branch context BEFORE dispatching
+    # This ensures dispatch_next_phase reads the correct branch info from DB
+    phase_output_updates = {
+        '_branch_name': next_branch,
+        '_parent_checkpoint_id': request.checkpoint_id,
+        '_version': 1  # First version on new/same branch
+    }
+    update_checkpoint_phase_output(request.checkpoint_id, phase_output_updates)
 
     # Update video status
     status_map = {

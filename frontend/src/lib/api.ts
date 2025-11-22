@@ -180,6 +180,55 @@ export interface VideoListResponse {
 }
 
 // Checkpoint-related types
+export interface ArtifactResponse {
+  id: string;
+  artifact_type: string;
+  artifact_key: string;
+  s3_url: string;
+  version: number;
+  metadata?: any;
+  created_at: string;
+}
+
+export interface CheckpointResponse {
+  id: string;
+  video_id: string;
+  branch_name: string;
+  phase_number: number;
+  version: number;
+  status: string;
+  approved_at?: string;
+  created_at: string;
+  cost_usd: number;
+  parent_checkpoint_id?: string;
+  artifacts: ArtifactResponse[];
+  user_id: string;
+  edit_description?: string;
+}
+
+export interface CheckpointTreeNode {
+  checkpoint: CheckpointResponse;
+  children: CheckpointTreeNode[];
+}
+
+export interface BranchInfo {
+  branch_name: string;
+  latest_checkpoint_id: string;
+  phase_number: number;
+  status: string;
+  can_continue: boolean;
+}
+
+export interface CheckpointInfo {
+  checkpoint_id: string;
+  branch_name: string;
+  phase_number: number;
+  version: number;
+  status: string;
+  created_at: string;
+  artifacts: Record<string, ArtifactResponse>;
+}
+
 export interface CheckpointListResponse {
   checkpoints: CheckpointResponse[];
   tree: CheckpointTreeNode[];
@@ -333,10 +382,10 @@ export const api = {
    * Get checkpoint tree structure
    */
   async getCheckpointTree(videoId: string): Promise<{ tree: CheckpointTreeNode[] }> {
-    const response = await apiClient.get<{ tree: CheckpointTreeNode[] }>(
-      `/api/video/${videoId}/checkpoints/tree`
+    const response = await apiClient.get<CheckpointTreeNode[]>(
+      `/api/video/${videoId}/checkpoint-tree`
     );
-    return response.data;
+    return { tree: response.data };
   },
 
   /**
