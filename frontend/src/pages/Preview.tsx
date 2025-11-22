@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Film, Download, BarChart3, ChevronDown, ChevronUp, Image as ImageIcon, Video, FileText, Sparkles, Play, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
-import { getVideoStatus, getVideo, StatusResponse, VideoResponse, getCheckpointTree, CheckpointTreeNode, CheckpointResponse, continueVideo } from '../lib/api';
+import { getVideoStatus, getVideo, getCheckpointTree, CheckpointTreeNode, CheckpointResponse, continueVideo } from '../lib/api';
 import { toast } from '@/hooks/use-toast';
 import { ChunkEditModal } from '../components/ChunkEditModal';
 import { Button } from '../components/ui/button';
