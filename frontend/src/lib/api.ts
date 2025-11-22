@@ -184,6 +184,81 @@ export interface VideoListResponse {
   total: number;
 }
 
+// Phase 6 Editing Types
+export interface ChunkVersion {
+  version_id: string;
+  url: string;
+  prompt?: string;
+  model?: string;
+  cost?: number;
+  created_at?: string;
+  is_selected: boolean;
+}
+
+export interface ChunkMetadata {
+  chunk_index: number;
+  url: string;
+  prompt: string;
+  model: string;
+  cost: number;
+  duration: number;
+  versions: ChunkVersion[];
+  current_version: string;
+}
+
+export interface ChunksListResponse {
+  video_id: string;
+  chunks: ChunkMetadata[];
+  total_chunks: number;
+  stitched_video_url?: string;
+}
+
+export interface EditingAction {
+  action_type: 'replace' | 'select_version' | 'reorder' | 'delete' | 'split' | 'undo_split';
+  chunk_indices: number[];
+  new_prompt?: string;
+  new_model?: string;
+  keep_original?: boolean;
+  version?: string;
+  new_order?: number[];
+  split_time?: number;  // Time in seconds (preferred)
+  split_frame?: number;  // Frame number (fallback)
+  split_percentage?: number;  // Percentage 0-100 (alternative)
+}
+
+export interface EditingRequest {
+  actions: EditingAction[];
+  estimate_cost_only?: boolean;
+}
+
+export interface EditingResponse {
+  video_id: string;
+  status: string;
+  message?: string;
+  updated_chunk_urls?: string[];
+  updated_stitched_url?: string;
+  total_cost?: number;
+  estimated_cost?: number;
+}
+
+export interface CostEstimate {
+  video_id: string;
+  chunk_indices: number[];
+  model: string;
+  estimated_cost: number;
+  estimated_time_seconds?: number;
+  cost_per_chunk: Record<number, number>;
+}
+
+export interface EditingStatus {
+  video_id: string;
+  status: string;
+  updated_chunk_urls?: string[];
+  updated_stitched_url?: string;
+  total_cost?: number;
+  error_message?: string;
+}
+
 // API functions
 export const api = {
   /**
@@ -339,6 +414,118 @@ export const api = {
    */
   async deleteVideo(videoId: string): Promise<void> {
     await apiClient.delete(`/api/video/${videoId}`);
+  },
+
+  // Phase 6 Editing API functions
+  /**
+   * Submit editing actions for a video
+   */
+  async submitEdits(videoId: string, request: EditingRequest): Promise<EditingResponse> {
+    const response = await apiClient.post<EditingResponse>(`/api/video/${videoId}/edit`, request);
+    return response.data;
+  },
+
+  /**
+   * Get cost estimate for editing
+   */
+  async estimateEditCost(
+    videoId: string,
+    chunkIndices: number[],
+    model: string = 'hailuo'
+  ): Promise<CostEstimate> {
+    const response = await apiClient.post<CostEstimate>(
+      `/api/video/${videoId}/edit/estimate`,
+      null,
+      {
+        params: {
+          chunk_indices: chunkIndices.join(','),
+          model,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get all chunks for a video
+   */
+  async getChunks(videoId: string): Promise<ChunksListResponse> {
+    const response = await apiClient.get<ChunksListResponse>(`/api/video/${videoId}/chunks`);
+    return response.data;
+  },
+
+  /**
+   * Get specific chunk metadata
+   */
+  async getChunk(videoId: string, chunkIndex: number): Promise<ChunkMetadata> {
+    const response = await apiClient.get<ChunkMetadata>(
+      `/api/video/${videoId}/chunks/${chunkIndex}`
+    );
+    return response.data;
+  },
+
+  /**
+   * Get all versions of a chunk
+   */
+  async getChunkVersions(videoId: string, chunkIndex: number): Promise<ChunkVersion[]> {
+    const response = await apiClient.get<ChunkVersion[]>(
+      `/api/video/${videoId}/chunks/${chunkIndex}/versions`
+    );
+    return response.data;
+  },
+
+  /**
+   * Get chunk preview URL
+   */
+  async getChunkPreview(
+    videoId: string,
+    chunkIndex: number,
+    version: string = 'current'
+  ): Promise<{ preview_url: string }> {
+    const response = await apiClient.get<{ preview_url: string }>(
+      `/api/video/${videoId}/chunks/${chunkIndex}/preview`,
+      {
+        params: { version },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Select which version to keep for a chunk
+   */
+  async selectChunkVersion(
+    videoId: string,
+    chunkIndex: number,
+    version: string
+  ): Promise<{ status: string; message: string }> {
+    const response = await apiClient.post<{ status: string; message: string }>(
+      `/api/video/${videoId}/chunks/${chunkIndex}/select-version`,
+      null,
+      {
+        params: { version },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Get split info for a chunk (check if it can be undone)
+   */
+  async getChunkSplitInfo(
+    videoId: string,
+    chunkIndex: number
+  ): Promise<{ is_split_part: boolean; original_index?: number; part_number?: number; original_url?: string; split_time?: number; part1_index?: number; part2_index?: number }> {
+    const response = await apiClient.get(`/api/video/${videoId}/chunks/${chunkIndex}/split-info`);
+    return response.data;
+  },
+
+  /**
+   * Get editing status for a video
+   */
+  async getEditingStatus(videoId: string): Promise<EditingStatus> {
+    const response = await apiClient.get<EditingStatus>(`/api/video/${videoId}/editing/status`);
+    return response.data;
   },
 
   /**

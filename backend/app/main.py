@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import generate, status, video, health, upload, assets
+from app.api import generate, status, video, health, upload, assets, editing
 from app.database import init_db
 from app.common.logging import setup_logging
 from app.services.firebase_auth import initialize_firebase
@@ -52,6 +52,7 @@ app.include_router(video.router, tags=["video"])
 # Register assets router BEFORE upload router to ensure more specific routes match first
 app.include_router(assets.router, tags=["assets"])
 app.include_router(upload.router, tags=["upload"])
+app.include_router(editing.router, tags=["editing"])
 
 # Startup event
 @app.on_event("startup")
