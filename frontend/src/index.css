@@ -230,16 +230,26 @@
   }
 
   .card {
-    @apply text-card-foreground rounded-2xl shadow-lg border transition-all duration-200 hover:shadow-xl;
+    @apply text-card-foreground rounded-2xl shadow-lg border;
     /* Claymorphism effect */
     background: linear-gradient(135deg, var(--card) 0%, var(--card) 100%);
     background-color: var(--card);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
     border-color: var(--border);
     opacity: 0.95;
     box-shadow: 
       0 8px 32px 0 rgba(0, 0, 0, 0.1),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+    /* Performance optimizations */
+    will-change: transform, opacity;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    contain: layout style paint;
+    transition: box-shadow 0.2s ease-out, transform 0.2s ease-out;
+  }
+  
+  .card:hover {
+    box-shadow: 
+      0 12px 40px 0 rgba(0, 0, 0, 0.15),
       inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
   }
   
@@ -273,11 +283,9 @@
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -311,7 +319,10 @@
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.5s ease-out forwards;
+  animation: fadeIn 0.3s ease-out forwards;
+  will-change: opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .animate-slide-in {
