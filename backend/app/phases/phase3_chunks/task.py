@@ -1,5 +1,8 @@
 # Phase 3: Chunk Generation Task
 import time
+import os
+import tempfile
+import logging
 from datetime import datetime
 from app.orchestrator.celery_app import celery_app
 from app.common.schemas import PhaseOutput
@@ -16,6 +19,10 @@ from app.phases.phase3_chunks.chunk_generator import (
     build_chunk_specs_with_storyboard
 )
 from langchain_core.runnables import RunnableParallel
+from app.services.thumbnail import thumbnail_service
+from app.services.s3 import s3_client
+
+logger = logging.getLogger(__name__)
 
 
 def generate_chunk_reference_image(chunk_spec: ChunkSpec, beat_to_chunk_map: dict) -> dict:
@@ -369,6 +376,70 @@ def generate_chunks(
         total_cost = chunk_results['total_cost']
         
         # Progress already updated to 70% in generate_chunks_parallel()
+        
+        # Generate thumbnail from first chunk (non-blocking - don't fail Phase 3 if this fails)
+        if chunk_urls and len(chunk_urls) > 0:
+            try:
+                first_chunk_url = chunk_urls[0]
+                logger.info(f"Generating thumbnail from first chunk: {first_chunk_url}")
+                
+                # Download first chunk from S3
+                first_chunk_path = None
+                try:
+                    # Extract S3 key from URL or download directly
+                    if first_chunk_url.startswith('s3://'):
+                        s3_key = first_chunk_url.replace(f's3://{s3_client.bucket}/', '')
+                        # Download from S3
+                        first_chunk_path = s3_client.download_temp(s3_key)
+                    else:
+                        # For presigned URLs, download directly
+                        import requests
+                        first_chunk_path = tempfile.mktemp(suffix='.mp4')
+                        response = requests.get(first_chunk_url, stream=True, timeout=60)
+                        response.raise_for_status()
+                        with open(first_chunk_path, 'wb') as f:
+                            for chunk in response.iter_content(chunk_size=8192):
+                                f.write(chunk)
+                    
+                    if first_chunk_path and os.path.exists(first_chunk_path):
+                        # Generate thumbnail
+                        thumbnail_url = thumbnail_service.generate_video_thumbnail(
+                            video_path=first_chunk_path,
+                            user_id=user_id,
+                            video_id=video_id
+                        )
+                        
+                        # Update database with thumbnail_url
+                        db = SessionLocal()
+                        try:
+                            video = db.query(VideoGeneration).filter(VideoGeneration.id == video_id).first()
+                            if video:
+                                video.thumbnail_url = thumbnail_url
+                                flag_modified(video, 'thumbnail_url')
+                                db.commit()
+                                logger.info(f"Updated video {video_id} with thumbnail_url: {thumbnail_url}")
+                        except Exception as db_error:
+                            logger.warning(f"Failed to update database with thumbnail_url: {str(db_error)}")
+                            db.rollback()
+                        finally:
+                            db.close()
+                        
+                        # Cleanup downloaded chunk
+                        if os.path.exists(first_chunk_path):
+                            try:
+                                os.remove(first_chunk_path)
+                            except Exception:
+                                pass
+                    else:
+                        logger.warning(f"First chunk file not found at {first_chunk_path}")
+                        
+                except Exception as download_error:
+                    logger.warning(f"Failed to download first chunk for thumbnail: {str(download_error)}")
+                    
+            except Exception as thumbnail_error:
+                # Don't fail Phase 3 if thumbnail generation fails
+                logger.warning(f"Thumbnail generation failed (non-blocking): {str(thumbnail_error)}", exc_info=True)
+        
         # Now proceed to stitching
         
         # Stitch chunks together with transitions

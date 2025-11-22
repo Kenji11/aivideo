@@ -58,13 +58,20 @@ Each video generation flows through 6 sequential phases:
 - Key Change: LLM composes custom sequences, not just template selection
 
 **Phase 2: Storyboard Generation (TDD v2.0)** ✅ ACTIVE
-- Input: Spec with beats from Phase 1
-- Process: Generate 1 SDXL image per beat (1:1 mapping)
+- Input: Spec with beats from Phase 1 + reference_mapping (from Phase 1)
+- Process: Generate 1 image per beat (1:1 mapping) with dual-path generation
+  - **ControlNet Path** (when product reference exists):
+    - Download product image from S3
+    - Preprocess with Canny edge detection (OpenCV)
+    - Generate with flux-dev-controlnet ($0.058/image)
+  - **Regular Path** (no product reference):
+    - Generate with regular flux-dev ($0.025/image)
 - Output: N storyboard images (N = number of beats)
-- Cost: $0.0055 per image | Time: ~8s per image
-- Key Change: REPLACES Phase 3 reference generation
+- Cost: $0.025 (regular) or $0.058 (ControlNet) per image | Time: ~8s per image
+- Key Change: REPLACES Phase 3 reference generation, adds ControlNet for product consistency
 - Images used at beat boundaries in Phase 4
 - Example: 3 beats = 3 images, 6 beats = 6 images
+- Reference Mapping: Uses beat_ids as keys to look up product references per beat
 
 **Phase 3: Reference Assets** ❌ DISABLED (TDD v2.0)
 - Status: Explicitly disabled, kept in codebase for backward compatibility
@@ -183,7 +190,7 @@ Each video generation flows through 6 sequential phases:
 - Chunks 1+: Use last frame continuation
 - Replaced by beat boundary system (more dynamic)
 
-### 4. Processing Pattern Evolution
+### 5. Processing Pattern Evolution
 
 **Current: Two-Phase Parallel Generation (PR #9)** ✅ ACTIVE
 - **Phase 1**: All reference image chunks generated in parallel
@@ -213,7 +220,7 @@ Each video generation flows through 6 sequential phases:
 - Caused visual resets and inconsistency
 - Replaced by sequential approach (now replaced by two-phase parallel)
 
-### 5. Model Reality Pattern (PR #7)
+### 6. Model Reality Pattern (PR #7)
 
 **Actual vs Requested Duration**
 - **Critical Discovery**: Models output different durations regardless of parameters
@@ -241,7 +248,7 @@ chunk_count = math.ceil(video_duration / actual_chunk_duration)
 - Affects cost estimation
 - Affects generation time estimation
 
-### 6. Progressive Enhancement Pattern
+### 7. Progressive Enhancement Pattern
 
 **Low-to-High Fidelity**
 - Development: Use wan ($0.09/s, fast, 480p)
@@ -261,6 +268,8 @@ chunk_count = math.ceil(video_duration / actual_chunk_duration)
 - **Fallback**: Client automatically falls back to polling if SSE unavailable
 
 ### 2. Asset Storage Pattern
+
+**Video Assets (Legacy):**
 ```
 /videos/:video_id/
   ├── animatic/
@@ -273,7 +282,54 @@ chunk_count = math.ceil(video_duration / actual_chunk_duration)
   └── final.mp4
 ```
 
-### 3. Cleanup Pattern
+**Reference Assets (PR #1):**
+```
+{user_id}/assets/
+  ├── nike_sneaker.png              # Original image (user's filename preserved)
+  ├── nike_sneaker_thumbnail.jpg     # Auto-generated thumbnail (400x400)
+  └── nike_sneaker_edges.png        # Preprocessed edges (optional, future)
+```
+- Flat structure: `{user_id}/assets/{filename}` (no asset_id in path)
+- S3 key remains unchanged when user edits asset name (only DB `name` field updates)
+- Helper functions: `get_asset_s3_key()`, `get_asset_thumbnail_s3_key()`
+
+### 3. Semantic Search Pattern (PR #3) ✅ NEW
+
+**CLIP Embedding System:**
+- **Text Embeddings**: CLIP text encoder converts queries to 512-dim vectors
+- **Image Embeddings**: CLIP vision encoder converts images to 512-dim vectors
+- **Storage**: pgvector `vector(512)` column in `assets` table
+- **Similarity Metric**: Cosine distance (`<=>` operator in PostgreSQL)
+
+**Search Types:**
+1. **Text-to-Image Search** (`search_assets_by_text`)
+   - Query: "blue energy drink can"
+   - Process: Generate text embedding → compare to image embeddings
+   - Threshold: 0.25 (25%) minimum similarity
+   - Use case: Finding assets by description
+   - Performance: Lower scores (0.2-0.5 typical) due to text-to-image gap
+
+2. **Image-to-Image Similarity** (`find_similar_assets`)
+   - Query: Reference asset ID
+   - Process: Get reference embedding → compare to other image embeddings
+   - Threshold: 0.7 (70%) minimum similarity
+   - Use case: Finding visually similar assets
+   - Performance: Higher scores (0.7-0.95 typical) - CLIP excels at image comparison
+
+3. **Style Consistency** (`recommend_style_consistent_assets`)
+   - Query: List of selected asset IDs
+   - Process: Calculate centroid embedding → find assets near centroid
+   - Use case: Recommending assets that match selected style
+   - Performance: Similar to image-to-image (high scores)
+
+**Key Implementation Details:**
+- Raw SQL queries for pgvector operations (SQLAlchemy doesn't support vector type directly)
+- Similarity score calculation: `1 - (embedding <=> query_embedding)` (cosine similarity)
+- Results ordered by cosine distance (ascending = most similar first)
+- Filters: `user_id`, `source = 'USER_UPLOAD'`, `embedding IS NOT NULL`
+- Enum compatibility: Use `AssetSource.USER_UPLOAD.name` for database enum labels
+
+### 4. Cleanup Pattern
 - Keep animatic and chunks during generation
 - Delete after final video is complete
 - Reduces storage costs
@@ -281,17 +337,25 @@ chunk_count = math.ceil(video_duration / actual_chunk_duration)
 
 ## Error Handling Patterns
 
-### 1. Retry with Exponential Backoff
+### 1. Enum Compatibility Pattern (PR #3) ✅ NEW
+- **Problem**: PostgreSQL enum labels (uppercase) don't match Python enum values (lowercase)
+- **Solution**: Use `.name` property for database operations
+  - `AssetSource.USER_UPLOAD.name` → `"USER_UPLOAD"` (database enum label)
+  - `AssetSource.USER_UPLOAD.value` → `"user_upload"` (Python enum value)
+- **Application**: Raw SQL queries, SQLAlchemy ORM filters, asset creation
+- **Note**: Model column is `String(20)` but database still uses enum type (migration deferred)
+
+### 2. Retry with Exponential Backoff
 - Replicate API calls can fail due to rate limits
 - Retry up to 3 times with increasing delays
 - If still fails, mark video as failed with clear error
 
-### 2. Partial Recovery
+### 3. Partial Recovery
 - If single chunk fails, regenerate only that chunk
 - Don't restart entire pipeline
 - Saves time and cost
 
-### 3. Graceful Degradation
+### 4. Graceful Degradation
 - If music generation fails, continue without audio
 - Better to deliver video without music than fail completely
 

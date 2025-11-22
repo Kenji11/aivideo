@@ -1,18 +1,27 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Form, Query, BackgroundTasks
+import logging
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from typing import List
+from sqlalchemy import text
+from typing import List, Optional
 import uuid
 import tempfile
 import os
 from pathlib import Path
 import mimetypes
+from PIL import Image
 
-from app.database import get_db
-from app.common.models import Asset, AssetType, AssetSource
+from app.database import get_db, SessionLocal
+from app.common.models import Asset, AssetType, AssetSource, ReferenceAssetType
 from app.common.auth import get_current_user
 from app.common.schemas import UploadedAsset, UploadResponse
 from app.services.s3 import s3_client
+from app.common.constants import get_asset_s3_key
+from app.services.asset_analysis import asset_analysis_service
+from app.services.clip_embeddings import clip_service
+from app.services.background_removal import background_removal_service
 
 router = APIRouter()
 
@@ -35,8 +44,9 @@ ALLOWED_DOCUMENT_TYPES = {
 
 ALL_ALLOWED_TYPES = ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES | ALLOWED_AUDIO_TYPES | ALLOWED_DOCUMENT_TYPES
 
-# Max file size: 100MB
+# Max file size: 100MB (general), 10MB for images (reference assets)
 MAX_FILE_SIZE = 100 * 1024 * 1024
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB for reference asset images
 
 
 def determine_asset_type(mime_type: str) -> AssetType:
@@ -52,14 +62,178 @@ def determine_asset_type(mime_type: str) -> AssetType:
         return AssetType.IMAGE
 
 
+def analyze_asset_background(
+    asset_id: str,
+    s3_url: str,
+    image_path: str,
+    user_provided_name: Optional[str],
+    user_provided_description: Optional[str]
+):
+    """
+    Background task to analyze asset with GPT-4o and generate CLIP embedding.
+    
+    This runs after the upload endpoint returns success to the user.
+    """
+    db = SessionLocal()
+    try:
+        # Get asset record
+        asset = db.query(Asset).filter(Asset.id == asset_id).first()
+        if not asset:
+            logger.error(f"Asset {asset_id} not found for analysis")
+            return
+        
+        # Generate presigned URL for GPT-4o (valid for 1 hour)
+        from app.services.s3 import s3_client
+        presigned_url = s3_client.generate_presigned_url(asset.s3_key, expiration=3600)
+        
+        # Step 1: GPT-4o Analysis
+        try:
+            logger.info(f"Starting GPT-4o analysis for asset {asset_id}")
+            analysis_result = asset_analysis_service.analyze_reference_asset(
+                image_url=presigned_url,
+                user_provided_name=user_provided_name,
+                user_provided_description=user_provided_description
+            )
+            
+            # Log the full analysis result for debugging
+            logger.info(f"GPT-4o analysis result for asset {asset_id}: {analysis_result}")
+            logger.info(f"asset_type from analysis: {analysis_result.get('asset_type')} (type: {type(analysis_result.get('asset_type'))})")
+            
+            # Extract fields from analysis
+            asset.analysis = analysis_result
+            asset.primary_object = analysis_result.get("primary_object")
+            asset.colors = analysis_result.get("colors", [])
+            asset.dominant_colors_rgb = analysis_result.get("dominant_colors_rgb", [])
+            asset.style_tags = analysis_result.get("style_tags", [])
+            asset.recommended_shot_types = analysis_result.get("recommended_shot_types", [])
+            asset.usage_contexts = analysis_result.get("usage_contexts", [])
+            asset.is_logo = analysis_result.get("is_logo", False)
+            asset.logo_position_preference = analysis_result.get("logo_position_preference")
+            
+            # Update reference_asset_type if not already set
+            if not asset.reference_asset_type and analysis_result.get("asset_type"):
+                asset_type_str = analysis_result["asset_type"].lower().strip()
+                # Validate it's a valid enum value
+                valid_values = {e.value for e in ReferenceAssetType}
+                if asset_type_str in valid_values:
+                    asset.reference_asset_type = asset_type_str
+                else:
+                    logger.warning(f"Invalid asset_type from GPT-4o: '{analysis_result.get('asset_type')}' (normalized: '{asset_type_str}')")
+            
+            logger.info(f"✓ GPT-4o analysis complete for asset {asset_id}")
+            
+            # Step 2: Background Removal (if product image)
+            asset_type_str = analysis_result.get("asset_type", "").lower().strip() if analysis_result.get("asset_type") else ""
+            if asset_type_str == "product" or asset.reference_asset_type == "product":
+                try:
+                    logger.info(f"Detected product image. Starting background removal for asset {asset_id}")
+                    # Generate fresh presigned URL for background removal
+                    bg_removal_url = s3_client.generate_presigned_url(asset.s3_key, expiration=3600)
+                    
+                    # Remove background (overwrites original image in S3)
+                    background_removal_service.remove_background(
+                        image_url=bg_removal_url,
+                        s3_key=asset.s3_key
+                    )
+                    
+                    # Update has_transparency flag (background-removed images have transparency)
+                    asset.has_transparency = True
+                    
+                    # Regenerate thumbnail with new image (background removed)
+                    try:
+                        # Download the processed image to regenerate thumbnail
+                        temp_image_path = s3_client.download_file(asset.s3_key)
+                        with Image.open(temp_image_path) as img:
+                            # Regenerate and upload thumbnail
+                            new_thumbnail_url = s3_client.upload_thumbnail(img, asset.user_id, asset.file_name)
+                            asset.thumbnail_url = new_thumbnail_url
+                        # Clean up temp file
+                        if os.path.exists(temp_image_path):
+                            os.unlink(temp_image_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to regenerate thumbnail after background removal: {str(e)}")
+                        # Continue without thumbnail update
+                    
+                    logger.info(f"✓ Background removal complete for asset {asset_id}")
+                except Exception as e:
+                    logger.error(f"Background removal failed for asset {asset_id}: {str(e)}", exc_info=True)
+                    # Continue without background removal - original image remains
+                    # Don't fail the entire upload process
+            
+            # Step 3: CLIP Embedding (only if GPT-4o succeeded)
+            try:
+                # Load image from file path (use processed image if background was removed)
+                # If background was removed, download the processed image from S3
+                clip_image_path = image_path
+                if asset.has_transparency and asset.reference_asset_type == "product":
+                    # Download the processed image for CLIP embedding
+                    clip_image_path = s3_client.download_file(asset.s3_key)
+                
+                with Image.open(clip_image_path) as img:
+                    # Convert to RGB if needed (CLIP expects RGB)
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    logger.info(f"Generating CLIP embedding for asset {asset_id}")
+                    embedding = clip_service.generate_image_embedding(img)
+                    
+                    # Store embedding (pgvector format)
+                    # Use raw SQL to set embedding since it's a pgvector type
+                    # Format: '[0.1, 0.2, ...]' as string for pgvector
+                    embedding_str = '[' + ','.join(str(f) for f in embedding) + ']'
+                    db.execute(
+                        text("UPDATE assets SET embedding = CAST(:embedding AS vector) WHERE id = :asset_id"),
+                        {"embedding": embedding_str, "asset_id": asset_id}
+                    )
+                    
+                    logger.info(f"✓ CLIP embedding generated for asset {asset_id}")
+                
+                # Clean up temp file if we downloaded processed image for CLIP
+                if clip_image_path != image_path and os.path.exists(clip_image_path):
+                    try:
+                        os.unlink(clip_image_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to delete temp CLIP image file: {str(e)}")
+            except Exception as e:
+                logger.error(f"Failed to generate CLIP embedding for asset {asset_id}: {str(e)}", exc_info=True)
+                # Continue without embedding - asset still has GPT-4o analysis
+            
+            db.commit()
+            logger.info(f"✓ Asset {asset_id} analysis complete and saved")
+            
+        except Exception as e:
+            logger.error(f"GPT-4o analysis failed for asset {asset_id}: {str(e)}", exc_info=True)
+            # Asset remains in database with basic metadata (no analysis)
+            db.rollback()
+        
+    finally:
+        db.close()
+        # Clean up temporary image file
+        if os.path.exists(image_path):
+            try:
+                os.unlink(image_path)
+            except Exception as e:
+                logger.warning(f"Failed to delete temp file {image_path}: {str(e)}")
+
+
 @router.post("/api/upload")
 async def upload_assets(
     files: List[UploadFile] = File(...),
     user_id: str = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    # Optional form fields for reference assets
+    name: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    reference_asset_type: Optional[str] = Form(None)
 ):
     """
     Upload one or more assets (images, videos, PDFs) to S3 and create database records.
+    
+    For reference assets (images), accepts optional metadata:
+    - name: User-defined name (defaults to filename)
+    - description: Optional description
+    - reference_asset_type: product, logo, person, environment, texture, prop
     
     Returns list of asset IDs that can be used as reference_assets in video generation.
     """
@@ -75,16 +249,21 @@ async def upload_assets(
             file_content = await file.read()
             file_size = len(file_content)
             
-            if file_size > MAX_FILE_SIZE:
-                errors.append(f"{file.filename}: File too large (max {MAX_FILE_SIZE / (1024*1024)}MB)")
+            # Validate MIME type
+            mime_type = file.content_type or mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
+            
+            # Check if it's an image (reference asset)
+            is_image = mime_type in ALLOWED_IMAGE_TYPES
+            
+            # Apply size limit based on file type
+            max_size = MAX_IMAGE_SIZE if is_image else MAX_FILE_SIZE
+            if file_size > max_size:
+                errors.append(f"{file.filename}: File too large (max {max_size / (1024*1024)}MB)")
                 continue
             
             if file_size == 0:
                 errors.append(f"{file.filename}: File is empty")
                 continue
-            
-            # Validate MIME type
-            mime_type = file.content_type or mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
             
             if mime_type not in ALL_ALLOWED_TYPES:
                 errors.append(f"{file.filename}: File type not allowed. Allowed: images, videos, PDFs")
@@ -96,11 +275,14 @@ async def upload_assets(
             # Generate unique asset ID
             asset_id = str(uuid.uuid4())
             
-            # Create S3 key: assets/{user_id}/{asset_id}/{filename}
+            # Get filename and sanitize
             filename = file.filename or f"file_{asset_id}"
-            # Sanitize filename
             safe_filename = "".join(c for c in filename if c.isalnum() or c in "._- ").strip()
-            s3_key = f"assets/{user_id}/{asset_id}/{safe_filename}"
+            if not safe_filename:
+                safe_filename = f"file_{asset_id}"
+            
+            # Create S3 key: {user_id}/assets/{filename} (new flat structure)
+            s3_key = get_asset_s3_key(user_id, safe_filename)
             
             # Save to temporary file
             with tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix) as temp_file:
@@ -108,11 +290,47 @@ async def upload_assets(
                 temp_path = temp_file.name
             
             try:
-                # Upload to S3
+                # Extract image properties if it's an image
+                width = None
+                height = None
+                has_transparency = False
+                thumbnail_url = None
+                
+                # Keep image in memory for CLIP embedding (if it's an image)
+                image_for_analysis = None
+                if is_image:
+                    try:
+                        with Image.open(temp_path) as img:
+                            width, height = img.size
+                            # Check for transparency (alpha channel)
+                            has_transparency = img.mode in ('RGBA', 'LA') or 'transparency' in img.info
+                            
+                            # Generate and upload thumbnail
+                            thumbnail_url = s3_client.upload_thumbnail(img, user_id, safe_filename)
+                            
+                            # Keep image copy for background analysis (save to new temp file)
+                            # We'll pass the temp_path to background task, but need to ensure it's not deleted
+                            image_for_analysis = temp_path
+                    except Exception as e:
+                        logger.warning(f"Failed to process image properties for {filename}: {str(e)}")
+                
+                # Upload original to S3
                 s3_url = s3_client.upload_file(temp_path, s3_key)
                 
                 # Generate presigned URL for access
                 presigned_url = s3_client.generate_presigned_url(s3_key, expiration=3600 * 24 * 7)  # 7 days
+                
+                # Parse reference_asset_type if provided
+                parsed_reference_type = None
+                if reference_asset_type:
+                    try:
+                        parsed_reference_type = ReferenceAssetType(reference_asset_type.lower())
+                    except ValueError:
+                        # Invalid type, will be None
+                        pass
+                
+                # Set name (default to filename if not provided)
+                asset_name = name or safe_filename
                 
                 # Create asset metadata
                 asset_metadata = {
@@ -127,27 +345,59 @@ async def upload_assets(
                     s3_key=s3_key,
                     s3_url=presigned_url,
                     asset_type=asset_type,
-                    source=AssetSource.USER_UPLOAD,
-                    file_name=filename,
+                    source=AssetSource.USER_UPLOAD.name,  # Use .name to get "USER_UPLOAD" for database enum
+                    file_name=safe_filename,
                     file_size_bytes=file_size,
                     mime_type=mime_type,
-                    asset_metadata=asset_metadata
+                    asset_metadata=asset_metadata,
+                    # Reference asset fields
+                    name=asset_name,
+                    description=description,
+                    reference_asset_type=parsed_reference_type,
+                    thumbnail_url=thumbnail_url,
+                    width=width,
+                    height=height,
+                    has_transparency=has_transparency
                 )
                 
                 db.add(asset_record)
                 db.commit()
                 db.refresh(asset_record)
                 
+                # Trigger background analysis for images (reference assets)
+                if is_image and image_for_analysis:
+                    # Create a copy of the temp file for background task (since we'll delete original)
+                    import shutil
+                    analysis_temp_path = temp_path + "_analysis"
+                    shutil.copy2(temp_path, analysis_temp_path)
+                    
+                    # Add background task for analysis
+                    background_tasks.add_task(
+                        analyze_asset_background,
+                        asset_id=asset_id,
+                        s3_url=s3_url,
+                        image_path=analysis_temp_path,
+                        user_provided_name=asset_name,
+                        user_provided_description=description
+                    )
+                    logger.info(f"Queued background analysis for asset {asset_id}")
+                
                 uploaded_assets.append({
                     "asset_id": asset_id,
-                    "filename": filename,
+                    "filename": safe_filename,
+                    "name": asset_name,
                     "asset_type": asset_type.value,
+                    "reference_asset_type": parsed_reference_type.value if parsed_reference_type else None,
                     "file_size_bytes": file_size,
-                    "s3_url": presigned_url
+                    "s3_url": presigned_url,
+                    "thumbnail_url": thumbnail_url,
+                    "width": width,
+                    "height": height,
+                    "analysis_status": "pending" if is_image else None
                 })
                 
             finally:
-                # Clean up temporary file
+                # Clean up temporary file (background task has its own copy)
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
                     
@@ -170,37 +420,147 @@ async def upload_assets(
     return JSONResponse(content=response_data)
 
 
-@router.get("/api/assets")
-async def get_assets(
+@router.get("/api/assets/{asset_id}")
+async def get_asset(
+    asset_id: str,
     user_id: str = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Get all assets for the authenticated user.
+    Get a single asset by ID.
     
-    Returns list of assets with metadata including presigned URLs for access.
+    Returns full asset details including all reference asset fields.
     """
-    # Query assets for the authenticated user only
-    assets = db.query(Asset).filter(Asset.user_id == user_id).order_by(Asset.created_at.desc()).all()
+    asset = db.query(Asset).filter(
+        Asset.id == asset_id,
+        Asset.user_id == user_id
+    ).first()
     
-    # Convert to response format
-    asset_list = []
-    for asset in assets:
-        # Generate fresh presigned URL (7 days expiration)
-        presigned_url = s3_client.generate_presigned_url(asset.s3_key, expiration=3600 * 24 * 7)
-        
-        asset_list.append({
-            "asset_id": asset.id,
-            "filename": asset.file_name or "unknown",
-            "asset_type": asset.asset_type.value,
-            "file_size_bytes": asset.file_size_bytes or 0,
-            "s3_url": presigned_url,
-            "created_at": asset.created_at.isoformat() if asset.created_at else None,
-        })
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    # Generate fresh presigned URL
+    presigned_url = s3_client.generate_presigned_url(asset.s3_key, expiration=3600 * 24 * 7)
     
     return {
-        "assets": asset_list,
-        "total": len(asset_list),
-        "user_id": user_id
+        "asset_id": asset.id,
+        "filename": asset.file_name or "unknown",
+        "name": asset.name or asset.file_name or "unknown",
+        "description": asset.description,
+        "asset_type": asset.asset_type.value,
+        "reference_asset_type": asset.reference_asset_type,
+        "file_size_bytes": asset.file_size_bytes or 0,
+        "mime_type": asset.mime_type,
+        "s3_url": presigned_url,
+        "thumbnail_url": asset.thumbnail_url,
+        "width": asset.width,
+        "height": asset.height,
+        "has_transparency": asset.has_transparency,
+        "is_logo": asset.is_logo,
+        "logo_position_preference": asset.logo_position_preference,
+        "primary_object": asset.primary_object,
+        "colors": asset.colors,
+        "dominant_colors_rgb": asset.dominant_colors_rgb,
+        "style_tags": asset.style_tags,
+        "recommended_shot_types": asset.recommended_shot_types,
+        "usage_contexts": asset.usage_contexts,
+        "usage_count": asset.usage_count or 0,
+        "created_at": asset.created_at.isoformat() if asset.created_at else None,
+        "updated_at": asset.updated_at.isoformat() if asset.updated_at else None,
+    }
+
+
+@router.patch("/api/assets/{asset_id}")
+async def update_asset(
+    asset_id: str,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    name: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    reference_asset_type: Optional[str] = Form(None),
+    logo_position_preference: Optional[str] = Form(None)
+):
+    """
+    Update asset metadata.
+    
+    Accepts partial updates: name, description, reference_asset_type, logo_position_preference.
+    S3 key remains unchanged - only DB fields update.
+    """
+    asset = db.query(Asset).filter(
+        Asset.id == asset_id,
+        Asset.user_id == user_id
+    ).first()
+    
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    # Update fields if provided
+    if name is not None:
+        asset.name = name
+    if description is not None:
+        asset.description = description
+    if reference_asset_type is not None:
+        try:
+            asset.reference_asset_type = ReferenceAssetType(reference_asset_type.lower())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid reference_asset_type: {reference_asset_type}")
+    if logo_position_preference is not None:
+        if asset.is_logo:
+            asset.logo_position_preference = logo_position_preference
+        else:
+            raise HTTPException(status_code=400, detail="logo_position_preference can only be set for logos")
+    
+    db.commit()
+    db.refresh(asset)
+    
+    # Generate fresh presigned URL
+    presigned_url = s3_client.generate_presigned_url(asset.s3_key, expiration=3600 * 24 * 7)
+    
+    return {
+        "asset_id": asset.id,
+        "filename": asset.file_name or "unknown",
+        "name": asset.name or asset.file_name or "unknown",
+        "description": asset.description,
+        "reference_asset_type": asset.reference_asset_type,
+        "logo_position_preference": asset.logo_position_preference,
+        "s3_url": presigned_url,
+        "updated_at": asset.updated_at.isoformat() if asset.updated_at else None,
+    }
+
+
+@router.delete("/api/assets/{asset_id}")
+async def delete_asset(
+    asset_id: str,
+    user_id: str = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete an asset.
+    
+    Removes the asset from S3 (including thumbnail and related files) and from the database.
+    """
+    asset = db.query(Asset).filter(
+        Asset.id == asset_id,
+        Asset.user_id == user_id
+    ).first()
+    
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    
+    # Get original filename for S3 deletion
+    filename = asset.file_name
+    if not filename:
+        raise HTTPException(status_code=400, detail="Asset filename not found")
+    
+    # Delete from S3 (all related files: original, thumbnail, preprocessed)
+    s3_client.delete_asset_files(user_id, filename)
+    
+    # Delete from database
+    db.delete(asset)
+    db.commit()
+    
+    return {
+        "message": "Asset deleted successfully",
+        "asset_id": asset_id
     }
 

@@ -38,6 +38,18 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
     
+    # CLIP Model Configuration
+    clip_model: str = Field(
+        default="ViT-B/32",
+        env="CLIP_MODEL",
+        description="CLIP model name (default: ViT-B/32, produces 512-dim embeddings)"
+    )
+    clip_model_cache: str = Field(
+        default="/mnt/models",
+        env="CLIP_MODEL_CACHE",
+        description="Directory path for CLIP model cache (Docker volume mount point)"
+    )
+    
     # Firebase credentials
     # Option 1: JSON file path (with private_key from env var)
     firebase_credentials_path: str = Field(

@@ -41,8 +41,10 @@ def get_planning_temperature(creativity: float) -> float:
 COST_GPT4_TURBO = 0.01
 COST_SDXL_IMAGE = 0.0055  # Legacy, not used anymore
 COST_FLUX_SCHNELL_IMAGE = 0.003  # Phase 2: Animatic frames (cheapest)
-COST_FLUX_DEV_IMAGE = 0.025  # Phase 3: Reference assets (better quality)
+COST_FLUX_DEV_IMAGE = 0.025  # Phase 2: Storyboard images (better quality)
+COST_FLUX_DEV_CONTROLNET_IMAGE = 0.058  # Phase 2: Storyboard images with ControlNet (product consistency)
 COST_FLUX_PRO_IMAGE = 0.04  # Phase 3: Reference assets (best quality, for final)
+COST_RECRAFT_REMOVE_BG = 0.01  # Background removal for product images ($0.01 per image)
 # Phase 4: Video generation model costs (per chunk generation, typically 5 seconds)
 # NOTE: Costs are per chunk, not per second. Multiply by chunk count for total video cost.
 # Verified pricing marked with [VERIFIED], others are estimates based on model tiers
@@ -56,8 +58,8 @@ COST_ZEROSCOPE = 0.10  # Zeroscope v2 XL - Estimated
 COST_WAN_25_T2V = 0.10  # Wan 2.5 T2V - Estimated (similar to Wan 2.1)
 COST_STABLE_AUDIO = 0.10  # stackadoc/stable-audio-open-1.0 per 30s (avg $0.06-$0.15)
 COST_BARK_MUSIC = 0.10  # Legacy: suno-ai/bark per 30s
-COST_VEO_FAST = 0.12  # Google Veo 3.1 Fast - Estimated (premium model, fast tier)
-COST_VEO = 0.15  # Google Veo 3.1 - Estimated (premium model, standard tier)
+COST_VEO_FAST = 0.75  # Google Veo 3.1 Fast - $0.15 per second * 5s chunk = $0.75 per chunk
+COST_VEO = 2.00  # Google Veo 3.1 - $0.4 per second * 5s chunk = $2.00 per chunk
 COST_MUSICGEN = 0.15  # meta/musicgen per 30s
 COST_HAILUO_23_FAST = 0.19  # Hailuo 2.3 Fast [VERIFIED] - $0.19 per 6s chunk at 768p, ~$0.19 per 5s at 720p
 COST_ANIMATEDIFF = 0.20  # AnimateDiff - Estimated
@@ -130,6 +132,51 @@ def get_video_s3_key(user_id: str, video_id: str, filename: str) -> str:
     """
     prefix = get_video_s3_prefix(user_id, video_id)
     return f"{prefix}/{filename}"
+
+
+def get_asset_s3_key(user_id: str, filename: str) -> str:
+    """
+    Generate the S3 key for a reference asset file.
+    
+    New standard structure: {user_id}/assets/{filename}
+    Original filename is preserved (sanitized for safety).
+    
+    Args:
+        user_id: User ID
+        filename: Original filename from user upload (e.g., "nike_sneaker.png")
+        
+    Returns:
+        S3 key (e.g., "user123/assets/nike_sneaker.png")
+        
+    Example:
+        >>> get_asset_s3_key("user-123", "nike_sneaker.png")
+        "user-123/assets/nike_sneaker.png"
+    """
+    return f"{user_id}/assets/{filename}"
+
+
+def get_asset_thumbnail_s3_key(user_id: str, filename: str) -> str:
+    """
+    Generate the S3 key for a reference asset thumbnail.
+    
+    Structure: {user_id}/assets/{base_name}_thumbnail.jpg
+    Replaces file extension with _thumbnail.jpg
+    
+    Args:
+        user_id: User ID
+        filename: Original filename (e.g., "nike_sneaker.png")
+        
+    Returns:
+        S3 key (e.g., "user123/assets/nike_sneaker_thumbnail.jpg")
+        
+    Example:
+        >>> get_asset_thumbnail_s3_key("user-123", "nike_sneaker.png")
+        "user-123/assets/nike_sneaker_thumbnail.jpg"
+    """
+    # Extract base name without extension
+    from pathlib import Path
+    base_name = Path(filename).stem
+    return f"{user_id}/assets/{base_name}_thumbnail.jpg"
 
 # Timeouts (seconds)
 PHASE1_TIMEOUT = 60

@@ -42,6 +42,13 @@ async def list_videos(
             s3_path = final_url.replace(f's3://{s3_client.bucket}/', '')
             final_url = s3_client.generate_presigned_url(s3_path, expiration=3600 * 24 * 7)  # 7 days
         
+        # Convert thumbnail S3 URL to presigned URL if needed
+        thumbnail_url = video.thumbnail_url
+        if thumbnail_url and thumbnail_url.startswith('s3://'):
+            from app.services.s3 import s3_client
+            s3_path = thumbnail_url.replace(f's3://{s3_client.bucket}/', '')
+            thumbnail_url = s3_client.generate_presigned_url(s3_path, expiration=3600 * 24 * 7)  # 7 days
+        
         video_items.append(
             VideoListItem(
                 video_id=video.id,
@@ -50,6 +57,7 @@ async def list_videos(
                 progress=video.progress,
                 current_phase=video.current_phase,
                 final_video_url=final_url,
+                thumbnail_url=thumbnail_url,
                 cost_usd=video.cost_usd,
                 created_at=video.created_at,
                 completed_at=video.completed_at
@@ -85,10 +93,19 @@ async def get_video(
         s3_path = final_video_url.replace(f's3://{s3_client.bucket}/', '')
         final_video_url = s3_client.generate_presigned_url(s3_path, expiration=3600 * 24 * 7)  # 7 days
     
+    # Convert thumbnail S3 URL to presigned URL if needed
+    thumbnail_url = video.thumbnail_url
+    if thumbnail_url and thumbnail_url.startswith('s3://'):
+        from app.services.s3 import s3_client
+        s3_path = thumbnail_url.replace(f's3://{s3_client.bucket}/', '')
+        thumbnail_url = s3_client.generate_presigned_url(s3_path, expiration=3600 * 24 * 7)  # 7 days
+    
     return VideoResponse(
         video_id=video.id,
+        title=video.title,
         status=video.status.value,
         final_video_url=final_video_url,
+        thumbnail_url=thumbnail_url,
         cost_usd=video.cost_usd,
         generation_time_seconds=video.generation_time_seconds,
         created_at=video.created_at,
