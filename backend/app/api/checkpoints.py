@@ -51,11 +51,17 @@ router = APIRouter()
 
 def _build_artifact_response(artifact: Dict[str, Any]) -> ArtifactResponse:
     """Convert artifact dict to response schema"""
+    # Convert S3 URI to presigned URL
+    s3_url = artifact['s3_url']
+    if s3_url and s3_url.startswith('s3://'):
+        s3_path = s3_url.replace(f's3://{s3_client.bucket}/', '')
+        s3_url = s3_client.generate_presigned_url(s3_path, expiration=3600)
+
     return ArtifactResponse(
         id=artifact['id'],
         artifact_type=artifact['artifact_type'],
         artifact_key=artifact['artifact_key'],
-        s3_url=artifact['s3_url'],
+        s3_url=s3_url,
         version=artifact['version'],
         metadata=artifact.get('metadata'),
         created_at=artifact['created_at']
