@@ -227,8 +227,16 @@ export function Preview() {
       }
 
       // Extract video URL (prefer final, fallback to stitched)
-      const videoUrlFromStatus = statusData?.final_video_url || statusData?.stitched_video_url;
-      const videoUrlFromData = videoData?.final_video_url || videoData?.stitched_video_url || videoData?.url;
+      // Note: stitched_video_url and url may not exist on VideoResponse type, add optional chaining and type guards
+      const videoUrlFromStatus =
+        statusData?.final_video_url ||
+        (statusData && 'stitched_video_url' in statusData ? (statusData as any).stitched_video_url : undefined);
+
+      const videoUrlFromData =
+        videoData?.final_video_url ||
+        (videoData && 'stitched_video_url' in videoData ? (videoData as any).stitched_video_url : undefined) ||
+        (videoData && 'url' in videoData ? (videoData as any).url : undefined);
+
       setVideoUrl(videoUrlFromStatus || videoUrlFromData || null);
 
       // Extract metadata
@@ -579,6 +587,35 @@ export function Preview() {
       return `${mins}m ${secs}s`;
     };
 
+    // Convert current phase to processing steps
+    const getProcessingSteps = () => {
+      const allPhases = [
+        'queued',
+        'validating',
+        'generating_animatic',
+        'generating_chunks',
+        'refining',
+        'exporting'
+      ];
+
+      return allPhases.map(phase => {
+        const phaseIndex = allPhases.indexOf(phase);
+        const currentIndex = allPhases.indexOf(currentPhase);
+
+        let status: 'pending' | 'processing' | 'completed' | 'failed' = 'pending';
+        if (phaseIndex < currentIndex) {
+          status = 'completed';
+        } else if (phaseIndex === currentIndex) {
+          status = 'processing';
+        }
+
+        return {
+          name: phase.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          status
+        };
+      });
+    };
+
     return (
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="space-y-6">
@@ -616,7 +653,7 @@ export function Preview() {
             </div>
 
             {/* Processing steps */}
-            <ProcessingSteps currentPhase={currentPhase} />
+            <ProcessingSteps steps={getProcessingSteps()} />
 
             {/* Current phase indicator */}
             {currentPhase && (
