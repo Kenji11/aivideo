@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Film, Download, BarChart3, Edit } from 'lucide-react';
+import { Film, Download, Edit } from 'lucide-react';
 import { getVideoStatus, getVideo, StatusResponse, VideoResponse } from '../lib/api';
 import { toast } from '@/hooks/use-toast';
 
@@ -181,11 +181,12 @@ export function Preview() {
               Create Another
             </button>
             <button
-              onClick={() => navigate(`/export/${videoId}`)}
-              className="btn-primary flex items-center justify-center space-x-2"
+              onClick={handleDownload}
+              disabled={!videoUrl}
+              className="btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <BarChart3 className="w-5 h-5" />
-              <span>Export</span>
+              <Download className="w-5 h-5" />
+              <span>Download Video</span>
             </button>
           </div>
           <button
@@ -195,17 +196,10 @@ export function Preview() {
             <Edit className="w-5 h-5" />
             <span>Edit Chunks</span>
           </button>
-          <button
-            onClick={handleDownload}
-            disabled={!videoUrl}
-            className="w-full btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Download className="w-5 h-5" />
-            <span>Download Video</span>
-          </button>
         </div>
       </div>
     </div>
   );
 }
+
 
