@@ -74,6 +74,7 @@ function AppContent() {
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [uploadedAssetIds, setUploadedAssetIds] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('veo_fast');
+  const [autoContinue, setAutoContinue] = useState<boolean>(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [videoToDelete, setVideoToDelete] = useState<{ id: string; title: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -331,6 +332,7 @@ function AppContent() {
               prompt={prompt}
               selectedModel={selectedModel}
               uploadedAssetIds={uploadedAssetIds}
+              autoContinue={autoContinue}
               onTitleChange={setTitle}
               onDescriptionChange={setDescription}
               onPromptChange={setPrompt}
@@ -339,6 +341,7 @@ function AppContent() {
                 setUploadedAssetIds(assetIds);
                 addNotification('success', 'Files Uploaded', `${assetIds.length} file(s) uploaded successfully!`);
               }}
+              onAutoContinueChange={setAutoContinue}
               onNotification={addNotification}
             />
           } />

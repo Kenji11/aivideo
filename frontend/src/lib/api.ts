@@ -76,6 +76,7 @@ export interface GenerateRequest {
   assets?: string[]; // For backward compatibility, can also be reference_assets
   reference_assets?: string[];
   model?: string; // Video generation model to use (e.g., 'hailuo', 'kling', 'sora')
+  auto_continue?: boolean; // Whether to automatically continue through phases without approval
 }
 
 export interface GenerateResponse {

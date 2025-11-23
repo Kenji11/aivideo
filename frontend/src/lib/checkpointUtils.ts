@@ -178,3 +178,37 @@ export function getSelectedCheckpoint(
 
   return null;
 }
+
+/**
+ * Get all Phase 1 checkpoints from anywhere in the tree
+ */
+export function getPhase1Options(tree: CheckpointTreeNode[]): CheckpointResponse[] {
+  const allCheckpoints = getAllCheckpointsFromTree(tree);
+  return allCheckpoints.filter(cp => cp.phase_number === 1);
+}
+
+/**
+ * Get Phase 2 checkpoints that are children of the selected Phase 1 checkpoint
+ */
+export function getPhase2Options(
+  tree: CheckpointTreeNode[],
+  phase1CheckpointId: string
+): CheckpointResponse[] {
+  const allCheckpoints = getAllCheckpointsFromTree(tree);
+  return allCheckpoints.filter(
+    cp => cp.phase_number === 2 && cp.parent_checkpoint_id === phase1CheckpointId
+  );
+}
+
+/**
+ * Get Phase 3 checkpoints that are children of the selected Phase 2 checkpoint
+ */
+export function getPhase3Options(
+  tree: CheckpointTreeNode[],
+  phase2CheckpointId: string
+): CheckpointResponse[] {
+  const allCheckpoints = getAllCheckpointsFromTree(tree);
+  return allCheckpoints.filter(
+    cp => cp.phase_number === 3 && cp.parent_checkpoint_id === phase2CheckpointId
+  );
+}

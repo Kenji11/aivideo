@@ -16,7 +16,7 @@ from app.orchestrator.progress import update_progress, update_cost
 from app.database import SessionLocal
 from app.common.models import VideoGeneration, VideoStatus
 from sqlalchemy.orm.attributes import flag_modified
-from app.database.checkpoint_queries import create_checkpoint, create_artifact, approve_checkpoint
+from app.database.checkpoint_queries import create_checkpoint, create_artifact, approve_checkpoint, update_checkpoint_phase_output
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +197,9 @@ def _generate_storyboard_impl(
 
             # Add checkpoint_id to output
             output.checkpoint_id = checkpoint_id
+
+            # Update checkpoint's phase_output to include checkpoint_id for next phase
+            update_checkpoint_phase_output(checkpoint_id, {'checkpoint_id': checkpoint_id})
 
             # Update video status to paused
             video.status = VideoStatus.PAUSED_AT_PHASE2

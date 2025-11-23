@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Film, Download, BarChart3, ChevronDown, ChevronUp, Image as ImageIcon, Video, FileText, Sparkles, Play, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { Film, Download, BarChart3, ChevronDown, ChevronUp, Image as ImageIcon, Video, FileText, Sparkles, Play, AlertCircle, Edit } from 'lucide-react';
 import { getVideoStatus, getVideo, getCheckpointTree, CheckpointTreeNode, CheckpointResponse, continueVideo } from '../lib/api';
 import { toast } from '@/hooks/use-toast';
 import { ChunkEditModal } from '../components/ChunkEditModal';
+import { CheckpointSelector } from '../components/CheckpointSelector';
+import { SpecEditModal } from '../components/SpecEditModal';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { ProcessingSteps } from '../components/ProcessingSteps';
@@ -31,12 +33,22 @@ export function Preview() {
     phase2: null,
     phase3: null,
   });
+  const [checkpointSelections, setCheckpointSelections] = useState<{
+    phase1: string | null;
+    phase2: string | null;
+    phase3: string | null;
+  }>({
+    phase1: null,
+    phase2: null,
+    phase3: null,
+  });
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
   const [videoTitle, setVideoTitle] = useState<string>('');
   const [videoDescription, setVideoDescription] = useState<string>('');
   const [processTime, setProcessTime] = useState<string>('');
   const [selectedChunkIndex, setSelectedChunkIndex] = useState<number | null>(null);
   const [chunkEditModalOpen, setChunkEditModalOpen] = useState(false);
+  const [specEditModalOpen, setSpecEditModalOpen] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
 
   // Processing state
@@ -82,14 +94,21 @@ export function Preview() {
   
   // Phase 4 removed from pipeline
 
-  // Get selected checkpoints
+  // Get selected checkpoints using ID-based selections
   const selectedPhase1 = useMemo(() => {
-    const selected = getSelectedCheckpoint(1, checkpointIndices, checkpointTree);
-    console.log('[Preview] Selected Phase 1 checkpoint:', selected?.id, 'from indices:', checkpointIndices.phase1, 'available:', phase1Checkpoints.length);
-    return selected;
-  }, [checkpointIndices, checkpointTree, phase1Checkpoints.length]);
-  const selectedPhase2 = useMemo(() => getSelectedCheckpoint(2, checkpointIndices, checkpointTree), [checkpointIndices, checkpointTree]);
-  const selectedPhase3 = useMemo(() => getSelectedCheckpoint(3, checkpointIndices, checkpointTree), [checkpointIndices, checkpointTree]);
+    if (!checkpointSelections.phase1) return null;
+    return getAllCheckpointsFromTree(checkpointTree).find(cp => cp.id === checkpointSelections.phase1) || null;
+  }, [checkpointSelections.phase1, checkpointTree]);
+
+  const selectedPhase2 = useMemo(() => {
+    if (!checkpointSelections.phase2) return null;
+    return getAllCheckpointsFromTree(checkpointTree).find(cp => cp.id === checkpointSelections.phase2) || null;
+  }, [checkpointSelections.phase2, checkpointTree]);
+
+  const selectedPhase3 = useMemo(() => {
+    if (!checkpointSelections.phase3) return null;
+    return getAllCheckpointsFromTree(checkpointTree).find(cp => cp.id === checkpointSelections.phase3) || null;
+  }, [checkpointSelections.phase3, checkpointTree]);
   // Phase 4 removed from pipeline
 
   // Initialize checkpoint indices based on current_checkpoint or first Phase 1
@@ -426,50 +445,79 @@ export function Preview() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [checkpointIndices, phase1Checkpoints, phase2Checkpoints, phase3Checkpoints]);
 
-  // Navigation handlers (Phase 4 removed)
-  const navigatePhase = (phase: 1 | 2 | 3, direction: 'prev' | 'next') => {
-    setCheckpointIndices(prev => {
-      const next = { ...prev };
-      let checkpoints: CheckpointResponse[] = [];
-      let currentIndex: number | null = null;
-
-      if (phase === 1) {
-        checkpoints = phase1Checkpoints;
-        currentIndex = prev.phase1;
-      } else if (phase === 2) {
-        checkpoints = phase2Checkpoints;
-        currentIndex = prev.phase2;
-      } else if (phase === 3) {
-        checkpoints = phase3Checkpoints;
-        currentIndex = prev.phase3;
-      }
-
-      if (checkpoints.length <= 1 || currentIndex === null) return prev;
-
-      const newIndex = direction === 'prev'
-        ? (currentIndex - 1 + checkpoints.length) % checkpoints.length
-        : (currentIndex + 1) % checkpoints.length;
-
-      if (phase === 1) {
-        next.phase1 = newIndex;
-        next.phase2 = null;
-        next.phase3 = null;
-      } else if (phase === 2) {
-        next.phase2 = newIndex;
-        next.phase3 = null;
-      } else if (phase === 3) {
-        next.phase3 = newIndex;
-        // Phase 3 is terminal
-      }
-
-      return next;
-    });
+  // Handle checkpoint selection change
+  const handleCheckpointSelection = (phase: 1 | 2 | 3, checkpointId: string) => {
+    if (phase === 1) {
+      // Selecting Phase 1 clears Phase 2 and 3
+      setCheckpointSelections({
+        phase1: checkpointId,
+        phase2: null,
+        phase3: null,
+      });
+    } else if (phase === 2) {
+      // Selecting Phase 2 clears Phase 3
+      setCheckpointSelections(prev => ({
+        ...prev,
+        phase2: checkpointId,
+        phase3: null,
+      }));
+    } else {
+      // Selecting Phase 3
+      setCheckpointSelections(prev => ({
+        ...prev,
+        phase3: checkpointId,
+      }));
+    }
   };
+
+  // Handle spec edit success
+  const handleSpecEditSuccess = useCallback(async () => {
+    const checkpointsBeforeRefresh = getAllCheckpointsFromTree(checkpointTree);
+
+    console.log('[Preview] handleSpecEditSuccess: Before refresh, checkpoint count:', checkpointsBeforeRefresh.length);
+
+    await fetchVideoData(true); // Refresh checkpoint tree
+
+    // Give React time to update the state after fetchVideoData completes
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        // This callback will run after the next two animation frames, ensuring state is updated
+        setCheckpointTree(currentTree => {
+          const allCheckpoints = getAllCheckpointsFromTree(currentTree);
+
+          // Find new checkpoints that weren't there before
+          const newCheckpoints = allCheckpoints.filter(
+            cp => !checkpointsBeforeRefresh.some(oldCp => oldCp.id === cp.id)
+          );
+
+          // Find the newest Phase 1 checkpoint (most recently created)
+          const newBranch = newCheckpoints
+            .filter(cp => cp.phase_number === 1)
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+          console.log('[Preview] After refresh - all checkpoints:', allCheckpoints.map(cp => ({ id: cp.id, phase: cp.phase_number, branch: cp.branch_name, parent: cp.parent_checkpoint_id })));
+          console.log('[Preview] New checkpoints:', newCheckpoints.map(cp => ({ id: cp.id, branch: cp.branch_name, created: cp.created_at })));
+          console.log('[Preview] Found new branch:', newBranch ? { id: newBranch.id, branch: newBranch.branch_name } : null);
+
+          if (newBranch) {
+            console.log('[Preview] Auto-selecting new branch:', newBranch.id, newBranch.branch_name);
+            setCheckpointSelections({
+              phase1: newBranch.id,
+              phase2: null,
+              phase3: null,
+            });
+          }
+
+          return currentTree; // Don't modify the tree, just use this to access current state
+        });
+      });
+    });
+  }, [checkpointTree, fetchVideoData]);
 
   // Handle continue/approve
   const handleContinue = async (checkpointId: string) => {
     if (!videoId || isContinuing) return;
-    
+
     setIsContinuing(true);
     try {
       await continueVideo(videoId, checkpointId);
@@ -895,7 +943,14 @@ export function Preview() {
         {checkpointTree.length > 0 ? (
           <div className="space-y-4">
             <h3 className="text-xl font-semibold text-foreground">Generation Phases & Artifacts</h3>
-            
+
+            {/* Checkpoint Selector */}
+            <CheckpointSelector
+              tree={checkpointTree}
+              selections={checkpointSelections}
+              onSelectionChange={handleCheckpointSelection}
+            />
+
             {/* Phase 1: Validation & Spec */}
             {phase1Checkpoints.length > 0 && (
               <div className="border border-border rounded-lg overflow-hidden">
@@ -907,38 +962,9 @@ export function Preview() {
                     <Sparkles className="w-5 h-5 text-primary" />
                     <span className="font-medium text-foreground">
                       Phase 1: Validation & Spec
-                      {phase1Checkpoints.length > 1 && (
-                        <span className="ml-2 text-sm text-muted-foreground">
-                          (Checkpoint {checkpointIndices.phase1 + 1} of {phase1Checkpoints.length})
-                        </span>
-                      )}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {phase1Checkpoints.length > 1 && (
-                      <>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigatePhase(1, 'prev');
-                          }}
-                          className="p-1 hover:bg-muted rounded"
-                          disabled={phase1Checkpoints.length <= 1}
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigatePhase(1, 'next');
-                          }}
-                          className="p-1 hover:bg-muted rounded"
-                          disabled={phase1Checkpoints.length <= 1}
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </>
-                    )}
                     {expandedPhases.has('phase1') ? (
                       <ChevronUp className="w-5 h-5 text-muted-foreground" />
                     ) : (
@@ -950,9 +976,19 @@ export function Preview() {
                   <div className="p-4 border-t border-border bg-muted/30">
                     {selectedPhase1 && phase1Artifacts?.spec ? (
                       <div className="space-y-2">
-                        <div className="flex items-center space-x-2 text-sm text-muted-foreground mb-2">
-                          <FileText className="w-4 h-4" />
-                          <span>Video Specification</span>
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                            <FileText className="w-4 h-4" />
+                            <span>Video Specification</span>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSpecEditModalOpen(true)}
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Spec
+                          </Button>
                         </div>
                         <pre className="text-xs bg-background p-3 rounded border border-border overflow-auto max-h-64">
                           {JSON.stringify(phase1Artifacts.spec, null, 2)}
@@ -967,6 +1003,16 @@ export function Preview() {
                             </Button>
                           </div>
                         )}
+
+                        {/* Spec Edit Modal */}
+                        <SpecEditModal
+                          open={specEditModalOpen}
+                          onOpenChange={setSpecEditModalOpen}
+                          videoId={videoId!}
+                          checkpointId={selectedPhase1.id}
+                          currentSpec={phase1Artifacts.spec}
+                          onSaveSuccess={handleSpecEditSuccess}
+                        />
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">No spec available</p>
@@ -987,36 +1033,9 @@ export function Preview() {
                     <ImageIcon className="w-5 h-5 text-primary" />
                     <span className="font-medium text-foreground">
                       Phase 2: Storyboard
-                      {phase2Checkpoints.length > 1 && (
-                        <span className="ml-2 text-sm text-muted-foreground">
-                          (Checkpoint {checkpointIndices.phase2! + 1} of {phase2Checkpoints.length})
-                        </span>
-                      )}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {phase2Checkpoints.length > 1 && (
-                      <>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigatePhase(2, 'prev');
-                          }}
-                          className="p-1 hover:bg-muted rounded"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigatePhase(2, 'next');
-                          }}
-                          className="p-1 hover:bg-muted rounded"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </>
-                    )}
                     {expandedPhases.has('phase2') ? (
                       <ChevronUp className="w-5 h-5 text-muted-foreground" />
                     ) : (
@@ -1076,36 +1095,9 @@ export function Preview() {
                     <Video className="w-5 h-5 text-primary" />
                     <span className="font-medium text-foreground">
                       Phase 3: Video Chunks
-                      {phase3Checkpoints.length > 1 && (
-                        <span className="ml-2 text-sm text-muted-foreground">
-                          (Checkpoint {checkpointIndices.phase3! + 1} of {phase3Checkpoints.length})
-                        </span>
-                      )}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    {phase3Checkpoints.length > 1 && (
-                      <>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigatePhase(3, 'prev');
-                          }}
-                          className="p-1 hover:bg-muted rounded"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigatePhase(3, 'next');
-                          }}
-                          className="p-1 hover:bg-muted rounded"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </>
-                    )}
                     {expandedPhases.has('phase3') ? (
                       <ChevronUp className="w-5 h-5 text-muted-foreground" />
                     ) : (

@@ -16,7 +16,7 @@ from app.phases.phase3_chunks.chunk_generator import (
     build_chunk_specs_with_storyboard
 )
 from langchain_core.runnables import RunnableParallel
-from app.database.checkpoint_queries import create_checkpoint, create_artifact, approve_checkpoint
+from app.database.checkpoint_queries import create_checkpoint, create_artifact, approve_checkpoint, update_checkpoint_phase_output
 
 
 def generate_chunk_reference_image(chunk_spec: ChunkSpec, beat_to_chunk_map: dict) -> dict:
@@ -481,6 +481,9 @@ def generate_chunks(
 
             # Add checkpoint_id to output
             output.checkpoint_id = checkpoint_id
+
+            # Update checkpoint's phase_output to include checkpoint_id for next phase
+            update_checkpoint_phase_output(checkpoint_id, {'checkpoint_id': checkpoint_id})
 
             # Update video status to COMPLETE (Phase 4 removed from pipeline)
             video.status = VideoStatus.COMPLETE

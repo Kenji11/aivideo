@@ -23,7 +23,7 @@ from app.common.template_archetypes import TEMPLATE_ARCHETYPES
 from app.database import SessionLocal
 from app.common.models import VideoGeneration, VideoStatus
 from app.orchestrator.progress import update_progress
-from app.database.checkpoint_queries import create_checkpoint, create_artifact, approve_checkpoint
+from app.database.checkpoint_queries import create_checkpoint, create_artifact, approve_checkpoint, update_checkpoint_phase_output
 
 logger = logging.getLogger(__name__)
 
@@ -262,6 +262,9 @@ def plan_with_gpt4o_mini(
         # Add checkpoint_id to output
         output.checkpoint_id = checkpoint_id
 
+        # Update checkpoint's phase_output to include checkpoint_id for next phase
+        update_checkpoint_phase_output(checkpoint_id, {'checkpoint_id': checkpoint_id})
+
         # Update video status to paused
         video.status = VideoStatus.PAUSED_AT_PHASE1
         video.current_phase = 'phase1'
@@ -425,6 +428,9 @@ def plan_with_gpt4_turbo(
 
         # Add checkpoint_id to output
         output.checkpoint_id = checkpoint_id
+
+        # Update checkpoint's phase_output to include checkpoint_id for next phase
+        update_checkpoint_phase_output(checkpoint_id, {'checkpoint_id': checkpoint_id})
 
         # Update video status to paused
         video.status = VideoStatus.PAUSED_AT_PHASE1

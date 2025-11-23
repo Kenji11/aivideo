@@ -497,9 +497,8 @@ def build_checkpoint_tree(video_id: str) -> List[Dict[str, Any]]:
                 if parent:
                     parent['children'].append(checkpoint_map[cp['id']])
             else:
-                # Only Phase 1 checkpoints should be roots when using explicit relationships
-                if cp['phase_number'] == 1:
-                    roots.append(checkpoint_map[cp['id']])
+                # Checkpoints with no parent are roots (typically Phase 1)
+                roots.append(checkpoint_map[cp['id']])
 
     return roots
 

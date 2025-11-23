@@ -47,6 +47,9 @@ export const auth: Auth = getAuth(app);
 // Google Auth Provider
 export const googleProvider = new GoogleAuthProvider();
 
+// Export User type for use in other modules
+export type { User };
+
 // Auth helper functions
 export const signInWithEmail = async (email: string, password: string): Promise<UserCredential> => {
   return signInWithEmailAndPassword(auth, email, password);

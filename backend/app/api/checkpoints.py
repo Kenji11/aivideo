@@ -35,6 +35,7 @@ from app.database.checkpoint_queries import (
     get_latest_artifact_version,
     get_next_version_number,
     create_artifact,
+    create_checkpoint,
     update_checkpoint_phase_output,
     update_artifact
 )
@@ -338,7 +339,8 @@ async def edit_spec(
     """
     Edit Phase 1 spec (beats, style, product, audio).
 
-    Merges provided fields with existing spec and creates new artifact version.
+    If checkpoint is approved, creates a new branch with edited spec.
+    Otherwise, updates the artifact version in-place.
     Only works at Phase 1 checkpoints.
     """
     # Verify ownership
@@ -381,6 +383,62 @@ async def edit_spec(
         if value is not None:
             updated_spec[key] = value
 
+    # If checkpoint is approved, create a new branch instead of editing in-place
+    if checkpoint['status'] == 'approved':
+        # Create new branch: main → main-1, main-1 → main-1-1
+        new_branch_name = create_branch_from_checkpoint(checkpoint_id, user_id)
+
+        # Create new Phase 1 checkpoint with updated spec in phase_output
+        new_phase_output = checkpoint['phase_output'].copy()
+        if 'output_data' in new_phase_output:
+            new_phase_output['output_data']['spec'] = updated_spec
+        else:
+            new_phase_output['spec'] = updated_spec
+
+        # Inherit the parent_checkpoint_id from the checkpoint being branched from
+        # This ensures the new branch is a sibling, not a child
+        new_checkpoint_id = create_checkpoint(
+            video_id=video_id,
+            branch_name=new_branch_name,
+            phase_number=1,
+            version=1,
+            phase_output=new_phase_output,
+            cost_usd=0.0,
+            user_id=user_id,
+            parent_checkpoint_id=checkpoint.get('parent_checkpoint_id'),
+            edit_description=f"Edited spec from checkpoint {checkpoint_id}"
+        )
+
+        # Copy all artifacts from original checkpoint to new checkpoint
+        original_artifacts = get_checkpoint_artifacts(checkpoint_id)
+        for artifact in original_artifacts:
+            # Update spec artifact with new spec, copy others as-is
+            artifact_metadata = artifact.get('metadata', {})
+            if artifact['artifact_type'] == 'spec' and artifact['artifact_key'] == 'spec':
+                artifact_metadata = {'spec': updated_spec}
+
+            create_artifact(
+                checkpoint_id=new_checkpoint_id,
+                artifact_type=artifact['artifact_type'],
+                artifact_key=artifact['artifact_key'],
+                s3_url=artifact.get('s3_url', ''),
+                s3_key=artifact.get('s3_key', ''),
+                version=1,  # New branch starts at version 1
+                parent_artifact_id=artifact['id'],
+                metadata=artifact_metadata,
+                file_size_bytes=artifact.get('file_size_bytes')
+            )
+
+        logger.info(f"Created new branch {new_branch_name} with checkpoint {new_checkpoint_id} for editing approved checkpoint {checkpoint_id}")
+
+        return ArtifactEditResponse(
+            artifact_id=new_checkpoint_id,  # Return new checkpoint ID
+            version=1,  # New branch starts at version 1
+            s3_url=None,
+            message=f"Created new branch '{new_branch_name}' with updated spec"
+        )
+
+    # For non-approved checkpoints, update in-place
     # Increment version number
     next_version = current_spec_artifact['version'] + 1
 
