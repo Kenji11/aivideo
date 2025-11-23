@@ -58,12 +58,13 @@ export function ProjectCard({ project, onSelect, onDelete, onDownload, onEdit }:
 
   // Determine navigation route based on status
   const getVideoRoute = () => {
-    if (project.status === 'complete' && project.final_video_url) {
+    // If there's a final video URL, allow preview (even for failed status)
+    if (project.final_video_url) {
       return `/preview/${project.video_id}`;
     } else if (project.status !== 'complete' && project.status !== 'failed') {
       return `/processing/${project.video_id}`;
     }
-    return '#'; // No link for failed videos
+    return '#'; // No link if no video and not processing
   };
 
   const videoRoute = getVideoRoute();
