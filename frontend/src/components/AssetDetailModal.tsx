@@ -58,6 +58,7 @@ export function AssetDetailModal({ isOpen, onClose, assetId, onAssetSelect }: As
     setIsLoading(true);
     try {
       const assetData = await api.getAsset(assetId);
+      console.log('Asset data loaded:', assetData);
       setAsset(assetData);
       setName(assetData.name || assetData.filename || '');
       setDescription(assetData.description || '');
@@ -193,8 +194,11 @@ export function AssetDetailModal({ isOpen, onClose, assetId, onAssetSelect }: As
   }
 
   if (!asset) {
+    console.warn('AssetDetailModal: No asset data available');
     return null;
   }
+
+  console.log('AssetDetailModal: Rendering asset:', asset);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose} key={assetId}>
@@ -251,18 +255,27 @@ export function AssetDetailModal({ isOpen, onClose, assetId, onAssetSelect }: As
           <DialogDescription>View and edit asset metadata</DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[400px]">
           {/* Image preview */}
           <div className="space-y-4">
-            <div className="aspect-square bg-muted rounded-lg overflow-hidden">
-              <img
-                src={asset.thumbnail_url || asset.s3_url}
-                alt={asset.name || asset.filename}
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  e.currentTarget.src = getPlaceholderImage(400, 400, 'Asset');
-                }}
-              />
+            <div className="aspect-square bg-muted rounded-lg overflow-hidden flex items-center justify-center min-h-[300px]">
+              {asset.thumbnail_url || asset.s3_url ? (
+                <img
+                  src={asset.thumbnail_url || asset.s3_url}
+                  alt={asset.name || asset.filename || 'Asset'}
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    console.error('Image failed to load, using placeholder');
+                    e.currentTarget.src = getPlaceholderImage(400, 400, 'Asset');
+                  }}
+                />
+              ) : (
+                <img
+                  src={getPlaceholderImage(400, 400, 'Asset')}
+                  alt="Asset placeholder"
+                  className="w-full h-full object-contain"
+                />
+              )}
             </div>
             {asset.width && asset.height && (
               <p className="text-sm text-muted-foreground text-center">
