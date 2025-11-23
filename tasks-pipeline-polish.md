@@ -195,81 +195,81 @@
 
 #### Test Extraction Accuracy
 
-1. [ ] Test explicit music extraction
+1. [x] Test explicit music extraction
    - Prompt: "Create an ad with upbeat electronic music"
    - Verify `music_theme = "upbeat electronic"`
 
-2. [ ] Test explicit color extraction
+2. [x] Test explicit color extraction
    - Prompt: "Use gold and black color scheme"
    - Verify `color_scheme = ["gold", "black"]`
 
-3. [ ] Test explicit scene requirements
+3. [x] Test explicit scene requirements
    - Prompt: "Show the watch on someone's wrist in the first scene"
    - Verify scene_requirements includes this for appropriate beat
 
-4. [ ] Test brand name extraction
+4. [x] Test brand name extraction
    - Prompt: "Create a Nike ad for Air Max shoes"
    - Verify `brand_name = "Nike"`
 
-5. [ ] Test vague prompt (inference)
+5. [x] Test vague prompt (inference)
    - Prompt: "Luxury watch ad"
    - Verify o4-mini infers appropriate music and colors
    - Should infer elegant/cinematic music and sophisticated colors
 
 #### Test Prompt Composition
 
-6. [ ] Verify composed prompts are 2-3 sentences
+6. [x] Verify composed prompts are 2-3 sentences
    - Check length of `composed_prompt` for each beat
    - Should be detailed and specific (min 100 chars per beat)
 
-7. [ ] Verify narrative flow across beats
+7. [x] Verify narrative flow across beats
    - Read all composed_prompts in sequence
    - Check that they reference each other or build on previous beats
    - Should feel like a cohesive story, not isolated scenes
 
-8. [ ] Verify color consistency
+8. [x] Verify color consistency
    - Check that color_scheme appears in multiple beat prompts
    - Colors should be used consistently throughout video
 
-9. [ ] Verify style consistency
+9. [x] Verify style consistency
    - Check that aesthetic style is maintained across all beats
    - Mood and tone should be consistent
 
 #### Test Logo/Brand Overlay
 
-10. [ ] Test logo asset path
+10. [x] Test logo asset path
     - Upload logo via asset library
     - Generate video with closing beat
     - Verify ControlNet used with `image_to_image_strength = 1.0`
     - Verify logo visible in final frame
 
-11. [ ] Test brand name text overlay
+11. [x] Test brand name text overlay
     - Generate video with brand_name but no logo asset
     - Verify closing beat prompt includes brand text
     - Check final video for text overlay
 
-12. [ ] Test no logo and no brand
+12. [x] Test no logo and no brand
     - Generic prompt without brand mention
     - Verify warning logged
     - Verify video still generates successfully
 
 #### Integration Testing
 
-13. [ ] Test complete flow: explicit prompt with logo
+13. [x] Test complete flow: explicit prompt with logo
     - Prompt: "Create a Nike ad with energetic music, red and black colors, show shoes in action"
     - Upload Nike logo
     - Verify all extractions work
     - Verify composed prompts use specified elements
     - Verify logo appears in closing
 
-14. [ ] Test complete flow: vague prompt without logo
+14. [x] Test complete flow: vague prompt without logo
     - Prompt: "Luxury perfume ad"
     - No assets uploaded
     - Verify o4-mini infers music and colors
     - Verify composed prompts are cohesive
     - Verify closing beat doesn't crash without logo
 
-15. [ ] Compare before/after video quality
+15. [x] Compare before/after video quality
     - Generate same prompt with old system (if possible)
     - Generate with new system
     - Compare narrative flow and polish
@@ -277,11 +277,11 @@
 
 #### Regression Testing
 
-16. [ ] Test backward compatibility
+16. [x] Test backward compatibility
     - Old videos in database should still work
     - System should handle missing new fields gracefully
 
-17. [ ] Test error handling
+17. [x] Test error handling
     - Invalid color names
     - Extremely long music_theme strings
     - Empty composed_prompts
