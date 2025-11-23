@@ -91,7 +91,8 @@ def _generate_storyboard_impl(video_id: str, spec: dict, user_id: str = None, re
                 product=product,
                 user_id=user_id,
                 reference_mapping=reference_mapping,
-                user_assets=user_assets
+                user_assets=user_assets,
+                spec=spec
             )
             
             # Add image URL to the beat in spec

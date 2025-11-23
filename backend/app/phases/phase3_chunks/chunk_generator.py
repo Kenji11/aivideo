@@ -235,12 +235,18 @@ def build_chunk_specs_with_storyboard(
             # This chunk does NOT start a beat - will use last-frame continuation
             print(f"   🔄 Chunk {chunk_num}: Will use last-frame continuation (does not start a beat)")
         
-        # Build prompt from beat
-        prompt_template = beat.get('prompt_template', '')
-        prompt = prompt_template.format(
-            product_name=spec.get('product', {}).get('name', 'product'),
-            style_aesthetic=spec.get('style', {}).get('aesthetic', 'cinematic')
-        )
+        # Build prompt from beat - use composed_prompt from Phase 1 if available
+        prompt = beat.get('prompt', beat.get('prompt_template', ''))
+        
+        # If prompt contains template placeholders, do substitution (backward compatibility)
+        if '{product_name}' in prompt or '{style_aesthetic}' in prompt:
+            prompt = prompt.format(
+                product_name=spec.get('product', {}).get('name', 'product'),
+                style_aesthetic=spec.get('style', {}).get('aesthetic', 'cinematic')
+            )
+            print(f"   ⚠️ Using template substitution for chunk {chunk_num}")
+        else:
+            print(f"   ✅ Using LLM-composed prompt for chunk {chunk_num}")
         
         # Truncate prompt if too long
         words = prompt.split()

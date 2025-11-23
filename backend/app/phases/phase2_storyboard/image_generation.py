@@ -31,7 +31,8 @@ def generate_beat_image(
     product: Dict,
     user_id: str,
     reference_mapping: Dict = None,
-    user_assets: list = None
+    user_assets: list = None,
+    spec: Dict = None
 ) -> Dict:
     """
     Generate a storyboard image for a single beat.
@@ -48,6 +49,7 @@ def generate_beat_image(
         user_id: User ID for organizing outputs in S3
         reference_mapping: Optional dict mapping beat_id to reference assets (from Phase 1)
         user_assets: Optional list of user asset dicts (from Phase 0) for metadata lookup
+        spec: Full video specification (used to extract brand_name for closing beats)
         
     Returns:
         Dictionary with:
@@ -61,12 +63,18 @@ def generate_beat_image(
             - referenced_asset_ids: List of asset IDs used (for usage tracking)
     """
     
-    # Extract base prompt from beat template
-    base_prompt = beat.get('prompt_template', '')
+    # Extract base prompt - use composed_prompt from Phase 1 if available, fallback to template
+    base_prompt = beat.get('prompt', beat.get('prompt_template', ''))
+    
+    # Log which prompt source we're using
+    if beat.get('prompt') and beat.get('prompt') != beat.get('prompt_template', ''):
+        logger.info(f"✅ Using LLM-composed prompt for beat {beat.get('beat_id')}")
+    else:
+        logger.info(f"⚠️ Using template fallback for beat {beat.get('beat_id')}")
     
     # Extract style information
     color_palette = style.get('color_palette', [])
-    colors_str = ', '.join(color_palette) if color_palette else 'neutral tones'
+    colors_str = ', '.join(color_palette) if color_palette else 'natural true-to-life colors'
     lighting = style.get('lighting', 'soft')
     aesthetic = style.get('aesthetic', 'cinematic')
     shot_type = beat.get('shot_type', 'medium')
@@ -141,6 +149,33 @@ def generate_beat_image(
                     f"Enhanced prompt with {usage_type} reference: {asset_name or primary_object} "
                     f"(asset_id: {asset_id})"
                 )
+    
+    # Check if this is a closing beat and handle brand/logo overlay
+    is_closing_beat = beat.get('typical_position') == 'closing'
+    brand_name = spec.get('brand_name') if spec else None
+    
+    if is_closing_beat:
+        logger.info(f"🎬 Closing beat detected: {beat.get('beat_id')}")
+        
+        # Check if we have a logo asset in reference_mapping
+        has_logo_asset = False
+        if reference_info and user_assets:
+            asset_ids = reference_info.get('asset_ids', [])
+            for asset_id in asset_ids:
+                asset = next((a for a in user_assets if a.get('asset_id') == asset_id), None)
+                if asset and asset.get('reference_asset_type') == 'logo':
+                    has_logo_asset = True
+                    logger.info(f"✅ Logo asset found in references: {asset.get('name')} (will use ControlNet)")
+                    break
+        
+        # If no logo asset but brand name extracted, add text overlay to prompt
+        if not has_logo_asset and brand_name:
+            logger.info(f"✅ Adding brand name text overlay to closing beat: '{brand_name}'")
+            reference_prompt_parts.append(f"prominent brand text '{brand_name}' overlay")
+            reference_prompt_parts.append("professional typography")
+            reference_prompt_parts.append("clean brand lockup")
+        elif not has_logo_asset and not brand_name:
+            logger.warning(f"⚠️ Closing beat has neither logo asset nor brand name - no brand overlay added")
     
     # Compose full prompt with reference enhancements
     prompt_parts = [base_prompt]
