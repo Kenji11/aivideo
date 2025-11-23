@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, Loader2 } from 'lucide-react';
-import { api, ChunkMetadata, ChunkVersion, getModelDisplayName } from '../../lib/api';
+import { Play, Loader2 } from 'lucide-react';
+import { api, ChunkMetadata, getModelDisplayName } from '../../lib/api';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +44,7 @@ export function ChunkPreview({ videoId, chunk, onVersionChange }: ChunkPreviewPr
     }
     currentLoadRef.current = loadKey;
     loadPreviewUrl(selectedVersion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVersion, videoId, chunk.chunk_index]);
 
   const loadPreviewUrl = async (version: string) => {
@@ -159,11 +160,11 @@ export function ChunkPreview({ videoId, chunk, onVersionChange }: ChunkPreviewPr
               controls
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
-              onError={(e) => {
-                console.error('Video loading error:', e);
+              onError={() => {
+                console.error('Video loading error');
                 // Don't show error to user, just log it
               }}
-              onAbort={(e) => {
+              onAbort={() => {
                 // Ignore abort events - they're expected when switching videos
                 console.debug('Video load aborted (expected when switching)');
               }}

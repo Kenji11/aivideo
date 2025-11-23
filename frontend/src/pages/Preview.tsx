@@ -10,7 +10,6 @@ export function Preview() {
   
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [title, setTitle] = useState<string>('');
-  const [description, setDescription] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -46,7 +45,7 @@ export function Preview() {
             setTitle(videoData.title);
             return;
           }
-        } catch (err) {
+        } catch {
           if (abortController.signal.aborted) return;
           // If getVideo fails, try status endpoint
         }
@@ -71,7 +70,7 @@ export function Preview() {
           if (matchingVideo) {
             setTitle(matchingVideo.title);
           }
-        } catch (err) {
+        } catch {
           // Failed to fetch title from video list
         }
       } catch (err: any) {
@@ -163,11 +162,11 @@ export function Preview() {
             src={videoUrl}
             controls
             className="w-full h-full object-contain"
-            onError={(e) => {
-              console.error('Video load error:', e);
+            onError={() => {
+              console.error('Video load error');
               setError('Failed to load video');
             }}
-            onAbort={(e) => {
+            onAbort={() => {
               // Silently handle abort (expected when navigating away)
               console.debug('Preview video aborted (expected when navigating)');
             }}
@@ -187,11 +186,6 @@ export function Preview() {
           <h2 className="text-2xl font-bold text-foreground mb-2">
             {title || 'Video Preview'}
           </h2>
-          {description && (
-            <p className="text-muted-foreground">
-              {description}
-            </p>
-          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4 p-4 bg-card rounded-lg">

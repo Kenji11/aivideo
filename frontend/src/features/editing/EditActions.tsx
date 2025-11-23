@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Trash2, Scissors, ArrowUpDown, DollarSign, Loader2, Undo2 } from 'lucide-react';
+import { RefreshCw, Trash2, Scissors, DollarSign, Loader2, Undo2 } from 'lucide-react';
 import { api, ChunkMetadata, EditingAction, CostEstimate, getModelDisplayName } from '../../lib/api';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -59,7 +59,7 @@ export function EditActions({
         try {
           const info = await api.getChunkSplitInfo(videoId, selectedChunks[0]);
           setSplitInfo(info);
-        } catch (error) {
+        } catch {
           setSplitInfo(null);
         }
       } else {
@@ -414,7 +414,6 @@ export function EditActions({
 
   const hasSelection = selectedChunks.length > 0;
   const selectedChunk = selectedChunks.length === 1 ? chunks[selectedChunks[0]] : null;
-  const maxFrames = selectedChunk ? Math.floor(selectedChunk.duration * 24) : 0;
 
   return (
     <div className="space-y-4">

@@ -7,7 +7,7 @@ import { ChunkTimeline } from './ChunkTimeline';
 import { ChunkPreview } from './ChunkPreview';
 import { EditActions } from './EditActions';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 
 export function EditingPage() {
   const navigate = useNavigate();
@@ -41,6 +41,7 @@ export function EditingPage() {
         loadingAbortControllerRef.current.abort();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoId]);
 
   const loadChunks = async () => {

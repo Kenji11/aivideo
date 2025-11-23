@@ -7,6 +7,7 @@ import { UploadZone } from '../components/UploadZone';
 import { Image, Trash2, Filter, X, Search, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
+import { getPlaceholderImage } from '../lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -264,7 +265,7 @@ export function AssetLibrary() {
         alt={asset.name || asset.filename}
         className="w-full h-full object-cover"
         onError={(e) => {
-          e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Asset';
+          e.currentTarget.src = getPlaceholderImage(400, 400, 'Asset');
         }}
       />
       
@@ -446,7 +447,7 @@ export function AssetLibrary() {
                   alt={asset.name || asset.filename}
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Asset';
+                    e.currentTarget.src = getPlaceholderImage(400, 400, 'Asset');
                   }}
                 />
                 

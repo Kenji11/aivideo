@@ -3,6 +3,7 @@ import { api, AssetDetail } from '../lib/api';
 import { X, Edit2, Save, Trash2, Search, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
+import { getPlaceholderImage } from '../lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -256,7 +257,7 @@ export function AssetDetailModal({ isOpen, onClose, assetId, onAssetSelect }: As
                 alt={asset.name || asset.filename}
                 className="w-full h-full object-contain"
                 onError={(e) => {
-                  e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Asset';
+                  e.currentTarget.src = getPlaceholderImage(400, 400, 'Asset');
                 }}
               />
             </div>
