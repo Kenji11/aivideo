@@ -67,50 +67,58 @@ class ChunkManager:
             chunk_url = chunk_urls[chunk_index]
             
             # Get chunk metadata from spec
+            # Try phase_outputs first (where beats are actually stored), then fall back to video.spec
             spec = video.spec or {}
-            beats = spec.get('beats', [])
+            phase_outputs = video.phase_outputs or {}
+            phase3_output = phase_outputs.get('phase3_chunks', {})
+            phase3_data = phase3_output.get('output_data', {})
+            phase3_spec = phase3_data.get('spec', {})
+            
+            # Prefer beats from phase3 output, fallback to video.spec
+            beats = phase3_spec.get('beats', spec.get('beats', []))
             
             # Get model from current selected version, or from phase3 output, or fallback to spec
             # Phase3 stores the actual model used in spec.model
-            model = spec.get('model', 'hailuo_fast')
-            
-            # Also check phase3 output for the model that was actually used
-            phase_outputs = video.phase_outputs or {}
-            phase3_output = phase_outputs.get('phase3_chunks', {})
-            phase3_spec = phase3_output.get('output_data', {}).get('spec', {})
-            if phase3_spec.get('model'):
-                model = phase3_spec.get('model')
+            # Use phase3_spec if available (already loaded above), otherwise use video.spec
+            model = phase3_spec.get('model', spec.get('model', 'hailuo_fast'))
             
             prompt = ''
             cost = 0.0
             
             # Get prompt from beat if available
             if beats:
-                # Map chunk_index to corresponding beat
-                # Calculate which beat this chunk corresponds to based on timing
-                chunk_duration = 5.0  # Default, will be updated below
-                try:
-                    model_config = get_model_config(model)
-                    chunk_duration = model_config.get('actual_chunk_duration', 5.0)
-                except Exception:
-                    pass
-                
-                chunk_start_time = chunk_index * chunk_duration
-                beat_index = 0
-                for i, beat in enumerate(beats):
-                    beat_start = beat.get('start', 0)
-                    beat_duration = beat.get('duration', 5)
-                    if chunk_start_time >= beat_start and chunk_start_time < beat_start + beat_duration:
-                        beat_index = i
-                        break
-                
-                # Use last beat if we've gone past all beats
-                if beat_index >= len(beats):
-                    beat_index = len(beats) - 1
-                
-                if beat_index < len(beats):
-                    beat = beats[beat_index]
+                # Try simple 1:1 mapping first (chunk_index to beat_index)
+                # This works when chunks map directly to beats
+                if chunk_index < len(beats):
+                    beat = beats[chunk_index]
                     prompt = beat.get('prompt', beat.get('prompt_template', ''))
+                
+                # If not found or empty, try timing-based mapping
+                if not prompt or prompt == '':
+                    # Map chunk_index to corresponding beat based on timing
+                    chunk_duration = 5.0  # Default, will be updated below
+                    try:
+                        model_config = get_model_config(model)
+                        chunk_duration = model_config.get('actual_chunk_duration', 5.0)
+                    except Exception:
+                        pass
+                    
+                    chunk_start_time = chunk_index * chunk_duration
+                    beat_index = 0
+                    for i, beat in enumerate(beats):
+                        beat_start = beat.get('start', 0)
+                        beat_duration = beat.get('duration', 5)
+                        if chunk_start_time >= beat_start and chunk_start_time < beat_start + beat_duration:
+                            beat_index = i
+                            break
+                    
+                    # Use last beat if we've gone past all beats
+                    if beat_index >= len(beats):
+                        beat_index = len(beats) - 1
+                    
+                    if beat_index < len(beats):
+                        beat = beats[beat_index]
+                        prompt = beat.get('prompt', beat.get('prompt_template', ''))
             
             # Check if this chunk has versions tracked (for replaced/split chunks)
             versions = self.get_chunk_versions(video_id, chunk_index)
@@ -187,7 +195,7 @@ class ChunkManager:
             # Find beat that contains this chunk
             beat_info = None
             for beat in beats:
-                beat_start = beat.get('start_time', 0)
+                beat_start = beat.get('start', 0)
                 beat_duration = beat.get('duration', 0)
                 if beat_start <= chunk_start_time < beat_start + beat_duration:
                     beat_info = beat
@@ -195,7 +203,7 @@ class ChunkManager:
             
             # Use prompt from beat if not set from version
             if not prompt and beat_info:
-                prompt = beat_info.get('prompt', '')
+                prompt = beat_info.get('prompt') or beat_info.get('prompt_template', '')
             
             # Ensure chunk_url is set (fallback to chunk_urls array)
             if not chunk_url and chunk_index < len(chunk_urls):
@@ -254,28 +262,37 @@ class ChunkManager:
             
             current_selected = versions_data.get('current_selected', 'original')
             
-            # Get original prompt, model, and created_at from spec/beats if not in tracking
-            original_prompt = original_data.get('prompt')
-            original_model_value = original_data.get('model')
-            original_created_at = original_data.get('created_at')
+            # Get original prompt, model, and created_at from spec/beats
+            # Always try to populate from spec/beats, using tracking data as fallback
+            # Try phase_outputs first (where beats are actually stored), then fall back to video.spec
+            spec = video.spec or {}
+            phase_outputs = video.phase_outputs or {}
+            phase3_output = phase_outputs.get('phase3_chunks', {})
+            phase3_data = phase3_output.get('output_data', {})
+            phase3_spec = phase3_data.get('spec', {})
             
-            # If not in tracking, get from spec/beats
-            if not original_prompt or not original_model_value or not original_created_at:
-                spec = video.spec or {}
-                beats = spec.get('beats', [])
+            # Prefer beats from phase3 output, fallback to video.spec
+            beats = phase3_spec.get('beats', spec.get('beats', []))
+            
+            # Get model from spec or phase3 output first
+            # Use phase3_spec if available (already loaded above), otherwise use video.spec
+            original_model_value = original_data.get('model')
+            if not original_model_value:
+                original_model_value = phase3_spec.get('model', spec.get('model', 'hailuo_fast'))
+            
+            # Get prompt from beat (prefer beats over tracking)
+            original_prompt = None
+            if beats:
+                # Try simple 1:1 mapping first (chunk_index to beat_index)
+                if chunk_index < len(beats):
+                    beat = beats[chunk_index]
+                    original_prompt = beat.get('prompt') or beat.get('prompt_template')
+                    if original_prompt:
+                        logger.debug(f"Chunk {chunk_index}: Got prompt from beat {chunk_index}: '{original_prompt[:50]}...'")
                 
-                # Get model from spec or phase3 output
-                if not original_model_value:
-                    original_model_value = spec.get('model', 'hailuo_fast')
-                    phase_outputs = video.phase_outputs or {}
-                    phase3_output = phase_outputs.get('phase3_chunks', {})
-                    phase3_spec = phase3_output.get('output_data', {}).get('spec', {})
-                    if phase3_spec.get('model'):
-                        original_model_value = phase3_spec.get('model')
-                
-                # Get prompt from beat
-                if not original_prompt and beats:
-                    # Map chunk_index to corresponding beat
+                # If not found or empty, try timing-based mapping
+                if not original_prompt:
+                    # Map chunk_index to corresponding beat based on timing
                     chunk_duration = 5.0
                     try:
                         model_config = get_model_config(original_model_value)
@@ -297,17 +314,26 @@ class ChunkManager:
                     
                     if beat_index < len(beats):
                         beat = beats[beat_index]
-                        original_prompt = beat.get('prompt', beat.get('prompt_template', ''))
-                
-                # Get created_at from video or phase3 output
-                if not original_created_at:
-                    phase_outputs = video.phase_outputs or {}
-                    phase3_output = phase_outputs.get('phase3_chunks', {})
-                    phase3_completed_at = phase3_output.get('completed_at')
-                    if phase3_completed_at:
-                        original_created_at = phase3_completed_at
-                    elif video.created_at:
-                        original_created_at = video.created_at.isoformat() if hasattr(video.created_at, 'isoformat') else str(video.created_at)
+                        original_prompt = beat.get('prompt') or beat.get('prompt_template')
+                        if original_prompt:
+                            logger.debug(f"Chunk {chunk_index}: Got prompt from beat {beat_index} (timing-based): '{original_prompt[:50]}...'")
+            
+            # Fallback to tracking data if beats don't have prompt
+            if not original_prompt:
+                original_prompt = original_data.get('prompt')
+                if not original_prompt:
+                    logger.warning(f"Chunk {chunk_index}: Could not find prompt in beats or tracking. Beats available: {len(beats)}, beat sample: {beats[0] if beats else 'no beats'}")
+            
+            # Get created_at from video or phase3 output
+            original_created_at = original_data.get('created_at')
+            if not original_created_at:
+                phase_outputs = video.phase_outputs or {}
+                phase3_output = phase_outputs.get('phase3_chunks', {})
+                phase3_completed_at = phase3_output.get('completed_at')
+                if phase3_completed_at:
+                    original_created_at = phase3_completed_at
+                elif video.created_at:
+                    original_created_at = video.created_at.isoformat() if hasattr(video.created_at, 'isoformat') else str(video.created_at)
             
             # Only add original version if URL exists
             if original_url:
@@ -375,42 +401,49 @@ class ChunkManager:
             # If no versions found, ensure we at least have the chunk URL from chunk_urls
             if not versions and original_url:
                 # Get prompt, model, and created_at from spec/beats
+                # Use phase3_spec if available (where beats are actually stored), otherwise use video.spec
                 spec = video.spec or {}
-                beats = spec.get('beats', [])
-                
-                # Get model
-                model_value = spec.get('model', 'hailuo_fast')
                 phase_outputs = video.phase_outputs or {}
                 phase3_output = phase_outputs.get('phase3_chunks', {})
-                phase3_spec = phase3_output.get('output_data', {}).get('spec', {})
-                if phase3_spec.get('model'):
-                    model_value = phase3_spec.get('model')
+                phase3_data = phase3_output.get('output_data', {})
+                phase3_spec = phase3_data.get('spec', {})
                 
-                # Get prompt from beat
+                # Get model from phase3_spec or spec
+                model_value = phase3_spec.get('model', spec.get('model', 'hailuo_fast'))
+                
+                # Get prompt from beat (prefer phase3 beats)
+                beats_for_prompt = phase3_spec.get('beats', spec.get('beats', []))
                 prompt_value = None
-                if beats:
-                    chunk_duration = 5.0
-                    try:
-                        model_config = get_model_config(model_value)
-                        chunk_duration = model_config.get('actual_chunk_duration', 5.0)
-                    except Exception:
-                        pass
+                if beats_for_prompt:
+                    # Try simple 1:1 mapping first (chunk_index to beat_index)
+                    if chunk_index < len(beats_for_prompt):
+                        beat = beats_for_prompt[chunk_index]
+                        prompt_value = beat.get('prompt') or beat.get('prompt_template')
                     
-                    chunk_start_time = chunk_index * chunk_duration
-                    beat_index = 0
-                    for i, beat in enumerate(beats):
-                        beat_start = beat.get('start', 0)
-                        beat_duration = beat.get('duration', 5)
-                        if chunk_start_time >= beat_start and chunk_start_time < beat_start + beat_duration:
-                            beat_index = i
-                            break
-                    
-                    if beat_index >= len(beats):
-                        beat_index = len(beats) - 1
-                    
-                    if beat_index < len(beats):
-                        beat = beats[beat_index]
-                        prompt_value = beat.get('prompt', beat.get('prompt_template', ''))
+                    # If not found or empty, try timing-based mapping
+                    if not prompt_value:
+                        chunk_duration = 5.0
+                        try:
+                            model_config = get_model_config(model_value)
+                            chunk_duration = model_config.get('actual_chunk_duration', 5.0)
+                        except Exception:
+                            pass
+                        
+                        chunk_start_time = chunk_index * chunk_duration
+                        beat_index = 0
+                        for i, beat in enumerate(beats_for_prompt):
+                            beat_start = beat.get('start', 0)
+                            beat_duration = beat.get('duration', 5)
+                            if chunk_start_time >= beat_start and chunk_start_time < beat_start + beat_duration:
+                                beat_index = i
+                                break
+                        
+                        if beat_index >= len(beats_for_prompt):
+                            beat_index = len(beats_for_prompt) - 1
+                        
+                        if beat_index < len(beats_for_prompt):
+                            beat = beats_for_prompt[beat_index]
+                            prompt_value = beat.get('prompt') or beat.get('prompt_template')
                 
                 # Get created_at
                 created_at_value = None
