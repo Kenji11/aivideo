@@ -5,6 +5,7 @@ import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import {
   Dialog,
@@ -530,11 +531,12 @@ export function EditActions({
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="prompt">Prompt</Label>
-              <Input
+              <Textarea
                 id="prompt"
                 placeholder="Enter prompt for video generation"
                 value={newPrompt}
                 onChange={(e) => setNewPrompt(e.target.value)}
+                className="resize-y min-h-[80px]"
               />
               <p className="text-xs text-muted-foreground">
                 {selectedChunks.length === 1 
