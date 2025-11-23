@@ -129,11 +129,17 @@
 
 ### Tasks:
 
-0. [x] **CRITICAL**: Update `generate_beat_image()` to use composed prompts
-   - Changed: `base_prompt = beat.get('prompt_template', '')` 
-   - To: `base_prompt = beat.get('prompt', beat.get('prompt_template', ''))`
-   - Added logging to show which prompt source is being used
-   - This makes Phase 2 use the beautiful LLM-composed prompts from Phase 1!
+0. [x] **CRITICAL**: Update Phase 2 & Phase 3 to use composed prompts
+   - **Phase 2** (`image_generation.py` line 65):
+     - Changed: `base_prompt = beat.get('prompt_template', '')` 
+     - To: `base_prompt = beat.get('prompt', beat.get('prompt_template', ''))`
+     - Added logging to show which prompt source is being used
+   - **Phase 3** (`chunk_generator.py` line 239-243):
+     - Changed: `prompt_template = beat.get('prompt_template', '')`
+     - To: `prompt = beat.get('prompt', beat.get('prompt_template', ''))`
+     - Added template substitution fallback if placeholders exist
+     - Added logging for prompt source
+   - This makes both Phase 2 (storyboard) and Phase 3 (chunks) use the beautiful LLM-composed prompts from Phase 1!
 
 1. [x] Add closing beat detection in `generate_storyboard_image()`
    - After line 190 (reference_info extraction)
