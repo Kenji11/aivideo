@@ -534,14 +534,16 @@ Given the user's prompt, you must:
    - Duration: Extract desired duration (default 30s if not specified)
    - Brand: Extract company/brand name if explicitly mentioned (e.g., "Nike", "Apple", "Rolex")
    - Music: Extract music genre/mood if mentioned (e.g., "upbeat electronic", "cinematic orchestral", "hip-hop beats")
-   - Colors: Extract color scheme if mentioned (e.g., ["gold", "black"], ["red", "white", "blue"])
+   - Colors: Extract color scheme ONLY if user explicitly mentions colors/themes (e.g., "gold and black", "vibrant red")
+     * If mentioned: Extract as array (e.g., ["gold", "black"], ["red", "white", "blue"])
+     * If NOT mentioned: Leave as None - products should maintain natural appearance
    - Scene Requirements: Extract any specific scene descriptions user provided (e.g., "show watch on wrist in first scene")
    - Style Keywords: Identify style keywords, mood, energy level, key message
 
 2. **Infer Missing Elements**
    - If brand name NOT mentioned: Leave as None
    - If music NOT mentioned: Infer appropriate genre based on archetype and mood
-   - If colors NOT mentioned: Infer 3-5 color palette based on product category and style
+   - If colors NOT mentioned: Leave as None (DO NOT infer - products should maintain natural, true-to-life colors)
    - If scenes vague: You'll compose compelling scene descriptions in step 4
 
 3. **Select Archetype**
