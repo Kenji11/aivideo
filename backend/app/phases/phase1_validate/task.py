@@ -560,6 +560,13 @@ Given the user's prompt, you must:
      * Create narrative flow (reference previous/next beats for continuity)
      * Be highly detailed and specific (describe lighting, composition, movement, emotion)
      * Respect any scene_requirements the user specified for that beat
+     * Keep prompts under 40 words for optimal video generation performance
+     * **CRITICAL - PEOPLE CONSTRAINTS:**
+       - Maximum 1-2 people per scene (video models struggle with crowds)
+       - Use "a person" or "an athlete" - NOT "people", "individuals", "various", "group"
+       - Avoid phrases like "from different backgrounds", "various individuals", "multiple people"
+       - If showing variety, describe ONE person clearly (e.g., "a cyclist in motion" not "cyclists and runners")
+       - For montages: describe ONE clear moment, not multiple scenarios happening simultaneously
    - CRITICAL CONSTRAINTS:
      * Total duration MUST equal user's requested duration (or 30s default)
      * Each beat MUST be 5s, 10s, or 15s (NO other durations allowed)
@@ -577,6 +584,32 @@ Given the user's prompt, you must:
    - mood: single word mood (energetic|elegant|minimalist|emotional|informative)
    - lighting: lighting style description
    - Ensure style matches the archetype and user's keywords
+
+===== PROMPT ANTI-PATTERNS - AVOID THESE =====
+
+When composing beat prompts, NEVER use these patterns (they cause video generation failures):
+
+❌ BAD: "Various individuals from different backgrounds enjoying EnergyX during intense workouts and adventures"
+✅ GOOD: "A single athlete drinking EnergyX after a workout, energized expression, gym environment blurred in background"
+
+❌ BAD: "Quick cuts between scenes showcase cyclists, runners, and gym-goers, all smiling with energy"
+✅ GOOD: "A runner mid-stride reaches for EnergyX, dynamic motion blur, determination on face, outdoor trail setting"
+
+❌ BAD: "Group of friends celebrating with the product in various settings"
+✅ GOOD: "One person raising EnergyX can triumphantly, victorious expression, sunset lighting, mountain summit backdrop"
+
+❌ BAD: "Multiple people from diverse backgrounds interacting with the product in different scenarios"
+✅ GOOD: "A young professional using the product confidently, modern office visible in soft background blur"
+
+❌ BAD: "Showing the product in action with athletes, dancers, and everyday people"
+✅ GOOD: "An athlete in motion with the product, focused intensity, dramatic side lighting"
+
+Key Rules for Prompts:
+- Use singular nouns ("a person", "an athlete") never plural ("people", "athletes", "individuals")
+- Describe ONE clear action per beat, not multiple scenarios or quick cuts between scenes
+- Simple, specific backgrounds (not "various settings", "different locations", "diverse environments")
+- Avoid quantifiers: "various", "several", "multiple", "different backgrounds", "from all walks of life"
+- One clear emotion/expression per person (not "smiling, laughing, and celebrating")
 
 ===== VALIDATION CHECKLIST =====
 
