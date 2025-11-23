@@ -89,12 +89,13 @@ export function Preview() {
     fetchVideoData();
 
     // Cleanup on unmount
+    const video = videoRef.current;
     return () => {
       abortController.abort();
-      if (videoRef.current) {
-        videoRef.current.pause();
-        videoRef.current.src = '';
-        videoRef.current.load();
+      if (video) {
+        video.pause();
+        video.src = '';
+        video.load();
       }
     };
   }, [videoId]);
