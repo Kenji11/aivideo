@@ -74,7 +74,7 @@ def generate_beat_image(
     
     # Extract style information
     color_palette = style.get('color_palette', [])
-    colors_str = ', '.join(color_palette) if color_palette else 'neutral tones'
+    colors_str = ', '.join(color_palette) if color_palette else 'natural true-to-life colors'
     lighting = style.get('lighting', 'soft')
     aesthetic = style.get('aesthetic', 'cinematic')
     shot_type = beat.get('shot_type', 'medium')
