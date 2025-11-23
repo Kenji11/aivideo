@@ -22,16 +22,18 @@ export function ChunkPreview({ videoId, chunk, onVersionChange }: ChunkPreviewPr
 
   useEffect(() => {
     // Cleanup on unmount or when dependencies change
+    const video = videoRef.current;
+    const abortController = loadingAbortControllerRef.current;
     return () => {
       // Abort any in-flight requests
-      if (loadingAbortControllerRef.current) {
-        loadingAbortControllerRef.current.abort();
+      if (abortController) {
+        abortController.abort();
       }
       // Pause and clear video
-      if (videoRef.current) {
-        videoRef.current.pause();
-        videoRef.current.src = '';
-        videoRef.current.load();
+      if (video) {
+        video.pause();
+        video.src = '';
+        video.load();
       }
     };
   }, [selectedVersion, videoId, chunk.chunk_index]);
