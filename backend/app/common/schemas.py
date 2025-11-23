@@ -27,7 +27,7 @@ class GenerateRequest(BaseModel):
     description: Optional[str] = Field(None, max_length=2000)
     prompt: str = Field(..., min_length=10, max_length=1000)
     reference_assets: List[str] = Field(default_factory=list, description="List of asset IDs to use as references")
-    model: Optional[str] = Field(None, description="Video generation model to use (e.g., 'hailuo', 'kling', 'sora'). Defaults to 'hailuo'")
+    model: Optional[str] = Field(None, description="Video generation model to use (e.g., 'hailuo_fast', 'veo_fast', 'kling_25_pro'). Defaults to 'hailuo_fast'")
 
 class GenerateResponse(BaseModel):
     """Response from generate endpoint"""

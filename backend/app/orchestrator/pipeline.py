@@ -21,7 +21,7 @@ redis_client = RedisClient()
 
 
 @celery_app.task(bind=True, name="app.orchestrator.pipeline.run_pipeline")
-def run_pipeline(self, video_id: str, prompt: str, assets: list = None, model: str = 'hailuo'):
+def run_pipeline(self, video_id: str, prompt: str, assets: list = None, model: str = 'hailuo_fast'):
     """
     Main orchestration task - dispatches pipeline as Celery chain and returns immediately.
     Worker thread is freed to handle more videos concurrently.
@@ -33,7 +33,7 @@ def run_pipeline(self, video_id: str, prompt: str, assets: list = None, model: s
         video_id: Unique video generation ID
         prompt: User's video description
         assets: Optional list of uploaded assets
-        model: Video generation model to use (default: 'hailuo')
+        model: Video generation model to use (default: 'hailuo_fast')
         
     Returns:
         Dictionary with video_id, workflow_id, and status

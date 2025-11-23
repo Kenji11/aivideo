@@ -173,7 +173,6 @@ export function UploadVideo() {
               <SelectItem value="kling_21_1080p">Kling 2.1 (1080p)</SelectItem>
               <SelectItem value="kling_25_pro">Kling 2.5 Turbo Pro</SelectItem>
               <SelectItem value="minimax_video_01">Minimax Video-01 (Subject Reference)</SelectItem>
-              <SelectItem value="runway_gen4_turbo">Runway Gen-4 Turbo (Final Only)</SelectItem>
               <SelectItem value="runway">Runway Gen-2</SelectItem>
             </SelectContent>
           </Select>

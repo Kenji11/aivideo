@@ -8,7 +8,6 @@ export function getModelDisplayName(modelId: string | undefined | null): string 
   if (!modelId) return 'Unknown';
   
   const modelMap: Record<string, string> = {
-    'hailuo': 'Hailuo Fast',
     'hailuo_fast': 'Hailuo Fast',
     'hailuo_23': 'Hailuo 2.3',
     'veo_fast': 'Veo Fast',
@@ -93,7 +92,7 @@ export interface GenerateRequest {
   prompt: string;
   assets?: string[]; // For backward compatibility, can also be reference_assets
   reference_assets?: string[];
-  model?: string; // Video generation model to use (e.g., 'hailuo', 'kling', 'sora')
+  model?: string; // Video generation model to use (e.g., 'hailuo_fast', 'veo_fast', 'kling_25_pro')
 }
 
 export interface GenerateResponse {

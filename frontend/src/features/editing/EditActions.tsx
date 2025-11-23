@@ -43,7 +43,8 @@ export function EditActions({
   const [costEstimateDialogOpen, setCostEstimateDialogOpen] = useState(false);
   
   const [newPrompt, setNewPrompt] = useState('');
-  const [newModel, setNewModel] = useState('hailuo_fast');
+  const [newModel, setNewModel] = useState('veo_fast');
+  const [originalModel, setOriginalModel] = useState<string>('veo_fast');
   const [splitTime, setSplitTime] = useState<number | ''>('');
   const [splitMethod, setSplitMethod] = useState<'time' | 'percentage'>('time');
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null);
@@ -51,7 +52,7 @@ export function EditActions({
   const [isProcessing, setIsProcessing] = useState(false);
   const [splitInfo, setSplitInfo] = useState<{ is_split_part: boolean; part_number?: number; original_index?: number } | null>(null);
   
-  // Check if selected chunk is a split part
+  // Check if selected chunk is a split part and get original model
   useEffect(() => {
     const checkSplitInfo = async () => {
       if (selectedChunks.length === 1 && videoId) {
@@ -66,14 +67,28 @@ export function EditActions({
       }
     };
     
+    // Set original model from first selected chunk
+    if (selectedChunks.length > 0 && chunks.length > 0) {
+      const firstChunk = chunks[selectedChunks[0]];
+      if (firstChunk?.model) {
+        setOriginalModel(firstChunk.model);
+        setNewModel(firstChunk.model); // Default to the original model
+      }
+    }
+    
     checkSplitInfo();
-  }, [selectedChunks, videoId]);
+  }, [selectedChunks, videoId, chunks]);
 
   const models = [
-    { value: 'hailuo_fast', label: 'Hailuo Fast' },
-    { value: 'hailuo_23', label: 'Hailuo 2.3' },
-    { value: 'veo_fast', label: 'Veo Fast' },
-    { value: 'veo', label: 'Veo Standard' },
+    { value: 'veo_fast', label: 'Google Veo 3.1 Fast (Default)' },
+    { value: 'hailuo_fast', label: 'Minimax Hailuo 2.3 Fast' },
+    { value: 'veo', label: 'Google Veo 3.1' },
+    { value: 'hailuo_23', label: 'Minimax Hailuo 2.3' },
+    { value: 'kling_16_pro', label: 'Kling 1.6 Pro' },
+    { value: 'kling_21', label: 'Kling 2.1 (720p)' },
+    { value: 'kling_21_1080p', label: 'Kling 2.1 (1080p)' },
+    { value: 'kling_25_pro', label: 'Kling 2.5 Turbo Pro' },
+    { value: 'minimax_video_01', label: 'Minimax Video-01 (Subject Reference)' },
     { value: 'runway', label: 'Runway Gen-2' },
   ];
 
@@ -97,7 +112,7 @@ export function EditActions({
           action_type: 'replace',
           chunk_indices: selectedChunks,
           new_prompt: newPrompt || undefined,
-          new_model: newModel !== 'hailuo_fast' ? newModel : undefined,
+          new_model: newModel !== originalModel ? newModel : undefined,
           keep_original: true,
         },
       ];
@@ -112,7 +127,7 @@ export function EditActions({
 
       // Reset form
       setNewPrompt('');
-      setNewModel('hailuo_fast');
+      setNewModel(originalModel);
       setSplitTime(''); // Reset split time
       
       // Poll for completion
@@ -164,6 +179,47 @@ export function EditActions({
         variant: 'destructive',
         title: 'Error',
         description: error.message || 'Failed to delete chunks',
+      });
+      setIsProcessing(false);
+      onProcessingChange(false);
+    }
+  };
+
+  const handleUndoSplit = async () => {
+    if (selectedChunks.length !== 1) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid selection',
+        description: 'Please select exactly one chunk to undo split',
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    onProcessingChange(true);
+
+    try {
+      const actions: EditingAction[] = [
+        {
+          action_type: 'undo_split',
+          chunk_indices: selectedChunks,
+        },
+      ];
+
+      await api.submitEdits(videoId, { actions });
+      
+      toast({
+        variant: 'default',
+        title: 'Undo Split Started',
+        description: 'Merging split chunks back together...',
+      });
+
+      pollEditingStatus();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to undo split',
       });
       setIsProcessing(false);
       onProcessingChange(false);
@@ -475,10 +531,18 @@ export function EditActions({
                   {models.map((model) => (
                     <SelectItem key={model.value} value={model.value}>
                       {model.label}
+                      {model.value === originalModel && (
+                        <span className="text-xs text-muted-foreground ml-2">(Original)</span>
+                      )}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {newModel === originalModel && (
+                <p className="text-xs text-muted-foreground">
+                  Using the same model as original chunk
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
