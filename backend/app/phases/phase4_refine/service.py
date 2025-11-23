@@ -58,7 +58,7 @@ class RefinementService:
         
         try:
             # Check if model generates its own audio (Veo models have native audio)
-            video_model = spec.get('model', 'hailuo')
+            video_model = spec.get('model', 'hailuo_fast')
             model_has_native_audio = video_model in ['veo_fast', 'veo']
             
             # Step 1: Download stitched video from Phase 4

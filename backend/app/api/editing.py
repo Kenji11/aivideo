@@ -58,13 +58,14 @@ async def submit_edits(
         # If only estimating cost, return estimate
         if request.estimate_cost_only:
             editing_service = EditingService(db)
-            # Extract model from first replace action
-            model = 'hailuo'
+            # Extract model from first replace action, fallback to spec model or chunk metadata
+            model = video.spec.get('model', 'hailuo_fast') if video.spec else 'hailuo_fast'
             chunk_indices = []
             for action in request.actions:
                 if hasattr(action, 'action_type') and action.action_type.value == 'replace':
                     chunk_indices = action.chunk_indices
-                    model = action.new_model or 'hailuo'
+                    # If new_model is provided, use it; otherwise use spec model or fallback
+                    model = action.new_model or model
                     break
             
             if chunk_indices:
@@ -128,7 +129,7 @@ async def submit_edits(
 async def estimate_edit_cost(
     video_id: str,
     chunk_indices: str = Query(..., description="Comma-separated chunk indices"),
-    model: str = Query(default='hailuo'),
+    model: str = Query(default='hailuo_fast'),
     user_id: str = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> CostEstimate:

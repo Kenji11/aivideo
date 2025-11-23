@@ -58,7 +58,7 @@ Frontend (React) → FastAPI → Celery Workers → AI Services → S3 Storage
 ### Generation Time
 
 **30-second video:**
-- **With Phase 5**: ~8.4 minutes (hailuo) or ~6.4 minutes (Veo)
+- **With Phase 5**: ~8.4 minutes (hailuo_fast) or ~6.4 minutes (Veo)
 - **Breakdown**:
   - Phase 1: ~7 seconds
   - Phase 2: ~32 seconds (4 images)
@@ -70,9 +70,9 @@ Frontend (React) → FastAPI → Celery Workers → AI Services → S3 Storage
 **30-second video:**
 - Phase 1: $0.02 (GPT-4)
 - Phase 2: $0.10 (4 images × $0.025)
-- Phase 4: $0.24 (6 chunks × $0.04 for hailuo)
+- Phase 4: $0.24 (6 chunks × $0.04 for hailuo_fast)
 - Phase 5: $0.15 (MusicGen)
-- **Total**: ~$0.51 (hailuo) or ~$0.36 (Veo, no Phase 5)
+- **Total**: ~$0.51 (hailuo_fast) or ~$0.36 (Veo, no Phase 5)
 
 ## 🚀 Quick Start
 
@@ -128,7 +128,7 @@ curl -X POST http://localhost:8000/api/generate \
   -d '{
     "prompt": "Create a 30-second Nike sneaker ad, energetic style",
     "title": "Nike Ad",
-    "model": "hailuo"
+    "model": "hailuo_fast"
   }'
 
 # Response: {"video_id": "...", "status": "queued"}
@@ -183,15 +183,15 @@ AWS_REGION=us-east-2
 
 ### Model Selection
 
-Default model is `hailuo`. To change:
+Default model is `hailuo_fast`. To change:
 
 ```python
 # backend/app/phases/phase3_chunks/model_config.py
-DEFAULT_MODEL = 'hailuo'  # Change to 'veo_fast', 'veo', etc.
+DEFAULT_MODEL = 'hailuo_fast'  # Change to 'veo_fast', 'veo', etc.
 ```
 
 Available models:
-- `hailuo`: Hailuo 2.3 Fast (default, 5s chunks, $0.04/chunk)
+- `hailuo_fast`: Hailuo 2.3 Fast (default, 5s chunks, $0.04/chunk)
 - `veo_fast`: Google Veo 3.1 Fast (5s chunks, native audio)
 - `veo`: Google Veo 3.1 (5s chunks, native audio)
 - `wan`: Wan 2.1 (5s chunks, $0.45/chunk)
@@ -208,7 +208,7 @@ Content-Type: application/json
   "prompt": "Create a 30-second Nike ad",
   "title": "Nike Ad",
   "description": "Energetic lifestyle ad",
-  "model": "hailuo",
+  "model": "hailuo_fast",
   "reference_assets": ["asset_id_1", "asset_id_2"]
 }
 

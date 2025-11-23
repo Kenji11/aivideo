@@ -254,7 +254,7 @@ POST /api/generate
   {
     "prompt": "Create a 30-second Nike ad",
     "title": "Nike Ad",
-    "model": "hailuo"
+    "model": "hailuo_fast"
   }
   ↓
 FastAPI Handler (generate.py)
@@ -525,14 +525,14 @@ AWS_REGION=us-east-2
 - **Phase 2**: ~32 seconds (4 images × 8s)
 - **Phase 4**: ~5.5 minutes (6 chunks × 45s + stitching)
 - **Phase 5**: ~2 minutes (or skipped for Veo)
-- **Total**: ~8.4 minutes (hailuo) or ~6.4 minutes (Veo)
+- **Total**: ~8.4 minutes (hailuo_fast) or ~6.4 minutes (Veo)
 
 ### Cost per Video (30-second)
 - **Phase 1**: $0.02 (GPT-4)
 - **Phase 2**: $0.10 (4 images × $0.025)
-- **Phase 4**: $0.24 (6 chunks × $0.04 for hailuo)
+- **Phase 4**: $0.24 (6 chunks × $0.04 for hailuo_fast)
 - **Phase 5**: $0.15 (MusicGen)
-- **Total**: ~$0.51 (hailuo) or ~$0.36 (Veo, no Phase 5)
+- **Total**: ~$0.51 (hailuo_fast) or ~$0.36 (Veo, no Phase 5)
 
 ### Scalability
 - **Concurrent Users**: 1 per user (MVP)

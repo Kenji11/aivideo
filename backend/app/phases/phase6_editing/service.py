@@ -249,14 +249,6 @@ class EditingService:
             chunk_urls = video.chunk_urls or []
             beats = spec.get('beats', [])
             chunk_duration = spec.get('chunk_duration', 5.0)
-            model = new_model or spec.get('model', 'hailuo')
-            
-            # Get model config
-            model_config = get_model_config(model)
-            actual_chunk_duration = model_config.get('actual_chunk_duration', chunk_duration)
-            
-            # Calculate beat-to-chunk mapping
-            beat_to_chunk_map = calculate_beat_to_chunk_mapping(beats, actual_chunk_duration)
             
             new_chunk_urls = []
             total_cost = 0.0
@@ -270,11 +262,23 @@ class EditingService:
                 if not chunk_metadata:
                     continue
                 
+                # Determine which model to use for THIS chunk
+                # Priority: 1) new_model (user specified), 2) chunk's original model, 3) spec model
+                chunk_original_model = chunk_metadata.get('model', spec.get('model', 'hailuo_fast'))
+                model = new_model if new_model else chunk_original_model
+                
+                # Get model config for this specific chunk
+                model_config = get_model_config(model)
+                actual_chunk_duration = model_config.get('actual_chunk_duration', chunk_duration)
+                
+                # Calculate beat-to-chunk mapping
+                beat_to_chunk_map = calculate_beat_to_chunk_mapping(beats, actual_chunk_duration)
+                
                 # IMPORTANT: Track the original chunk as 'original' version BEFORE replacing
                 # This ensures users can switch back to the original version
                 original_url = chunk_urls[chunk_idx]
                 original_prompt_for_tracking = chunk_metadata['prompt']
-                original_model_for_tracking = chunk_metadata.get('model', spec.get('model', 'hailuo'))
+                original_model_for_tracking = chunk_original_model
                 
                 # Check if original version is already tracked
                 existing_versions = self.chunk_manager.get_chunk_versions(video_id, chunk_idx)
@@ -524,7 +528,7 @@ class EditingService:
                     break
             
             prompt = beat_info.get('prompt', '') if beat_info else ''
-            model = spec.get('model', 'hailuo')
+            model = spec.get('model', 'hailuo_fast')
             
             # Track original chunk as a version BEFORE splitting
             # This allows undo functionality

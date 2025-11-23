@@ -61,12 +61,12 @@ def edit_chunks(
             # If only estimating cost, return estimate
             if estimate_cost_only:
                 # Extract model from first replace action
-                model = 'hailuo'
+                model = 'hailuo_fast'
                 chunk_indices = []
                 for action in actions:
                     if action.get('action_type') == 'replace':
                         chunk_indices = action.get('chunk_indices', [])
-                        model = action.get('new_model', 'hailuo')
+                        model = action.get('new_model', 'hailuo_fast')
                         break
                 
                 if chunk_indices:
