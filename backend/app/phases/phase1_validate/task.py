@@ -218,6 +218,16 @@ def plan_with_gpt4o_mini(
     logger.info(f"   LLM selected archetype: {llm_output.selected_archetype}")
     logger.info(f"   LLM composed {len(llm_output.beat_sequence)} beats")
     
+    # Log extracted/inferred fields
+    if llm_output.brand_name:
+        logger.info(f"   Brand name: {llm_output.brand_name}")
+    if llm_output.music_theme:
+        logger.info(f"   Music theme: {llm_output.music_theme}")
+    if llm_output.color_scheme:
+        logger.info(f"   Color scheme: {llm_output.color_scheme}")
+    if llm_output.scene_requirements:
+        logger.info(f"   Scene requirements: {len(llm_output.scene_requirements)} beats have specific requirements")
+    
     # Extract reference_mapping if present
     reference_mapping = llm_output_dict.get('reference_mapping', {})
     if reference_mapping:
@@ -317,6 +327,16 @@ def plan_with_gpt4_turbo(
     # Log planning results
     logger.info(f"   LLM selected archetype: {llm_output_dict.get('selected_archetype')}")
     logger.info(f"   LLM composed {len(llm_output_dict.get('beat_sequence', []))} beats")
+    
+    # Log extracted/inferred fields
+    if llm_output_dict.get('brand_name'):
+        logger.info(f"   Brand name: {llm_output_dict['brand_name']}")
+    if llm_output_dict.get('music_theme'):
+        logger.info(f"   Music theme: {llm_output_dict['music_theme']}")
+    if llm_output_dict.get('color_scheme'):
+        logger.info(f"   Color scheme: {llm_output_dict['color_scheme']}")
+    if llm_output_dict.get('scene_requirements'):
+        logger.info(f"   Scene requirements: {len(llm_output_dict['scene_requirements'])} beats have specific requirements")
     
     # Extract reference_mapping if present
     reference_mapping = llm_output_dict.get('reference_mapping', {})
@@ -509,17 +529,37 @@ def build_gpt4_system_prompt(reference_context: dict = None) -> str:
 
 Given the user's prompt, you must:
 
-1. **Understand Intent**
-   - Extract: product name, category, desired duration (default 30s if not specified)
-   - Identify: style keywords, mood, energy level, key message
+1. **Extract User Intent**
+   - Product: Extract product name, category
+   - Duration: Extract desired duration (default 30s if not specified)
+   - Brand: Extract company/brand name if explicitly mentioned (e.g., "Nike", "Apple", "Rolex")
+   - Music: Extract music genre/mood if mentioned (e.g., "upbeat electronic", "cinematic orchestral", "hip-hop beats")
+   - Colors: Extract color scheme ONLY if user explicitly mentions colors/themes (e.g., "gold and black", "vibrant red")
+     * If mentioned: Extract as array (e.g., ["gold", "black"], ["red", "white", "blue"])
+     * If NOT mentioned: Leave as None - products should maintain natural appearance
+   - Scene Requirements: Extract any specific scene descriptions user provided (e.g., "show watch on wrist in first scene")
+   - Style Keywords: Identify style keywords, mood, energy level, key message
 
-2. **Select Archetype**
+2. **Infer Missing Elements**
+   - If brand name NOT mentioned: Leave as None
+   - If music NOT mentioned: Infer appropriate genre based on archetype and mood
+   - If colors NOT mentioned: Leave as None (DO NOT infer - products should maintain natural, true-to-life colors)
+   - If scenes vague: You'll compose compelling scene descriptions in step 4
+
+3. **Select Archetype**
    - Choose the archetype that best matches the product, mood, and style
    - Consider: product category, style keywords, desired energy level
    - You can choose ANY archetype from the library above
 
-3. **Compose Beat Sequence**
+4. **Compose Beat Sequence with Full Prompts**
    - Use beats from the library to create a compelling narrative
+   - For EACH beat, compose a FULL scene description (1-2 sentences) in the `composed_prompt` field
+   - DON'T just use the beat's prompt_template - compose complete, detailed scene descriptions
+   - Each composed_prompt should:
+     * Incorporate: product name, style aesthetic, color scheme, mood, beat's shot_type and camera_movement
+     * Create narrative flow (reference previous/next beats for continuity)
+     * Be highly detailed and specific (describe lighting, composition, movement, emotion)
+     * Respect any scene_requirements the user specified for that beat
    - CRITICAL CONSTRAINTS:
      * Total duration MUST equal user's requested duration (or 30s default)
      * Each beat MUST be 5s, 10s, or 15s (NO other durations allowed)
@@ -531,9 +571,9 @@ Given the user's prompt, you must:
    - Maintain appropriate energy_curve
    - Ensure beat_ids match exactly those in the AVAILABLE BEATS library
 
-4. **Build Style Specification**
+5. **Build Style Specification**
    - Define: aesthetic (string describing overall visual style)
-   - color_palette: array of 3-5 color names
+   - color_palette: array of 3-5 color names. Use extracted/inferred colors (3-5 color names)
    - mood: single word mood (energetic|elegant|minimalist|emotional|informative)
    - lighting: lighting style description
    - Ensure style matches the archetype and user's keywords

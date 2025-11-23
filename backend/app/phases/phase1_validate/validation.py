@@ -82,6 +82,41 @@ def validate_spec(spec: dict) -> None:
                 f"Consider using: {', '.join(CLOSING_BEATS.keys())}"
             )
     
+    # Check 5: Validate composed_prompt exists in each beat
+    for beat in beats:
+        if 'prompt' not in beat or not beat['prompt']:
+            logger.warning(
+                f"Beat '{beat.get('beat_id')}' missing 'prompt' field. "
+                f"This may cause issues in Phase 2 generation."
+            )
+        elif len(beat['prompt']) < 10:
+            logger.warning(
+                f"Beat '{beat.get('beat_id')}' has very short prompt ({len(beat['prompt'])} chars). "
+                f"Prompts should be detailed (2-3 sentences recommended)."
+            )
+    
+    # Check 6: Validate music_theme if provided
+    if spec.get('music_theme'):
+        music_theme = spec['music_theme']
+        if not music_theme.strip():
+            logger.warning("music_theme is empty string (should be None or valid genre/mood)")
+        elif len(music_theme) > 100:
+            logger.warning(f"music_theme is very long ({len(music_theme)} chars). Should be concise genre/mood.")
+        else:
+            logger.info(f"✓ Music theme: {music_theme}")
+    
+    # Check 7: Validate color_scheme if provided
+    if spec.get('color_scheme'):
+        color_scheme = spec['color_scheme']
+        if not isinstance(color_scheme, list):
+            logger.warning(f"color_scheme should be a list, got {type(color_scheme)}")
+        elif len(color_scheme) < 2:
+            logger.warning(f"color_scheme has only {len(color_scheme)} color(s). Recommend 3-5 colors.")
+        elif len(color_scheme) > 7:
+            logger.warning(f"color_scheme has {len(color_scheme)} colors. Too many - recommend 3-5.")
+        else:
+            logger.info(f"✓ Color scheme: {color_scheme}")
+    
     logger.info(f"✅ Spec validation passed: {len(beats)} beats, {duration}s total")
 
 
@@ -184,18 +219,26 @@ def build_full_spec(llm_output: dict, video_id: str) -> dict:
             "duration": duration  # Override with requested duration
         }
         
-        # Fill in prompt template with actual product/style
-        # Handle {product_name}, {style_aesthetic}, {setting} placeholders
-        beat['prompt_template'] = beat['prompt_template'].format(
-            product_name=intent['product']['name'],
-            style_aesthetic=style['aesthetic'],
-            setting=f"{style['mood']} setting"
-        )
+        # Use composed_prompt from LLM if available (NEW approach)
+        # Otherwise fallback to template substitution (backward compatibility)
+        if 'composed_prompt' in beat_info and beat_info['composed_prompt']:
+            beat['prompt'] = beat_info['composed_prompt']
+            logger.info(f"   Using LLM-composed prompt for beat '{beat_id}'")
+        else:
+            # Fallback: Fill in prompt template with actual product/style
+            # Handle {product_name}, {style_aesthetic}, {setting} placeholders
+            beat['prompt_template'] = beat['prompt_template'].format(
+                product_name=intent['product']['name'],
+                style_aesthetic=style['aesthetic'],
+                setting=f"{style['mood']} setting"
+            )
+            beat['prompt'] = beat['prompt_template']
+            logger.warning(f"   Using template fallback for beat '{beat_id}' (composed_prompt missing)")
         
         full_beats.append(beat)
         current_time += duration
     
-    # Assemble final spec
+    # Assemble final spec with new extracted fields
     spec = {
         "template": llm_output['selected_archetype'],
         "duration": current_time,
@@ -204,6 +247,11 @@ def build_full_spec(llm_output: dict, video_id: str) -> dict:
         "product": intent['product'],
         "style": style,
         "beats": full_beats,
+        # NEW: Add extracted/inferred fields from LLM
+        "brand_name": llm_output.get('brand_name'),
+        "music_theme": llm_output.get('music_theme'),
+        "color_scheme": llm_output.get('color_scheme'),
+        "scene_requirements": llm_output.get('scene_requirements'),
         "llm_reasoning": {
             "selected_archetype": llm_output['selected_archetype'],
             "archetype_reasoning": llm_output.get('archetype_reasoning', ''),
