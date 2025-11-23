@@ -32,7 +32,8 @@ export function Projects() {
   }, []);
 
   const handleProjectSelect = (project: VideoListItem) => {
-    if (project.status === 'complete' && project.final_video_url) {
+    // If there's a final video URL, navigate to preview (even for failed status)
+    if (project.final_video_url) {
       navigate(`/preview/${project.video_id}`);
     } else if (project.status !== 'complete' && project.status !== 'failed') {
       navigate(`/processing/${project.video_id}`);
