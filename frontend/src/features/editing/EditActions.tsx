@@ -431,7 +431,14 @@ export function EditActions({
 
           {/* Replace */}
           <Button
-            onClick={() => setReplaceDialogOpen(true)}
+            onClick={() => {
+              // Initialize prompt with original prompt from first selected chunk
+              if (selectedChunks.length > 0 && chunks.length > 0) {
+                const firstChunk = chunks[selectedChunks[0]];
+                setNewPrompt(firstChunk?.prompt || '');
+              }
+              setReplaceDialogOpen(true);
+            }}
             disabled={isProcessing}
             className="w-full flex items-center gap-2"
             variant="default"
@@ -502,7 +509,17 @@ export function EditActions({
       )}
 
       {/* Replace Dialog */}
-      <Dialog open={replaceDialogOpen} onOpenChange={setReplaceDialogOpen}>
+      <Dialog 
+        open={replaceDialogOpen} 
+        onOpenChange={(open) => {
+          setReplaceDialogOpen(open);
+          // Reset prompt when dialog closes without saving
+          if (!open && selectedChunks.length > 0 && chunks.length > 0) {
+            const firstChunk = chunks[selectedChunks[0]];
+            setNewPrompt(firstChunk?.prompt || '');
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Replace Chunks</DialogTitle>
@@ -512,13 +529,18 @@ export function EditActions({
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="prompt">New Prompt (optional)</Label>
+              <Label htmlFor="prompt">Prompt</Label>
               <Input
                 id="prompt"
-                placeholder="Leave empty to use original prompt"
+                placeholder="Enter prompt for video generation"
                 value={newPrompt}
                 onChange={(e) => setNewPrompt(e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">
+                {selectedChunks.length === 1 
+                  ? 'Edit the prompt to generate a new version of this chunk'
+                  : `This prompt will be applied to all ${selectedChunks.length} selected chunks`}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="model">Model</Label>
