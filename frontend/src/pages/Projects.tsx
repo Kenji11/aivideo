@@ -61,6 +61,10 @@ export function Projects() {
     }
   };
 
+  const handleEdit = (project: VideoListItem) => {
+    navigate(`/video/${project.video_id}/edit`);
+  };
+
   const confirmDelete = async () => {
     if (!videoToDelete) return;
     
@@ -138,6 +142,7 @@ export function Projects() {
                 onSelect={handleProjectSelect}
                 onDelete={handleDeleteProject}
                 onDownload={handleDownload}
+                onEdit={handleEdit}
               />
             ))}
           </div>
