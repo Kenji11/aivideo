@@ -44,18 +44,6 @@ export function ProjectCard({ project, onSelect, onDelete, onDownload, onEdit }:
     };
   }, []);
 
-  const handleClick = () => {
-    // Clean up video before navigation to prevent abort errors
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.src = '';
-    }
-    // Small delay to allow cleanup
-    setTimeout(() => {
-      onSelect?.(project);
-    }, 50);
-  };
-
   // Determine navigation route based on status
   const getVideoRoute = () => {
     // If there's a final video URL, allow preview (even for failed status)
@@ -74,7 +62,7 @@ export function ProjectCard({ project, onSelect, onDelete, onDownload, onEdit }:
       <Link
         to={videoRoute}
         className="block"
-        onClick={(e) => {
+        onClick={() => {
           // Clean up video before navigation to prevent abort errors
           if (videoRef.current) {
             videoRef.current.pause();
@@ -124,11 +112,11 @@ export function ProjectCard({ project, onSelect, onDelete, onDownload, onEdit }:
                     e.currentTarget.pause();
                     e.currentTarget.currentTime = 0;
                   }}
-                  onError={(e) => {
+                  onError={() => {
                     // Silently handle video errors
-                    console.debug('ProjectCard video error (expected when navigating):', e);
+                    console.debug('ProjectCard video error (expected when navigating)');
                   }}
-                  onAbort={(e) => {
+                  onAbort={() => {
                     // Silently handle abort (expected when navigating)
                     console.debug('ProjectCard video aborted (expected when navigating)');
                   }}
@@ -151,11 +139,11 @@ export function ProjectCard({ project, onSelect, onDelete, onDownload, onEdit }:
                   e.currentTarget.pause();
                   e.currentTarget.currentTime = 0;
                 }}
-                onError={(e) => {
+                onError={() => {
                   // Silently handle video errors
-                  console.debug('ProjectCard video error (expected when navigating):', e);
+                  console.debug('ProjectCard video error (expected when navigating)');
                 }}
-                onAbort={(e) => {
+                onAbort={() => {
                   // Silently handle abort (expected when navigating)
                   console.debug('ProjectCard video aborted (expected when navigating)');
                 }}
@@ -192,7 +180,7 @@ export function ProjectCard({ project, onSelect, onDelete, onDownload, onEdit }:
         <Link
           to={videoRoute}
           className="block hover:text-primary transition-colors"
-          onClick={(e) => {
+          onClick={() => {
             if (onSelect) {
               onSelect(project);
             }

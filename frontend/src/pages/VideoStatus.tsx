@@ -5,6 +5,7 @@ import { ProcessingSteps } from '../components/ProcessingSteps';
 import { NotificationCenter, Notification } from '../components/NotificationCenter';
 import { StatusResponse } from '../lib/api';
 import { useVideoStatusStream } from '../lib/useVideoStatusStream';
+import { getPlaceholderImage } from '../lib/utils';
 
 export function VideoStatus() {
   const navigate = useNavigate();
@@ -68,7 +69,7 @@ export function VideoStatus() {
   };
 
   // Use SSE stream for real-time status updates (with automatic fallback to polling)
-  const { status: streamStatus, error: streamError, isConnected } = useVideoStatusStream(
+  const { status: streamStatus, error: streamError } = useVideoStatusStream(
     videoId || null,
     isProcessing
   );
@@ -270,7 +271,7 @@ export function VideoStatus() {
                         }`}
                         onClick={() => window.open(url, '_blank')}
                         onError={(e) => {
-                          e.currentTarget.src = 'https://via.placeholder.com/200x200?text=Image+Not+Available';
+                          e.currentTarget.src = getPlaceholderImage(200, 200, 'Image Not Available');
                         }}
                       />
                       {isProcessingChunk && (
@@ -313,7 +314,7 @@ export function VideoStatus() {
                     alt="Style Guide"
                     className="w-full h-48 object-cover rounded-lg border border-border"
                     onError={(e) => {
-                      e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Style+Guide';
+                      e.currentTarget.src = getPlaceholderImage(400, 400, 'Style Guide');
                     }}
                   />
                 </div>
@@ -326,7 +327,7 @@ export function VideoStatus() {
                     alt="Product Reference"
                     className="w-full h-48 object-cover rounded-lg border border-border"
                     onError={(e) => {
-                      e.currentTarget.src = 'https://via.placeholder.com/400x400?text=Product+Reference';
+                      e.currentTarget.src = getPlaceholderImage(400, 400, 'Product Reference');
                     }}
                   />
                 </div>
@@ -345,7 +346,7 @@ export function VideoStatus() {
                       alt={`Uploaded asset ${idx + 1}`}
                       className="w-full h-24 object-cover rounded border border-border"
                       onError={(e) => {
-                        e.currentTarget.src = 'https://via.placeholder.com/200x200?text=Asset';
+                        e.currentTarget.src = getPlaceholderImage(200, 200, 'Asset');
                       }}
                     />
                   ))}
