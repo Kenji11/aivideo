@@ -84,6 +84,34 @@ class ChunkManager:
             prompt = ''
             cost = 0.0
             
+            # Get prompt from beat if available
+            if beats:
+                # Map chunk_index to corresponding beat
+                # Calculate which beat this chunk corresponds to based on timing
+                chunk_duration = 5.0  # Default, will be updated below
+                try:
+                    model_config = get_model_config(model)
+                    chunk_duration = model_config.get('actual_chunk_duration', 5.0)
+                except Exception:
+                    pass
+                
+                chunk_start_time = chunk_index * chunk_duration
+                beat_index = 0
+                for i, beat in enumerate(beats):
+                    beat_start = beat.get('start', 0)
+                    beat_duration = beat.get('duration', 5)
+                    if chunk_start_time >= beat_start and chunk_start_time < beat_start + beat_duration:
+                        beat_index = i
+                        break
+                
+                # Use last beat if we've gone past all beats
+                if beat_index >= len(beats):
+                    beat_index = len(beats) - 1
+                
+                if beat_index < len(beats):
+                    beat = beats[beat_index]
+                    prompt = beat.get('prompt', beat.get('prompt_template', ''))
+            
             # Check if this chunk has versions tracked (for replaced/split chunks)
             versions = self.get_chunk_versions(video_id, chunk_index)
             if versions:
@@ -226,15 +254,70 @@ class ChunkManager:
             
             current_selected = versions_data.get('current_selected', 'original')
             
+            # Get original prompt, model, and created_at from spec/beats if not in tracking
+            original_prompt = original_data.get('prompt')
+            original_model_value = original_data.get('model')
+            original_created_at = original_data.get('created_at')
+            
+            # If not in tracking, get from spec/beats
+            if not original_prompt or not original_model_value or not original_created_at:
+                spec = video.spec or {}
+                beats = spec.get('beats', [])
+                
+                # Get model from spec or phase3 output
+                if not original_model_value:
+                    original_model_value = spec.get('model', 'hailuo_fast')
+                    phase_outputs = video.phase_outputs or {}
+                    phase3_output = phase_outputs.get('phase3_chunks', {})
+                    phase3_spec = phase3_output.get('output_data', {}).get('spec', {})
+                    if phase3_spec.get('model'):
+                        original_model_value = phase3_spec.get('model')
+                
+                # Get prompt from beat
+                if not original_prompt and beats:
+                    # Map chunk_index to corresponding beat
+                    chunk_duration = 5.0
+                    try:
+                        model_config = get_model_config(original_model_value)
+                        chunk_duration = model_config.get('actual_chunk_duration', 5.0)
+                    except Exception:
+                        pass
+                    
+                    chunk_start_time = chunk_index * chunk_duration
+                    beat_index = 0
+                    for i, beat in enumerate(beats):
+                        beat_start = beat.get('start', 0)
+                        beat_duration = beat.get('duration', 5)
+                        if chunk_start_time >= beat_start and chunk_start_time < beat_start + beat_duration:
+                            beat_index = i
+                            break
+                    
+                    if beat_index >= len(beats):
+                        beat_index = len(beats) - 1
+                    
+                    if beat_index < len(beats):
+                        beat = beats[beat_index]
+                        original_prompt = beat.get('prompt', beat.get('prompt_template', ''))
+                
+                # Get created_at from video or phase3 output
+                if not original_created_at:
+                    phase_outputs = video.phase_outputs or {}
+                    phase3_output = phase_outputs.get('phase3_chunks', {})
+                    phase3_completed_at = phase3_output.get('completed_at')
+                    if phase3_completed_at:
+                        original_created_at = phase3_completed_at
+                    elif video.created_at:
+                        original_created_at = video.created_at.isoformat() if hasattr(video.created_at, 'isoformat') else str(video.created_at)
+            
             # Only add original version if URL exists
             if original_url:
                 versions.append(ChunkVersion(
                     version_id='original',
                     url=original_url,
-                    prompt=original_data.get('prompt'),
-                    model=original_data.get('model'),
+                    prompt=original_prompt,
+                    model=original_model_value,
                     cost=original_data.get('cost'),
-                    created_at=original_data.get('created_at'),
+                    created_at=original_created_at,
                     is_selected=(current_selected == 'original')
                 ))
             
@@ -291,13 +374,59 @@ class ChunkManager:
             
             # If no versions found, ensure we at least have the chunk URL from chunk_urls
             if not versions and original_url:
+                # Get prompt, model, and created_at from spec/beats
+                spec = video.spec or {}
+                beats = spec.get('beats', [])
+                
+                # Get model
+                model_value = spec.get('model', 'hailuo_fast')
+                phase_outputs = video.phase_outputs or {}
+                phase3_output = phase_outputs.get('phase3_chunks', {})
+                phase3_spec = phase3_output.get('output_data', {}).get('spec', {})
+                if phase3_spec.get('model'):
+                    model_value = phase3_spec.get('model')
+                
+                # Get prompt from beat
+                prompt_value = None
+                if beats:
+                    chunk_duration = 5.0
+                    try:
+                        model_config = get_model_config(model_value)
+                        chunk_duration = model_config.get('actual_chunk_duration', 5.0)
+                    except Exception:
+                        pass
+                    
+                    chunk_start_time = chunk_index * chunk_duration
+                    beat_index = 0
+                    for i, beat in enumerate(beats):
+                        beat_start = beat.get('start', 0)
+                        beat_duration = beat.get('duration', 5)
+                        if chunk_start_time >= beat_start and chunk_start_time < beat_start + beat_duration:
+                            beat_index = i
+                            break
+                    
+                    if beat_index >= len(beats):
+                        beat_index = len(beats) - 1
+                    
+                    if beat_index < len(beats):
+                        beat = beats[beat_index]
+                        prompt_value = beat.get('prompt', beat.get('prompt_template', ''))
+                
+                # Get created_at
+                created_at_value = None
+                phase3_completed_at = phase3_output.get('completed_at')
+                if phase3_completed_at:
+                    created_at_value = phase3_completed_at
+                elif video.created_at:
+                    created_at_value = video.created_at.isoformat() if hasattr(video.created_at, 'isoformat') else str(video.created_at)
+                
                 versions.append(ChunkVersion(
                     version_id='original',
                     url=original_url,
-                    prompt=None,
-                    model=None,
+                    prompt=prompt_value,
+                    model=model_value,
                     cost=None,
-                    created_at=None,
+                    created_at=created_at_value,
                     is_selected=True
                 ))
             
