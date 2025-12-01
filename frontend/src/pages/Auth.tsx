@@ -83,8 +83,9 @@ export function Auth({ onAuthSuccess }: AuthProps) {
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-primary to-primary/80 rounded-3xl mb-6 shadow-xl">
-            <Film className="w-11 h-11 text-white" />
+          <div className="relative inline-flex items-center justify-center w-40 h-40 mb-6">
+            <Film className="w-24 h-24 text-primary" />
+            <div className="absolute inset-0 bg-primary/20 rounded-xl blur-lg" />
           </div>
           <h1 className="text-4xl font-bold text-foreground mb-3">VideoAI Studio</h1>
           <p className="text-lg text-muted-foreground">Create professional videos with AI</p>
