@@ -83,7 +83,7 @@ export function Auth({ onAuthSuccess }: AuthProps) {
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="relative inline-flex items-center justify-center w-40 h-40 mb-6">
+          <div className="relative inline-flex items-center justify-center w-40 h-40">
             <Film className="w-24 h-24 text-primary" />
             <div className="absolute inset-0 bg-primary/20 rounded-xl blur-lg" />
           </div>
