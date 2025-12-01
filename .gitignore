@@ -180,6 +180,8 @@ frontend/.netlify/
 secrets.json
 credentials.json
 serviceAccount.json
+firebase-credentials.json
+*-credentials.json
 
 # Video Generation Outputs (local testing)
 videos/
