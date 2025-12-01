@@ -203,6 +203,9 @@ generated_images/
 *.webp
 *.svg
 
+# Allow favicon
+!frontend/public/favicon.png
+
 # Audio Outputs (local testing)
 audio/
 generated_audio/
